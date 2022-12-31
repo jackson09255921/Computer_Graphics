@@ -1,0 +1,19 @@
+500 500
+
+object bench.obj
+
+observer 10 10 -10 0 0 0 0 1 1000 10
+
+viewport -.5 .5 -.5 .5
+
+display
+
+observer -10 10 10 0 0 0 0 1 1000 10
+
+display
+
+observer 2 2 -2 0 0 0 0 1 1000 10
+
+display
+
+end

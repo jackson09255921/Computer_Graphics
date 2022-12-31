@@ -1,0 +1,21 @@
+900 900
+
+
+rotate 0 30 0
+object Elon_Musk_head.obj
+
+observer 0 0 10 0 0 0 0 0.1 1000 15
+
+
+viewport -1 1 -1 1
+
+display
+
+reset
+object mona.obj
+
+observer 0 100 250 0 100 0 0 0.1 1000 15
+
+display
+
+end

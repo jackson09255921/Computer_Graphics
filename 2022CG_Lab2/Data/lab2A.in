@@ -1,0 +1,46 @@
+
+
+
+reset
+scale 2 2
+rotate 220.0
+triangle
+
+reset
+scale 2 2
+rotate 80.0
+translate 2 2
+triangle
+
+view -6.0 6.0 -6.0 6.0 200.0 600.0 200.0 600.0
+
+# clear data and screen
+clearData
+clearScreen
+
+# create a square and its transformation
+reset
+scale 2.0 2.0
+rotate 45.0
+translate 10.0 10.0
+square
+
+# create a triangle and its transformation
+reset
+translate 5.0 5.0
+scale 0.5 0.5
+rotate 20.0
+triangle
+
+# 2 non-overlapping viewports
+view 0.0 20.0 0.0 20.0 100.0 200.0  100.0 200.0
+view 0.0 20.0 0.0 20.0 210.0 600.0 210.0 600.0
+
+# clear the openGL window
+clearScreen
+
+# display the world in one viewport
+view 0.0 10.0 0.0 10.0 200.0 600.0  200.0 600.0
+
+
+end

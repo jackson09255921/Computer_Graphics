@@ -1,0 +1,17 @@
+800 800
+
+translate 0.4 -0.4 0.2
+rotate 30 40 0
+
+ambient 0.4 0.4 0.4
+viewport -1 1 -1 1
+background 0.2 0.0 0.2
+
+light 1 0.7 0.7 0.7 100.0 100.0 1000.0
+
+object vtuber.obj 0.6 0.5 0.9 0.75 0.9  1
+
+observer 0 0 5 0 0 0 0 .1 1000 15
+display
+
+end

@@ -1,0 +1,70 @@
+400 400
+
+reset
+rotate 50 60 220
+object cube.obj 
+
+reset
+translate 0 1 0
+rotate 50 60 220
+
+object cube.obj 
+
+reset
+translate 1 0 0
+rotate 50 60 220
+
+object cube.obj 
+
+reset
+translate 0 0 1
+rotate 50 60 220
+
+object cube.obj 
+
+## 2
+
+reset
+translate 0 0 2
+rotate 50 60 220
+
+object cube.obj 
+
+reset
+translate 2 0 0
+rotate 50 60 220
+
+object cube.obj 
+
+reset
+translate 0 2 0
+rotate 50 60 220
+
+object cube.obj 
+
+reset
+translate 0 1 1
+rotate 50 60 220
+
+object cube.obj 
+
+reset
+translate 1 0 1
+rotate 50 60 220
+
+object cube.obj 
+
+reset
+translate 1 1 0
+rotate 50 60 220
+
+object cube.obj 
+
+
+viewport -.8 .8 -.8 .8
+
+observer 5 5 5 0 0 0 0 .1 1000 15
+
+display
+
+end
