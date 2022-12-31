@@ -1,9 +1,15 @@
 1.這次的Exe檔有三個，windows真的超慢，已經放棄什麼優化程式碼了。
 給助教看數據有在動而不是carsh。
-(1)lab4_Flat 為Flat shading (lab4_FlatnoData 為不會顯示執行狀況的 Flat shading)
-()lab4_Phong 為Phong shading(大概八，看起有點不像，也有可能Grouaund shading)
+(1)Lab4_Flat.exe    為Flat shading。
+(2)Lab4_Gouraud.exe 為Gouraud shading。
+(3)Lab4_Phong.exe   為Phong shading。
 
-2.另外有兩份對應的專案檔
+
+
+2.另外有僅有一份的專案檔
+其中第17行程式碼為Shading控制器，需要的Shading請設定為1，"其餘設為0"
+(否則出事別怪我喔 嘿嘿~)
+
 3.Exe檔操作說明
 (1)執行檔請用./檔名.exe lab4X.in做輸入
 (2) 出現請按任一件繼續，點擊鍵盤任意鍵

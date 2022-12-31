@@ -11,8 +11,15 @@
 
 using namespace std;
 
-string FILE_NAME = "lab4C.in";
+string FILE_NAME = "lab4A.in";
 
+// Lab4 shading controler
+vector<bool> Doshading = {0,0,1};
+// shading bottom (Flat, Gouraud, Phong)
+
+bool Do_flat_shading = false;
+bool Do_Phong_shading = true;
+bool Do_gouraud_shading = false;
 
 int window;
 void display();
@@ -73,6 +80,7 @@ public:
     vector<double> coefficent;
     vector<vector<double>> pos;
     vector<double> colors;
+    vector <double> normal;
 };
 
 void clearData();
@@ -149,7 +157,7 @@ int main(int argc, char* argv[]) {
     system("pause"); //視窗保留
 
     /*----------------------匯入檔案-----------------------------*/
-    /*cout << argv[1] << endl;
+    cout << argv[1] << endl;
     string s = argv[1];
     string delimiter = "\\";
     size_t pos = 0;
@@ -158,10 +166,10 @@ int main(int argc, char* argv[]) {
         token = s.substr(0, pos);
         s.erase(0, pos + delimiter.length());
     }
-    FILE_NAME = s;*/
+     FILE_NAME = s;
 
 
-    string s = ".\\Data\\" + FILE_NAME;
+     s = ".\\Data\\" + FILE_NAME;
 
     ifstream ifs(s, ios::in);
     if (!ifs.is_open())
@@ -742,6 +750,7 @@ vector<double> eye_vector, bgColor, ambient, objectColor, coefficent;
 vector<string> fileCommandBuffer;
 vector<vector<double>> screenEdge;
 vector<Dot> dotBuffer;
+
 /*-----------------------------匯入圖形-------------------------------*/
 
 void AddObject(string s)
@@ -1067,6 +1076,7 @@ void triangle_3D(int first, int second, int third)
     triangle.coefficent = coefficent;
     triangle.pos = pos;
     triangle.colors = objectColor;
+    triangle.normal = v1;
     Shape.push_back(triangle);
 }
 
@@ -1274,34 +1284,37 @@ void viewport(double wxl, double wxr, double wyb, double wyt, double vxl, double
 void display_window()
 {
     // 處理每個點的法向量
-    for (int i = 0; i < dotBuffer.size(); i++)
+    if (Doshading[1] || Doshading[2])
     {
-        // 單一點的數筆資料，第一步前處理，過濾掉重複向 (改為0向量)
-       /*for (int j = 0; j < dotBuffer[i].normalSet.size() - 1; j++)
+        for (int i = 0; i < dotBuffer.size(); i++)
         {
-            vector<double> temp = dotBuffer[i].normalSet[j];
-            for (int k = j + 1; k < dotBuffer[i].normalSet.size(); k++)
+            // 單一點的數筆資料，第一步前處理，過濾掉重複向 (改為0向量)
+           /*for (int j = 0; j < dotBuffer[i].normalSet.size() - 1; j++)
             {
-                if (temp[0] == dotBuffer[i].normalSet[k][0] &&
-                    temp[1] == dotBuffer[i].normalSet[k][1] &&
-                    temp[2] == dotBuffer[i].normalSet[k][2])
+                vector<double> temp = dotBuffer[i].normalSet[j];
+                for (int k = j + 1; k < dotBuffer[i].normalSet.size(); k++)
                 {
-                    dotBuffer[i].normalSet[k][0] = 0.0;
-                    dotBuffer[i].normalSet[k][1] = 0.0;
-                    dotBuffer[i].normalSet[k][2] = 0.0;
+                    if (temp[0] == dotBuffer[i].normalSet[k][0] &&
+                        temp[1] == dotBuffer[i].normalSet[k][1] &&
+                        temp[2] == dotBuffer[i].normalSet[k][2])
+                    {
+                        dotBuffer[i].normalSet[k][0] = 0.0;
+                        dotBuffer[i].normalSet[k][1] = 0.0;
+                        dotBuffer[i].normalSet[k][2] = 0.0;
+                    }
                 }
-            }
-        }*/
+            }*/
 
-        //第二步全部加總並匯入對應頂點的n.x, n.y, n.z
-        for (int j = 0; j < dotBuffer[i].normalSet.size(); j++)
-        {
-            dotBuffer[i].nx += dotBuffer[i].normalSet[j][0];
-            dotBuffer[i].ny += dotBuffer[i].normalSet[j][1];
-            dotBuffer[i].nz += dotBuffer[i].normalSet[j][2];
+            //第二步全部加總並匯入對應頂點的n.x, n.y, n.z
+            for (int j = 0; j < dotBuffer[i].normalSet.size(); j++)
+            {
+                dotBuffer[i].nx += dotBuffer[i].normalSet[j][0];
+                dotBuffer[i].ny += dotBuffer[i].normalSet[j][1];
+                dotBuffer[i].nz += dotBuffer[i].normalSet[j][2];
+            }
         }
-        
     }
+    
 
 
 
@@ -1753,6 +1766,8 @@ void Z_Buffer(vector<vector<double>>& ZBuff, vector<vector<vector<double>>>& CBu
         vectorNormals[i][2] /= length;     
     }
 
+    
+
     //checkMatrix(polygonColors);
     double left_x, bottom_y, right_x, top_y;
     left_x = width;
@@ -1762,6 +1777,15 @@ void Z_Buffer(vector<vector<double>>& ZBuff, vector<vector<vector<double>>>& CBu
 
 
     vector<vector<double>> WSPos = T(triangle.pos);
+
+
+
+    vector<vector<double>> colors =
+    {
+        shading(triangle.colors, triangle.coefficent, WSPos[0], vectorNormals[0]),
+        shading(triangle.colors, triangle.coefficent, WSPos[1], vectorNormals[1]),
+        shading(triangle.colors, triangle.coefficent, WSPos[2], vectorNormals[2])
+    };
 
     //三角形邊界計算
 
@@ -1786,11 +1810,23 @@ void Z_Buffer(vector<vector<double>>& ZBuff, vector<vector<vector<double>>>& CBu
                     {x - triangleDot[1][0], y - triangleDot[1][1]},
                     {x - triangleDot[2][0], y - triangleDot[2][1]}
                 };
-
-                vector <double> pos = BaryCentric(WSPos, d(distance[0]), d(distance[1]), d(distance[2]));   
-                vector<double> normal = BaryCentric(vectorNormals, d(distance[0]), d(distance[1]), d(distance[2]));
-                ZBuff[x][y] = zi;  
-                CBuff[x][y] = shading(triangle.colors, triangle.coefficent, pos, normal);
+                vector <double> pos = BaryCentric(WSPos, d(distance[0]), d(distance[1]), d(distance[2]));
+                if (Doshading[0])
+                {
+                    
+                    CBuff[x][y] = shading(triangle.colors, triangle.coefficent, pos, triangle.normal);
+                }
+                else if (Doshading[1])
+                {
+                    CBuff[x][y] = BaryCentric(colors, d(distance[0]), d(distance[1]), d(distance[2]));
+                }
+                else if (Doshading[2])
+                {
+                    vector<double> normal = BaryCentric(vectorNormals, d(distance[0]), d(distance[1]), d(distance[2]));
+                    CBuff[x][y] = shading(triangle.colors, triangle.coefficent, pos, normal);
+                    
+                }
+                ZBuff[x][y] = zi;              
             }
         }
     }
@@ -1842,38 +1878,29 @@ vector<double> shading(vector<double>& polygonColors, vector<double>& coeffi, ve
 
         // sum vector
         sumVector = { Ix - position[0] ,Iy - position[1],Iz - position[2] };
-        //sumVector = { position[0] - Ix ,position[1] - Iy, position[2] - Iz};
         length = sqrt(D(sumVector, sumVector));
 
         fatt = 1 / D(sumVector, sumVector);
-        //cout << "fatt: " << fatt << endl;
 
         // normalization
         sumVector = { sumVector[0] / length, sumVector[1] / length, sumVector[2] / length };
         scale = D(normal, sumVector);
-        // if scale < 0, delete it.
 
-        //cout << scale << endl;
 
         scale = max(scale, 0.0);
         single = { Kd * Ipr * scale ,  Kd * Ipg * scale,  Kd * Ipb * scale };
         diffuse = { diffuse[0] + single[0], diffuse[1] + single[1], diffuse[2] + single[2] };
 
-        //cout << diffuse[0] << " " << diffuse[1] << " " << diffuse[2] << endl;
-
         // specular
         H = { (sumVector[0] + eye_vector[0]), (sumVector[1] + eye_vector[1]), (sumVector[2] + eye_vector[2]) };
         length = sqrt(D(H, H));
         H = { H[0] / length, H[1] / length, H[2] / length };
-        // if scale < 0, delete it.
-        //cout << "x: " << H[0] << " y: " << H[1] << " z: " << H[2] << endl;
-        //cout << "x: " << normal[0] << " y: " << normal[1] << " z: " << normal[2] << endl;
+
         scale = D(H, normal);
         scale = pow(scale, N);
 
         scale = max(scale, 0.0);
         spot = { Ks * Ipr * scale, Ks * Ipg * scale, Ks * Ipb * scale };
-        //cout << spot[0] << " " << spot[1] << " " << spot[2] << endl;
         specular = { specular[0] + spot[0], specular[1] + spot[1], specular[2] + spot[2] };
     }
 
