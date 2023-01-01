@@ -11,10 +11,10 @@
 
 using namespace std;
 
-string FILE_NAME = "lab4A.in";
+string FILE_NAME = "lab4B.in";
 
 // Lab4 shading controler
-vector<bool> Doshading = { 0,0,1 };
+vector<bool> Doshading = {0,0,1};
 // shading bottom (Flat, Gouraud, Phong)
 
 bool Do_flat_shading = false;
@@ -146,6 +146,7 @@ double product(vector<double>& p1, vector<double>& p2, vector<double>& p3);
 double bilinearInterpolation(vector<vector<double>>& trianglePos, vector<double>& pos);
 double d(vector<double>& v1);
 vector<double> BaryCentric(vector<vector<double>>& targetTriangle, double r1, double r2, double r3);
+double area(vector<double>& p1, vector<double>& p2, vector<double> p3);
 
 vector<vector<double>> ZBuff;
 vector<vector<vector<double>>> CBuff;
@@ -156,7 +157,7 @@ int main(int argc, char* argv[]) {
     system("pause"); //視窗保留
 
     /*----------------------匯入檔案-----------------------------*/
-    /*cout << argv[1] << endl;
+    cout << argv[1] << endl;
     string s = argv[1];
     string delimiter = "\\";
     size_t pos = 0;
@@ -165,10 +166,10 @@ int main(int argc, char* argv[]) {
         token = s.substr(0, pos);
         s.erase(0, pos + delimiter.length());
     }
-     FILE_NAME = s;*/
+     FILE_NAME = s;
 
 
-    string s = ".\\Data\\" + FILE_NAME;
+    s = ".\\Data\\" + FILE_NAME;
 
     ifstream ifs(s, ios::in);
     if (!ifs.is_open())
@@ -838,7 +839,7 @@ void objectSelector3D(vector<string>& fileCommandBuffer)
         }
     }
     cout << objectEdgeNum << endl;
-    fileCommandBuffer.clear();
+    fileCommandBuffer.clear();    
 }
 
 
@@ -1232,7 +1233,7 @@ void viewport(double wxl, double wxr, double wyb, double wyt, double vxl, double
 void display_window()
 {
     // 處理每個點的法向量
-
+  
     /*----------------Z_Buffer initial------------------*/
     vector<vector<double>> ZBuffInitial((int)height, vector<double>((int)width, DBL_MAX));
     vector<vector<vector<double>>> CBuffInitial((int)height, vector<vector<double>>((int)width, bgColor));
@@ -1267,7 +1268,7 @@ void display_window()
     checkMatrix(ScreenScale);
     */
     cout << "display" << endl;;
-
+    
     vector<vector<double>> Edge;
     // Screen Scale
     Edge = matrix_multiply(ScreenScale, screenEdge);
@@ -1663,7 +1664,7 @@ void WMinusZ(vector<vector<double>>& pos, vector<double>& z_value)
 
 void Z_Buffer(vector<vector<double>>& ZBuff, vector<vector<vector<double>>>& CBuff, vector<vector<double>>& pos, Triangle triangle)
 {
-
+ 
     // normal vector normalization
     vector<vector<double>> vectorNormals =
     {
@@ -1672,16 +1673,16 @@ void Z_Buffer(vector<vector<double>>& ZBuff, vector<vector<vector<double>>>& CBu
         {dotBuffer[triangle.vertexIndex[2]].nx, dotBuffer[triangle.vertexIndex[2]].ny, dotBuffer[triangle.vertexIndex[2]].nz},
     };
     //checkMatrix(vectorNormals);
-
+    
     for (int i = 0; i < 3; i++)
     {
         double length = d(vectorNormals[i]);
         vectorNormals[i][0] /= length;
         vectorNormals[i][1] /= length;
-        vectorNormals[i][2] /= length;
+        vectorNormals[i][2] /= length;     
     }
 
-
+    
 
     //checkMatrix(polygonColors);
     double left_x, bottom_y, right_x, top_y;
@@ -1719,29 +1720,29 @@ void Z_Buffer(vector<vector<double>>& ZBuff, vector<vector<vector<double>>>& CBu
 
             if (zi < ZBuff[x][y])
             {
-                vector<vector<double>> distance =
+                vector <double> triangleArea =
                 {
-                    {x - triangleDot[0][0], y - triangleDot[0][1]},
-                    {x - triangleDot[1][0], y - triangleDot[1][1]},
-                    {x - triangleDot[2][0], y - triangleDot[2][1]}
+                    area(triangleDot[1], triangleDot[2], o),
+                    area(triangleDot[0], triangleDot[2], o),
+                    area(triangleDot[0], triangleDot[1], o)
                 };
-                vector <double> pos = BaryCentric(WSPos, d(distance[0]), d(distance[1]), d(distance[2]));
+                vector <double> pos = BaryCentric(WSPos, triangleArea[0], triangleArea[1], triangleArea[2]);
                 if (Doshading[0])
                 {
-
+                    
                     CBuff[x][y] = shading(triangle.colors, triangle.coefficent, pos, triangle.normal);
                 }
                 else if (Doshading[1])
                 {
-                    CBuff[x][y] = BaryCentric(colors, d(distance[0]), d(distance[1]), d(distance[2]));
+                    CBuff[x][y] = BaryCentric(colors, triangleArea[0], triangleArea[1], triangleArea[2]);
                 }
                 else if (Doshading[2])
                 {
-                    vector<double> normal = BaryCentric(vectorNormals, d(distance[0]), d(distance[1]), d(distance[2]));
+                    vector<double> normal = BaryCentric(vectorNormals, triangleArea[0], triangleArea[1], triangleArea[2]);
                     CBuff[x][y] = shading(triangle.colors, triangle.coefficent, pos, normal);
-
+                    
                 }
-                ZBuff[x][y] = zi;
+                ZBuff[x][y] = zi;              
             }
         }
     }
@@ -1845,20 +1846,20 @@ double bilinearInterpolation(vector<vector<double>>& trianglePos, vector<double>
 
     if (n[2] != 0) return (trianglePos[0][2] - (((n[0] * (pos[0] - trianglePos[0][0])) + (n[1] * (pos[1] - trianglePos[0][1]))) / n[2]));
     else  return trianglePos[0][2];
-
+   
 }
 
-vector<double> BaryCentric(vector<vector<double>>& targetTriangle, double r1, double r2, double r3)
+vector<double> BaryCentric(vector<vector<double>>& targetTriangle, double A1, double A2, double A3)
 {
     vector<double> o;
     double x, y, z;
-    double temp = sqrt(r1 * r1 + r2 * r2 + r3 + r3);
-    r1 = r1 / temp;
-    r2 = r2 / temp;
-    r3 = r3 / temp;
-    x = (targetTriangle[0][0] * r1 + targetTriangle[1][0] * r2 + targetTriangle[2][0] * r3) / (r1 + r2 + r3);
-    y = (targetTriangle[0][1] * r1 + targetTriangle[1][1] * r2 + targetTriangle[2][1] * r3) / (r1 + r2 + r3);
-    z = (targetTriangle[0][2] * r1 + targetTriangle[1][2] * r2 + targetTriangle[2][2] * r3) / (r1 + r2 + r3);
+    double temp = sqrt(A1 * A1 + A2 * A2 + A3 + A3);
+    A1 = A1 / temp;
+    A2 = A2 / temp;
+    A3 = A3 / temp;
+    x = (targetTriangle[0][0] * A1 + targetTriangle[1][0] * A2 + targetTriangle[2][0] * A3) / (A1 + A2 + A3);
+    y = (targetTriangle[0][1] * A1 + targetTriangle[1][1] * A2 + targetTriangle[2][1] * A3) / (A1 + A2 + A3);
+    z = (targetTriangle[0][2] * A1 + targetTriangle[1][2] * A2 + targetTriangle[2][2] * A3) / (A1 + A2 + A3);
     o = { x, y, z };
     return o;
 }
@@ -1866,4 +1867,9 @@ vector<double> BaryCentric(vector<vector<double>>& targetTriangle, double r1, do
 double d(vector<double>& v1)
 {
     return sqrt(D(v1, v1));
+}
+
+double area(vector<double>& p1, vector<double>& p2, vector<double> p3)
+{
+    return (abs(p1[0] * p2[1] + p2[0] * p3[1] + p3[0] * p1[1] - p2[0] * p1[1] - p3[0] * p2[1] - p1[0] * p3[1]) / 2);
 }
