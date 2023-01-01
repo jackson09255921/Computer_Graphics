@@ -14,7 +14,7 @@ using namespace std;
 string FILE_NAME = "lab4A.in";
 
 // Lab4 shading controler
-vector<bool> Doshading = {0,0,1};
+vector<bool> Doshading = { 0,0,1 };
 // shading bottom (Flat, Gouraud, Phong)
 
 bool Do_flat_shading = false;
@@ -63,7 +63,6 @@ double color_b = 1;
 class Dot
 {
 public:
-    vector<vector<double>> normalSet;
     double x = 0.0;
     double y = 0.0;
     double z = 0.0;
@@ -116,7 +115,7 @@ void AddObject(string name);
 void objectSelector3D(vector<string>& fileCommandBuffer);
 
 void triangle_3D(int first, int second, int third);
-void rectangle_3D(int first, int second, int third, int fourth);
+
 
 void viewing_transform(double epx, double epy, double epz, double COIx, double COIy, double COIz, double Tilt);
 void projection_transformation(double Hither, double Yon, double Hav);
@@ -157,7 +156,7 @@ int main(int argc, char* argv[]) {
     system("pause"); //視窗保留
 
     /*----------------------匯入檔案-----------------------------*/
-    cout << argv[1] << endl;
+    /*cout << argv[1] << endl;
     string s = argv[1];
     string delimiter = "\\";
     size_t pos = 0;
@@ -166,10 +165,10 @@ int main(int argc, char* argv[]) {
         token = s.substr(0, pos);
         s.erase(0, pos + delimiter.length());
     }
-     FILE_NAME = s;
+     FILE_NAME = s;*/
 
 
-     s = ".\\Data\\" + FILE_NAME;
+    string s = ".\\Data\\" + FILE_NAME;
 
     ifstream ifs(s, ios::in);
     if (!ifs.is_open())
@@ -839,7 +838,7 @@ void objectSelector3D(vector<string>& fileCommandBuffer)
         }
     }
     cout << objectEdgeNum << endl;
-    fileCommandBuffer.clear();    
+    fileCommandBuffer.clear();
 }
 
 
@@ -1067,9 +1066,18 @@ void triangle_3D(int first, int second, int third)
 
 
     // 存回normal vector，需考慮向量重複計算狀況
-    dotBuffer[first].normalSet.push_back(v1);
-    dotBuffer[second].normalSet.push_back(v1);
-    dotBuffer[third].normalSet.push_back(v1);
+    dotBuffer[first].nx += v1[0];
+    dotBuffer[first].nz += v1[1];
+    dotBuffer[first].nz += v1[2];
+
+    dotBuffer[second].nx += v1[0];
+    dotBuffer[second].nz += v1[1];
+    dotBuffer[second].nz += v1[2];
+
+    dotBuffer[third].nx += v1[0];
+    dotBuffer[third].nz += v1[1];
+    dotBuffer[third].nz += v1[2];
+
 
     Triangle triangle;
     triangle.vertexIndex = { first, second, third };
@@ -1080,67 +1088,7 @@ void triangle_3D(int first, int second, int third)
     Shape.push_back(triangle);
 }
 
-void rectangle_3D(int first, int second, int third, int fourth)
-{
-    vector<vector<double>> pos = {
-        {dotBuffer[first].x, dotBuffer[first].y, dotBuffer[first].z, 1},
-        {dotBuffer[second].x, dotBuffer[second].y, dotBuffer[second].z, 1},
-        {dotBuffer[third].x, dotBuffer[third].y, dotBuffer[third].z, 1},
-        {dotBuffer[fourth].x, dotBuffer[fourth].y, dotBuffer[fourth].z, 1},
-    };
-    pos = T(pos);
-    pos = matrix_multiply(M, pos);
-    pos = T(pos);
 
-    vector<double> v1 = { pos[0][1] - pos[0][0], pos[1][1] - pos[1][0], pos[2][1] - pos[2][0] };
-    vector<double> v2 = { pos[0][2] - pos[0][0], pos[1][2] - pos[1][0], pos[2][2] - pos[2][0] };
-    v1 = C(v1, v2);
-    double length = d(v1);
-    v1 = { v1[0] / length, v1[1] / length , v1[2] / length };
-    cout << endl << "new: " << endl << v1[0] / length << " " << v1[1] / length << " " << v1[2] / length << endl;
-
-    // 存回normal vector，需考慮正方形切割的兩個三角形，向量重複計算狀況
-    dotBuffer[first].weight++;
-    dotBuffer[first].nx += (v1[0]);
-    dotBuffer[first].ny += (v1[1]);
-    dotBuffer[first].nz += (v1[2]);
-
-
-    dotBuffer[second].weight++;
-    dotBuffer[second].nx += (v1[0]);
-    dotBuffer[second].ny += (v1[1]);
-    dotBuffer[second].nz += (v1[2]);
-
-
-    dotBuffer[third].weight++;
-    dotBuffer[third].nx += (v1[0]);
-    dotBuffer[third].ny += (v1[1]);
-    dotBuffer[third].nz += (v1[2]);
-
-
-    dotBuffer[fourth].weight++;
-    dotBuffer[fourth].nx += (v1[0]);
-    dotBuffer[fourth].ny += (v1[1]);
-    dotBuffer[fourth].nz += (v1[2]);
-
-    vector <vector<double>> newPos ={pos[0], pos[1],pos[2]};
-    newPos = T(newPos);
-
-    Triangle triangle;
-    triangle.vertexIndex = { first, second, third };
-    triangle.coefficent = coefficent;
-    triangle.pos = newPos;
-    triangle.colors = objectColor;
-    Shape.push_back(triangle);
-
-    newPos = { pos[2], pos[3],pos[1] };
-    newPos = T(newPos);
-    triangle.vertexIndex = { third, fourth, first };
-    triangle.coefficent = coefficent;
-    triangle.pos = pos;
-    triangle.colors = objectColor;
-    Shape.push_back(triangle);
-}
 
 
 /*-------------------------viewig transform--------------------------*/
@@ -1284,39 +1232,6 @@ void viewport(double wxl, double wxr, double wyb, double wyt, double vxl, double
 void display_window()
 {
     // 處理每個點的法向量
-    if (Doshading[1] || Doshading[2])
-    {
-        for (int i = 0; i < dotBuffer.size(); i++)
-        {
-            // 單一點的數筆資料，第一步前處理，過濾掉重複向 (改為0向量)
-           /*for (int j = 0; j < dotBuffer[i].normalSet.size() - 1; j++)
-            {
-                vector<double> temp = dotBuffer[i].normalSet[j];
-                for (int k = j + 1; k < dotBuffer[i].normalSet.size(); k++)
-                {
-                    if (temp[0] == dotBuffer[i].normalSet[k][0] &&
-                        temp[1] == dotBuffer[i].normalSet[k][1] &&
-                        temp[2] == dotBuffer[i].normalSet[k][2])
-                    {
-                        dotBuffer[i].normalSet[k][0] = 0.0;
-                        dotBuffer[i].normalSet[k][1] = 0.0;
-                        dotBuffer[i].normalSet[k][2] = 0.0;
-                    }
-                }
-            }*/
-
-            //第二步全部加總並匯入對應頂點的n.x, n.y, n.z
-            for (int j = 0; j < dotBuffer[i].normalSet.size(); j++)
-            {
-                dotBuffer[i].nx += dotBuffer[i].normalSet[j][0];
-                dotBuffer[i].ny += dotBuffer[i].normalSet[j][1];
-                dotBuffer[i].nz += dotBuffer[i].normalSet[j][2];
-            }
-        }
-    }
-    
-
-
 
     /*----------------Z_Buffer initial------------------*/
     vector<vector<double>> ZBuffInitial((int)height, vector<double>((int)width, DBL_MAX));
@@ -1352,7 +1267,7 @@ void display_window()
     checkMatrix(ScreenScale);
     */
     cout << "display" << endl;;
-    
+
     vector<vector<double>> Edge;
     // Screen Scale
     Edge = matrix_multiply(ScreenScale, screenEdge);
@@ -1748,7 +1663,7 @@ void WMinusZ(vector<vector<double>>& pos, vector<double>& z_value)
 
 void Z_Buffer(vector<vector<double>>& ZBuff, vector<vector<vector<double>>>& CBuff, vector<vector<double>>& pos, Triangle triangle)
 {
- 
+
     // normal vector normalization
     vector<vector<double>> vectorNormals =
     {
@@ -1757,16 +1672,16 @@ void Z_Buffer(vector<vector<double>>& ZBuff, vector<vector<vector<double>>>& CBu
         {dotBuffer[triangle.vertexIndex[2]].nx, dotBuffer[triangle.vertexIndex[2]].ny, dotBuffer[triangle.vertexIndex[2]].nz},
     };
     //checkMatrix(vectorNormals);
-    
+
     for (int i = 0; i < 3; i++)
     {
         double length = d(vectorNormals[i]);
         vectorNormals[i][0] /= length;
         vectorNormals[i][1] /= length;
-        vectorNormals[i][2] /= length;     
+        vectorNormals[i][2] /= length;
     }
 
-    
+
 
     //checkMatrix(polygonColors);
     double left_x, bottom_y, right_x, top_y;
@@ -1813,7 +1728,7 @@ void Z_Buffer(vector<vector<double>>& ZBuff, vector<vector<vector<double>>>& CBu
                 vector <double> pos = BaryCentric(WSPos, d(distance[0]), d(distance[1]), d(distance[2]));
                 if (Doshading[0])
                 {
-                    
+
                     CBuff[x][y] = shading(triangle.colors, triangle.coefficent, pos, triangle.normal);
                 }
                 else if (Doshading[1])
@@ -1824,9 +1739,9 @@ void Z_Buffer(vector<vector<double>>& ZBuff, vector<vector<vector<double>>>& CBu
                 {
                     vector<double> normal = BaryCentric(vectorNormals, d(distance[0]), d(distance[1]), d(distance[2]));
                     CBuff[x][y] = shading(triangle.colors, triangle.coefficent, pos, normal);
-                    
+
                 }
-                ZBuff[x][y] = zi;              
+                ZBuff[x][y] = zi;
             }
         }
     }
@@ -1930,7 +1845,7 @@ double bilinearInterpolation(vector<vector<double>>& trianglePos, vector<double>
 
     if (n[2] != 0) return (trianglePos[0][2] - (((n[0] * (pos[0] - trianglePos[0][0])) + (n[1] * (pos[1] - trianglePos[0][1]))) / n[2]));
     else  return trianglePos[0][2];
-   
+
 }
 
 vector<double> BaryCentric(vector<vector<double>>& targetTriangle, double r1, double r2, double r3)
