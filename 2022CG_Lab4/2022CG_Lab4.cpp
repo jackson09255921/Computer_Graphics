@@ -11,10 +11,10 @@
 
 using namespace std;
 
-string FILE_NAME = "lab4B.in";
+string FILE_NAME = "lab4A.in";
 
 // Lab4 shading controler
-vector<bool> Doshading = {0,0,1};
+vector<bool> Doshading = {0,1,0};
 // shading bottom (Flat, Gouraud, Phong)
 
 bool Do_flat_shading = false;
@@ -82,6 +82,13 @@ public:
     vector <double> normal;
 };
 
+class Shape 
+{
+    public:
+        vector<Dot> dotBuffer;
+        vector<Triangle> TriangleBuffer;
+};
+
 void clearData();
 void clearScreen();
 void end();
@@ -90,8 +97,7 @@ void end();
 vector<vector<double>> T(vector<vector<double>> matrix);
 vector<vector<double>> transform_matrix;
 vector<vector<double>> matrix_multiply(vector<vector<double>>& a, vector<vector<double>>& b);
-vector<Triangle> Shape;
-vector< vector<Triangle>> Objects;
+vector<Shape> Objects;
 vector<string> buffer;
 bool had_read = false;
 bool command = false;
@@ -114,7 +120,7 @@ void display_window();
 void AddObject(string name);
 void objectSelector3D(vector<string>& fileCommandBuffer);
 
-void triangle_3D(int first, int second, int third);
+void triangle_3D(int first, int second, int third, Shape& shape);
 
 
 void viewing_transform(double epx, double epy, double epz, double COIx, double COIy, double COIz, double Tilt);
@@ -133,13 +139,13 @@ void checkMatrix(vector<vector<double>>& matrix);
 void checkVertex(vector<vector<double>>& pos);
 vector<double> C(vector<double>& vector1, vector<double>& vector2);
 double D(vector<double>& v1, vector<double>& v2);
-double width, height;
+int width, height;
 
 /*=====================================================================================*/
 /*==========================Lab4 variable and function===============================*/
 /*=====================================================================================*/
 
-void Z_Buffer(vector<vector<double>>& ZBuff, vector<vector<vector<double>>>& CBuff, vector<vector<double>>& pos, Triangle triangle);
+void Z_Buffer(vector<vector<double>>& ZBuff, vector<vector<vector<double>>>& CBuff, vector<vector<double>>& pos, Triangle triangle, vector<Dot> dotBuffer);
 vector<double> shading(vector<double>& polygonColors, vector<double>& coeffi, vector<double>& position, vector<double>& normal);
 bool isInTriangle(vector<double>& p1, vector<double>& p2, vector<double>& p3, vector<double>& o);
 double product(vector<double>& p1, vector<double>& p2, vector<double>& p3);
@@ -157,7 +163,7 @@ int main(int argc, char* argv[]) {
     system("pause"); //視窗保留
 
     /*----------------------匯入檔案-----------------------------*/
-    cout << argv[1] << endl;
+    /*cout << argv[1] << endl;
     string s = argv[1];
     string delimiter = "\\";
     size_t pos = 0;
@@ -166,10 +172,10 @@ int main(int argc, char* argv[]) {
         token = s.substr(0, pos);
         s.erase(0, pos + delimiter.length());
     }
-     FILE_NAME = s;
+     FILE_NAME = s;*/
 
 
-    s = ".\\Data\\" + FILE_NAME;
+    string s = ".\\Data\\" + FILE_NAME;
 
     ifstream ifs(s, ios::in);
     if (!ifs.is_open())
@@ -187,16 +193,16 @@ int main(int argc, char* argv[]) {
     // Initital size of 3D window
     string temp;
     in >> temp;
-    width = stod(temp);
+    width = stoi(temp);
     in >> temp;
-    height = stod(temp);
+    height = stoi(temp);
     cout << "Width: " << width << " Height: " << height << endl;
 
     /*----------------------匯入檔案-----------------------------*/
     readCommand_3D();
 
     glutInitDisplayMode(GLUT_RGBA | GLUT_SINGLE);
-    glutInitWindowSize((int)width, (int)height);
+    glutInitWindowSize(width, height);
     glutInitWindowPosition(500, 100);
     gluOrtho2D(0, width, 0, height);
     window = glutCreateWindow("2022CG_Lab4_108305003");
@@ -722,11 +728,7 @@ vector<vector<double>> T(vector<vector<double>> matrix)
 }
 
 /*---------------------------清除資料-----------------------------------*/
-void clearData()
-{
-    Objects.clear();
-    Shape.clear();
-}
+
 
 void clearScreen()
 {
@@ -749,8 +751,12 @@ vector<vector<double>> M, V, P, PM, Viewport, ScreenScale;
 vector<double> eye_vector, bgColor, ambient, objectColor, coefficent;
 vector<string> fileCommandBuffer;
 vector<vector<double>> screenEdge;
-vector<Dot> dotBuffer;
 
+void clearData()
+{
+    cout << "clear data" << endl;
+    Objects.clear();
+}
 /*-----------------------------匯入圖形-------------------------------*/
 
 void AddObject(string s)
@@ -771,7 +777,8 @@ void AddObject(string s)
 }
 void objectSelector3D(vector<string>& fileCommandBuffer)
 {
-    dotBuffer.clear();
+    Shape shape;
+    vector<Dot> dotBuffer;
     //if (fileCommandBuffer.empty()) return;
     vector<double> vertex = { 0, 0, 0, 0 };
     int fileCommandNum = 0;
@@ -799,6 +806,7 @@ void objectSelector3D(vector<string>& fileCommandBuffer)
             dot.y = stod(words[2]);
             dot.z = stod(words[3]);
             dotBuffer.push_back(dot);
+            shape.dotBuffer = dotBuffer;
         }
         if (words[0] == "vt")
         {
@@ -826,20 +834,20 @@ void objectSelector3D(vector<string>& fileCommandBuffer)
             // 三角形
             if (words.size() == 4)
             {
-                triangle_3D(indexContainer[0][0] - 1, indexContainer[1][0] - 1, indexContainer[2][0] - 1);
+                triangle_3D(indexContainer[0][0] - 1, indexContainer[1][0] - 1, indexContainer[2][0] - 1, shape);
                 objectEdgeNum += 3;
             }
             if (words.size() == 5)
             {
-                triangle_3D(indexContainer[0][0] - 1, indexContainer[1][0] - 1, indexContainer[2][0] - 1);
-                triangle_3D(indexContainer[2][0] - 1, indexContainer[3][0] - 1, indexContainer[0][0] - 1);
+                triangle_3D(indexContainer[0][0] - 1, indexContainer[1][0] - 1, indexContainer[2][0] - 1, shape);
+                triangle_3D(indexContainer[2][0] - 1, indexContainer[3][0] - 1, indexContainer[0][0] - 1, shape);
                 objectEdgeNum += 6;
             }
-
         }
     }
     cout << objectEdgeNum << endl;
     fileCommandBuffer.clear();    
+    Objects.push_back(shape);
 }
 
 
@@ -901,7 +909,6 @@ void commandSelector_3D()
             words.push_back(word);
         }
 
-        if (words.empty()) return;
         if (words[0] == "reset") reset_3D();
         if (words[0] == "scale")scaling_3D(stod(words[1]), stod(words[2]), stod(words[3]));
         if (words[0] == "rotate") rotation_3D(stod(words[1]), stod(words[2]), stod(words[3]));
@@ -913,10 +920,6 @@ void commandSelector_3D()
             coefficent = { stod(words[5]), stod(words[6]), stod(words[7]) };
             AddObject(".\\Mesh\\" + words[1]);
             objectSelector3D(fileCommandBuffer);
-
-            // Objects 收集所有物體， Shape 收集物體所需要建構的所有triangle，triangle收集所有dot, color, normal等資訊
-            Objects.push_back(Shape);
-            Shape.clear();
         }
         if (words[0] == "observer") {
             viewing_transform(stod(words[1]), stod(words[2]), stod(words[3]), stod(words[4]), stod(words[5]), stod(words[6]), stod(words[7]));
@@ -944,7 +947,6 @@ void commandSelector_3D()
         if (words[0] == "cleardata") clearData();
         if (words[0] == "clearScreen") clearScreen();
         words.clear();
-
     }
 }
 
@@ -1049,8 +1051,10 @@ void rotation_3D(double rotate_x, double rotate_y, double rotate_z)
 /*------------------------Add triangle and square--------------------*/
 
 // Draw triangle in 3D
-void triangle_3D(int first, int second, int third)
+void triangle_3D(int first, int second, int third, Shape &shape)
 {
+    vector<Dot>& dotBuffer = shape.dotBuffer;
+
     vector<vector<double>> pos = {
         {dotBuffer[first].x, dotBuffer[first].y, dotBuffer[first].z, 1},
         {dotBuffer[second].x, dotBuffer[second].y, dotBuffer[second].z, 1},
@@ -1065,8 +1069,6 @@ void triangle_3D(int first, int second, int third)
     double length = d(v1);
     v1 = { v1[0] / length, v1[1] / length , v1[2] / length };
 
-
-    // 存回normal vector，需考慮向量重複計算狀況
     dotBuffer[first].nx += v1[0];
     dotBuffer[first].nz += v1[1];
     dotBuffer[first].nz += v1[2];
@@ -1086,7 +1088,7 @@ void triangle_3D(int first, int second, int third)
     triangle.pos = pos;
     triangle.colors = objectColor;
     triangle.normal = v1;
-    Shape.push_back(triangle);
+    shape.TriangleBuffer.push_back(triangle);
 }
 
 
@@ -1213,8 +1215,8 @@ void viewport(double wxl, double wxr, double wyb, double wyt, double vxl, double
 
     // 等比放大
     ScreenScale = {
-        {width / 2, 0 ,0, width / 2},
-        {0, height / 2, 0, height / 2},
+        {(double)width / 2, 0 ,0, (double)width / 2},
+        {0, (double)height / 2, 0, (double)height / 2},
         {0, 0, 1, 0},
         {0, 0, 0, 1}
     };
@@ -1282,13 +1284,13 @@ void display_window()
     // Traverse所有物體
     for (int num = 0; num < Objects.size(); num++)
     {
-        vector<Triangle> Shape = Objects[num];
+        Shape shape = Objects[num];
         // 單一物體遍歷所有triangle
-        for (int i = 0; i < Shape.size(); i++)
+        for (int i = 0; i < shape.TriangleBuffer.size(); i++)
         {
-            cout << "Shape (" << (num + 1) << "/" << Objects.size() << "), Triangle (" << (i + 1) << "/" << Shape.size() << ")" << endl;
+            cout << "Shape (" << (num + 1) << "/" << Objects.size() << "), Triangle (" << (i + 1) << "/" << shape.TriangleBuffer.size() << ")" << endl;
             // triangle 基本性質
-            Triangle triangle = Shape[i];
+            Triangle triangle = shape.TriangleBuffer[i];
             vector<vector<double>> pos = triangle.pos;
 
             // 所有轉換
@@ -1315,7 +1317,7 @@ void display_window()
             // Z-buffer
             if (needSkin)
             {
-                Z_Buffer(ZBuff, CBuff, pos, triangle);
+                Z_Buffer(ZBuff, CBuff, pos, triangle, shape.dotBuffer);
 
             }
             else
@@ -1338,7 +1340,7 @@ void display_window()
         {
             for (int x = leftEdge; x < rightEdge; x++)
             {
-                glColor3d(CBuff[x][y][0], CBuff[x][y][1], CBuff[x][y][2]);
+                glColor3d(CBuff[y][x][0], CBuff[y][x][1], CBuff[y][x][2]);
                 drawSquare(x, y);
             }
         }
@@ -1662,7 +1664,7 @@ void WMinusZ(vector<vector<double>>& pos, vector<double>& z_value)
     z_value = tempz;
 }
 
-void Z_Buffer(vector<vector<double>>& ZBuff, vector<vector<vector<double>>>& CBuff, vector<vector<double>>& pos, Triangle triangle)
+void Z_Buffer(vector<vector<double>>& ZBuff, vector<vector<vector<double>>>& CBuff, vector<vector<double>>& pos, Triangle triangle, vector<Dot> dotBuffer)
 {
  
     // normal vector normalization
@@ -1706,19 +1708,22 @@ void Z_Buffer(vector<vector<double>>& ZBuff, vector<vector<vector<double>>>& CBu
     //三角形邊界計算
 
     left_x = min(max(0.0, triangleDot[0][0]), min(triangleDot[1][0], triangleDot[2][0]));
-    right_x = max(min(width, triangleDot[0][0]), max(triangleDot[1][0], triangleDot[2][0]));
+    right_x = max(min((double)width, triangleDot[0][0]), max(triangleDot[1][0], triangleDot[2][0]));
     bottom_y = min(max(0.0, triangleDot[0][1]), min(triangleDot[1][1], triangleDot[2][1]));
-    top_y = max(min(height, triangleDot[0][1]), max(triangleDot[1][1], triangleDot[2][1]));
+    top_y = max(min((double)height, triangleDot[0][1]), max(triangleDot[1][1], triangleDot[2][1]));
 
-    for (double y = max(floor(bottom_y), 0.0); y < min(ceil(top_y), height); y++)
+
+
+    for (int y = max(floor(bottom_y), 0.0); y < min(ceil(top_y), (double)height); y++)
     {
-        for (double x = max(floor(left_x), 0.0); x < min(ceil(right_x), width); x++)
+        for (int x = max(floor(left_x), 0.0); x < min(ceil(right_x), (double)width); x++)
         {
             //cout << " x: " << x << " y: " << y << endl;
             vector<double> o = { x + 0.5, y + 0.5 };
+
             double zi = bilinearInterpolation(triangleDot, o);
 
-            if (zi < ZBuff[x][y])
+            if (zi < ZBuff[y][x])
             {
                 vector <double> triangleArea =
                 {
@@ -1730,19 +1735,19 @@ void Z_Buffer(vector<vector<double>>& ZBuff, vector<vector<vector<double>>>& CBu
                 if (Doshading[0])
                 {
                     
-                    CBuff[x][y] = shading(triangle.colors, triangle.coefficent, pos, triangle.normal);
+                    CBuff[y][x] = shading(triangle.colors, triangle.coefficent, pos, triangle.normal);
                 }
                 else if (Doshading[1])
                 {
-                    CBuff[x][y] = BaryCentric(colors, triangleArea[0], triangleArea[1], triangleArea[2]);
+                    CBuff[y][x] = BaryCentric(colors, triangleArea[0], triangleArea[1], triangleArea[2]);
                 }
                 else if (Doshading[2])
                 {
                     vector<double> normal = BaryCentric(vectorNormals, triangleArea[0], triangleArea[1], triangleArea[2]);
-                    CBuff[x][y] = shading(triangle.colors, triangle.coefficent, pos, normal);
+                    CBuff[y][x] = shading(triangle.colors, triangle.coefficent, pos, normal);
                     
                 }
-                ZBuff[x][y] = zi;              
+                ZBuff[y][x] = zi;              
             }
         }
     }
