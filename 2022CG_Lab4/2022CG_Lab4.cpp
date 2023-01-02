@@ -11,10 +11,10 @@
 
 using namespace std;
 
-string FILE_NAME = "lab4A.in";
+string FILE_NAME = "lab4B.in";
 
 // Lab4 shading controler
-vector<bool> Doshading = {0,1,0};
+vector<bool> Doshading = {0,0,1};
 // shading bottom (Flat, Gouraud, Phong)
 
 bool Do_flat_shading = false;
@@ -163,7 +163,7 @@ int main(int argc, char* argv[]) {
     system("pause"); //視窗保留
 
     /*----------------------匯入檔案-----------------------------*/
-    /*cout << argv[1] << endl;
+    /* << argv[1] << endl;
     string s = argv[1];
     string delimiter = "\\";
     size_t pos = 0;
@@ -1070,15 +1070,15 @@ void triangle_3D(int first, int second, int third, Shape &shape)
     v1 = { v1[0] / length, v1[1] / length , v1[2] / length };
 
     dotBuffer[first].nx += v1[0];
-    dotBuffer[first].nz += v1[1];
+    dotBuffer[first].ny += v1[1];
     dotBuffer[first].nz += v1[2];
 
     dotBuffer[second].nx += v1[0];
-    dotBuffer[second].nz += v1[1];
+    dotBuffer[second].ny += v1[1];
     dotBuffer[second].nz += v1[2];
 
     dotBuffer[third].nx += v1[0];
-    dotBuffer[third].nz += v1[1];
+    dotBuffer[third].ny += v1[1];
     dotBuffer[third].nz += v1[2];
 
 
