@@ -23,6 +23,7 @@ Method
 這次專案開發項目僅涉及到光柵化中的管線化與著色，而動畫模擬的部分因礙於時間問題，課程尚未看到，因此先行留空。以下全部程式使用C++語言，畫螢幕著色部分僅調用openGL函式庫中「畫點功能」進行實作。最一開始，需要先學會如何在螢幕上畫出點、線、面，最後再延伸到立體空間。
 ![計算機圖學已知概念圖](https://github.com/jackson09255921/Computer_Graphics/blob/main/images/image25.png)
 
+---
 ## Lab 1 小畫家
 小畫家環節呈現出按住滑鼠畫連續點、畫直線、畫多邊形、畫圓形、清空、回上一步以及換色的功能。點的部分，因為不含任何運算技術，就直接調用glut函式中的畫點功能。
 1. 畫線: 決定畫面上的兩個位置，並將鄰近兩點連線中的pixel上色，透過iteration的方式讓vertex從起點朝向終點逐一檢查，每當vertex到pixel的邊界時，使用線性插值檢查相鄰pixel的距離，選取相對接近的點進行著色後進續迭代直到終點。這個方法需要每45度建構一個，因此建構共8個方向，並透過斜率與起終點方向來決定應當使用的演算法。
@@ -34,11 +35,8 @@ Method
 #### Lab1 成果
 ![小畫家](https://github.com/jackson09255921/Computer_Graphics/blob/main/images/image28.png)
 
-
-
-
+---
 ## Lab2 2D填充
-
 上一個環節，我們成功勾勒出圖形外框，接下來我們要把整個面構建起來。這邊要做四件事情，外部讀檔、圖形填充、viewport以及圖形切割。
 1. 外部讀檔: 使用```main(int argc, char* argv[])```進行外部檔案讀取即可。用意在於最終目標為讀入.obj模型座標與設定各項參數條件進行繪製，不存在人工繪製的需求，所以我們建立輸入參數的管道。
 2. 圖形填充: 使用外積的方式進行檢測目前的pixel是否在圖形當中，若是則上色，反之直接跳過。
@@ -48,8 +46,7 @@ Method
 #### Lab2 成果
 ![2D填充-1](https://github.com/jackson09255921/Computer_Graphics/blob/main/images/image35.png ) ![2D填充-2](https://github.com/jackson09255921/Computer_Graphics/blob/main/images/image33.png)
 
-
-
+---
 ## Lab3 3D Pipeline
 第三小節，將介紹3D Pipeline。我們在前兩小節已經學會如何在螢幕上呈現常見的幾何圖形了，那接下來就是要把3D object丟到螢幕上方，並且可以「立即」看到他的成像(圖8)。這部分的演算法一共有6個(4個空間轉換 + 3D clipping + Hide Surface Removal)，下面依序介紹。
 ![3D Pipeline](https://github.com/jackson09255921/Computer_Graphics/blob/main/images/image40.png)
@@ -72,6 +69,7 @@ Method
 ![HSR-1](https://github.com/jackson09255921/Computer_Graphics/blob/main/images/image47.png)
 ![HSR-2](https://github.com/jackson09255921/Computer_Graphics/blob/main/images/image49.png)
 
+---
 ## Lab4 3D Shading
 著色為此章節最後一個小節，著色(Shading)系統是透過近似的方式將光照模擬出來，透過此方式可以藉由犧牲準確度，換取及時光照渲染，以下採用馮布林光照模型(Blinn-Phong model)進行建構。Blinn-Phong模型將光照切割成三種不同光照模式，最後再透過疊加原理模擬出假光照，分為環境光(Ambient)、漫反射(Diffusion)、高光(Specular)。光照計算World space進行，而螢幕上色部分則將會在下一章進行說明。
 ![Blinn-Phong Shading Model](https://github.com/jackson09255921/Computer_Graphics/blob/main/images/image50.png)
@@ -93,25 +91,50 @@ Method
 ![漫反射](https://github.com/jackson09255921/Computer_Graphics/blob/main/images/image19.png)
 
 3. 高光(Specular):模擬物體被直接光照後，人眼正好在反射線附近所看到的畫面。通常這個區域僅在反射線夾角正負5度的距離才有機會見到，如玻璃盤上方最亮的部分。  
--玻璃盤:  
-![玻璃盤](https://github.com/jackson09255921/Computer_Graphics/blob/main/images/image20.png)
--Specular 示意圖:  
+- 玻璃盤:  
+![玻璃盤](https://github.com/jackson09255921/Computer_Graphics/blob/main/images/image20.jpg)  
+- Specular 示意圖:  
 ![高光示意圖](https://github.com/jackson09255921/Computer_Graphics/blob/main/images/image21.png)  
--Specular 成果:  
+- Specular 成果:  
 ![Specular 成果](https://github.com/jackson09255921/Computer_Graphics/blob/main/images/image22.png)  
 
 最後，將三種光照方式進行線性組合可以得到圖26的各個畫面，最右邊為疊加的最終成果。以上最基礎的光照方式，下一章將呈現三種不同的著色頻率方式以及本次專題的最終成果(Flat Shading/Gouraud Shading/Phong Shading)。
 ![Blinn-Phong光照成果](https://github.com/jackson09255921/Computer_Graphics/blob/main/images/image23.png)
 
+---
+三種著色方式(Flat Shading、Gouraud Shading、Phong Shading)
+===
+1. 著色頻率
+著色頻率(Shading Frequencies)，依照虛擬法向量以及光照的關係達成三種截然不同的畫面。  
+- Shade each triangle(Flat Shading):以面為單位進行法向量計算，換言之就是整個面上任何區域的虛擬法向量都一樣，之後再進行光照。達成效果為單一面為同一顏色，不存在連續漸變。
+- Shade each vertex(Gouraud Shading):以點為單位進行法向量計算，其(虛擬)法向量根據該頂點周遭三角形的法向量進行加權平均求得，之後對每個頂點進行光照，最後將光照插值分配給每個像素。  
+![點的虛擬法向量計算](https://github.com/jackson09255921/Computer_Graphics/blob/main/images/image24.png)  
+- Shade each pixel(Phong Shading):以pixel為單位進行法向量計算，其計算方式將代入重心座標進行處理(也可以丟到雙線性插值來計算，但程式要處理一大堆的例外狀況，因此不採納)，求得後對於每一個pixel進行光照，最後就可以獲得Phong Shading。   
+![Pixel的法向量計算](https://github.com/jackson09255921/Computer_Graphics/blob/main/images/image32.png)  
+
+2. Z-buffer
+先前提到的所有演算法，都只有涉及到「單一3D物體」投影到2D螢幕上的過程，那如果需要同時將「多個3D物體」渲染在螢幕中，該如何避免圖形在2D平面上重疊的問題，這個就是Z-buffer將解決的部分。  
+Z-buffer稱為深度緩衝，基於螢幕所見到的畫面以x-y軸進行投影，z軸扮演衡量物體前後相對距離的角色，這個相對關係稱為深度，機器視覺所提到的深度相機也代有此含意。如圖29，他的作法是在Image space中對於物體每面，面被pixel所涵蓋的區域進行z值查驗，若其z值為越小，代表離螢幕越近，Z-buffer就會儲存它的資訊來做後續比較，同時間也會用Color buffer(frame buffer)來蒐集目前區域的顏色。反之，保留背景顏色。根據此規則掃蕩每個物體中的每一塊三角形區域。最後用Color buffer內的顏色值投影到螢幕當中。  
+![Z-buffer成效](https://github.com/jackson09255921/Computer_Graphics/blob/main/images/image37.png)  
+到了這裡，已經是整個pipeline與shading最後環節，其他的像是程式該如何編寫，obj檔案的格式與象徵意義，以及Rasterization的最後一個環節-Texturing部分歡迎到計算機圖學課程或是games101課程進行深究。
+
+
+---
+成果展示
+===
+![最終成果1](https://github.com/jackson09255921/Computer_Graphics/blob/main/images/image39.png)  
+![最終成果2](https://github.com/jackson09255921/Computer_Graphics/blob/main/images/image42.png)  
+![最終成果3](https://github.com/jackson09255921/Computer_Graphics/blob/main/images/image44.png)  
+![最終成果3](https://github.com/jackson09255921/Computer_Graphics/blob/main/images/image46.png)  
+
+---
 
 
 
-## Reference
-
-[Lab1 Reference](https://hackmd.io/TpltIfbET3O9X64BYrsNKQ?view)
-
-[Lab2 Reference](https://hackmd.io/5O2FIpo7RuCUEnjf0qvQiA?both)
-
-[Lab3 Reference](https://hackmd.io/@leon890820/HJN9ahXNj)
-
-[Lab4 Reference](https://hackmd.io/@leon890820/r1ceTQ5Dj)
+Reference
+===
+- [Lab1 Reference](https://hackmd.io/TpltIfbET3O9X64BYrsNKQ?view)
+- [Lab2 Reference](https://hackmd.io/5O2FIpo7RuCUEnjf0qvQiA?both)
+- [Lab3 Reference](https://hackmd.io/@leon890820/HJN9ahXNj)
+- [Lab4 Reference](https://hackmd.io/@leon890820/r1ceTQ5Dj)
+- [GAMES 101](https://www.bilibili.com/video/BV1X7411F744/?vd_source=079f4f5683be9efc4fbd04ff20338398)
