@@ -154,6 +154,8 @@ Conclusion & Demo
 
 ![最終成果3](https://github.com/jackson09255921/Computer_Graphics/blob/main/images/image46.png)  
 
+## 補充:
+### 若要設定download自己的3D model是可行的，只要把model裝到Mech資料夾中，並在Data資料夾中建立符合條件的參數格式即可，格式撰寫可以參閱下方Reference，祝玩得愉快。
 ---
 
 Reference
