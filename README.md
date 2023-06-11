@@ -124,8 +124,7 @@ Method
 ---
 三種著色方式(Flat Shading、Gouraud Shading、Phong Shading)
 ===
-1. 著色頻率
-著色頻率(Shading Frequencies)，依照虛擬法向量以及光照的關係達成三種截然不同的畫面。  
+1. 著色頻率(Shading Frequencies)，依照虛擬法向量以及光照的關係達成三種截然不同的畫面。  
 - Shade each triangle(Flat Shading):以面為單位進行法向量計算，換言之就是整個面上任何區域的虛擬法向量都一樣，之後再進行光照。達成效果為單一面為同一顏色，不存在連續漸變。
 - Shade each vertex(Gouraud Shading):以點為單位進行法向量計算，其(虛擬)法向量根據該頂點周遭三角形的法向量進行加權平均求得，之後對每個頂點進行光照，最後將光照插值分配給每個像素。  
 
