@@ -117,7 +117,8 @@ Method
 
 ![Specular 成果](https://github.com/jackson09255921/Computer_Graphics/blob/main/images/image22.png)  
 
-最後，將三種光照方式進行線性組合可以得到圖26的各個畫面，最右邊為疊加的最終成果。以上最基礎的光照方式，下一part將呈現三種不同的著色頻率方式以及本次專題的最終成果(Flat Shading/Gouraud Shading/Phong Shading)。
+最後，將三種光照方式進行線性組合可以得到的各個畫面，最右邊為疊加的最終成果。以上最基礎的光照方式，下一part將呈現三種不同的著色頻率方式以及本次專題的最終成果(Flat Shading/Gouraud Shading/Phong Shading)。
+
 ![Blinn-Phong光照成果](https://github.com/jackson09255921/Computer_Graphics/blob/main/images/image23.png)
 
 ---
