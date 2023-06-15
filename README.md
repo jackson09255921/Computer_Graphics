@@ -86,7 +86,7 @@ Method
 
 ![Blinn-Phong Shading Model](https://github.com/jackson09255921/Computer_Graphics/blob/main/images/image50.png)
 
-1. 環境光(Ambient): 模擬人眼在夜晚無直接光照下看到的情形，因周遭仍有細微光源彈射(例如:月亮)。當我們在夜晚進行觀察的時候，若前方有物體，可以隱約見到物體的形狀，但無法辨識他的遠近，以及真實外觀(圖17)。環境光不考慮光源方向以及視線方向，每個位置成效均一。  
+1. 環境光(Ambient): 模擬人眼在夜晚無直接光照下看到的情形，因周遭仍有細微光源彈射(例如:月亮)。當我們在夜晚進行觀察的時候，若前方有物體，可以隱約見到物體的形狀，但無法辨識他的遠近，以及真實外觀。環境光不考慮光源方向以及視線方向，每個位置成效均一。  
 - 概念圖:   
 ![Ambient 說明](https://github.com/jackson09255921/Computer_Graphics/blob/main/images/image51.png)  
 - Ambient 成果:  
@@ -135,7 +135,7 @@ Method
 
 2. Z-buffer
 先前提到的所有演算法，都只有涉及到「單一3D物體」投影到2D螢幕上的過程，那如果需要同時將「多個3D物體」渲染在螢幕中，該如何避免圖形在2D平面上重疊的問題，這個就是Z-buffer將解決的部分。  
-Z-buffer稱為深度緩衝，基於螢幕所見到的畫面以x-y軸進行投影，z軸扮演衡量物體前後相對距離的角色，這個相對關係稱為深度，機器視覺所提到的深度相機也代有此含意。如圖29，他的作法是在Image space中對於物體每面，面被pixel所涵蓋的區域進行z值查驗，若其z值為越小，代表離螢幕越近，Z-buffer就會儲存它的資訊來做後續比較，同時間也會用Color buffer(frame buffer)來蒐集目前區域的顏色。反之，保留背景顏色。根據此規則掃蕩每個物體中的每一塊三角形區域。最後用Color buffer內的顏色值投影到螢幕當中。  
+Z-buffer稱為深度緩衝，基於螢幕所見到的畫面以x-y軸進行投影，z軸扮演衡量物體前後相對距離的角色，這個相對關係稱為深度，機器視覺所提到的深度相機也代有此含意。他的作法是在Image space中對於物體每面，面被pixel所涵蓋的區域進行z值查驗，若其z值為越小，代表離螢幕越近，Z-buffer就會儲存它的資訊來做後續比較，同時間也會用Color buffer(frame buffer)來蒐集目前區域的顏色。反之，保留背景顏色。根據此規則掃蕩每個物體中的每一塊三角形區域。最後用Color buffer內的顏色值投影到螢幕當中。  
 
 ![Z-buffer成效](https://github.com/jackson09255921/Computer_Graphics/blob/main/images/image37.png)  
 到了這裡，已經是整個pipeline與shading最後環節，其他的像是程式該如何編寫，obj檔案的格式與象徵意義，以及Rasterization的最後一個環節-Texturing部分歡迎到計算機圖學課程或是games101課程進行深究。
