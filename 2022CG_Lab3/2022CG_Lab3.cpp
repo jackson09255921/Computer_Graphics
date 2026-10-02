@@ -189,20 +189,12 @@ double width, height;
 /*=============================主程式=========================================*/
 int main(int argc, char* argv[]) {
     glutInit(&argc, argv); //初始化
-    system("pause"); //視窗保留
 
     /*----------------------匯入檔案-----------------------------*/
-    /*cout << argv[1] << endl;
-    string s = argv[1];
-    string delimiter = "\\";
-    size_t pos = 0;
-    string token;
-    while ((pos = s.find(delimiter)) != std::string::npos) {
-        token = s.substr(0, pos);
-        s.erase(0, pos + delimiter.length());
+    if (argc > 1) {
+        FILE_NAME = argv[1];
     }
-    FILE_NAME = s;*/
-    string s = ".\\Data\\" + FILE_NAME;
+    string s = "Data/" + FILE_NAME;
 
     ifstream ifs(s, ios::in);
     if (!ifs.is_open())
@@ -1097,7 +1089,7 @@ void readCommand()
 {
     if (had_read) return;
     had_read = true;
-    string s = ".\\Data\\" + FILE_NAME;
+    string s = "Data/" + FILE_NAME;
 
     ifstream ifs(s, ios::in);
     if (!ifs.is_open())
@@ -1659,7 +1651,7 @@ void readCommand_3D()
     if (had_read) return;
     reset_3D();
     had_read = true;
-    string s = ".\\Data\\" + FILE_NAME;
+    string s = "Data/" + FILE_NAME;
 
     ifstream ifs(s, ios::in);
     if (!ifs.is_open())
@@ -1709,7 +1701,7 @@ void commandSelector_3D()
         if (words[0] == "object")
         {
             cout << words[0] << " " << words[1] << endl;
-            AddObject(".\\Mesh\\" + words[1]);
+            AddObject("Mesh/" + words[1]);
         }
         if (words[0] == "observer") {
             viewing_transform(stod(words[1]), stod(words[2]), stod(words[3]), stod(words[4]), stod(words[5]), stod(words[6]), stod(words[7]));

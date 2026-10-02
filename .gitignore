@@ -1,0 +1,26 @@
+# Build output
+/build/
+/out/
+/cmake-build-*/
+CMakeUserPresets.json
+
+# Compilers and IDEs
+*.o
+*.obj
+*.pdb
+*.ilk
+*.exp
+*.lib
+.vs/
+.vscode/
+.idea/
+
+# Generated executables and runtime libraries
+*.exe
+*.dll
+*.so
+*.dylib
+
+# OS metadata
+.DS_Store
+Thumbs.db

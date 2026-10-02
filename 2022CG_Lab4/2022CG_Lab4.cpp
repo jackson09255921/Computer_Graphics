@@ -11,7 +11,7 @@
 
 using namespace std;
 
-string FILE_NAME = "lab4A.txt";
+string FILE_NAME = "lab4A.in";
 
 // Lab4 shading controler
 vector<bool> Doshading = {0,0,1};
@@ -160,22 +160,27 @@ double leftEdge, rightEdge, bottomEdge, topEdge;
 /*=============================主程式=========================================*/
 int main(int argc, char* argv[]) {
     glutInit(&argc, argv); //初始化
-    system("pause"); //視窗保留
 
     /*----------------------匯入檔案-----------------------------*/
-    /*cout << argv[1] << endl;
-    string s = argv[1];
-    string delimiter = "\\";
-    size_t pos = 0;
-    string token;
-    while ((pos = s.find(delimiter)) != std::string::npos) {
-        token = s.substr(0, pos);
-        s.erase(0, pos + delimiter.length());
+    if (argc > 1) {
+        FILE_NAME = argv[1];
     }
-     FILE_NAME = s;*/
+    if (argc > 2) {
+        const string shading = argv[2];
+        if (shading == "flat") {
+            Doshading = {1, 0, 0};
+        } else if (shading == "gouraud") {
+            Doshading = {0, 1, 0};
+        } else if (shading == "phong") {
+            Doshading = {0, 0, 1};
+        } else {
+            cerr << "Unknown shading mode: " << shading
+                 << " (expected flat, gouraud, or phong)" << endl;
+            return -1;
+        }
+    }
 
-
-    string s = ".\\Data\\" + FILE_NAME;
+    string s = "Data/" + FILE_NAME;
 
     ifstream ifs(s, ios::in);
     if (!ifs.is_open())
@@ -872,7 +877,7 @@ void readCommand_3D()
     reset_3D();
     had_read = true;
     string s = FILE_NAME;
-    s = ".\\Data\\" + FILE_NAME;
+    s = "Data/" + FILE_NAME;
     ifstream ifs(s, ios::in);
     if (!ifs.is_open())
     {
@@ -922,7 +927,7 @@ void commandSelector_3D()
             cout << words[0] << " " << words[1] << endl;
             objectColor = { stod(words[2]), stod(words[3]), stod(words[4]) };
             coefficent = { stod(words[5]), stod(words[6]), stod(words[7]) };
-            AddObject(".\\Mesh\\" + words[1]);
+            AddObject("Mesh/" + words[1]);
             objectSelector3D(fileCommandBuffer);
         }
         if (words[0] == "observer") {

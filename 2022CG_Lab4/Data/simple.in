@@ -3,11 +3,11 @@ ambient 0.5 0.5 0.5
 
 reset
 translate 0 1 0
-object cube.asc 1 0 0 0.7 0.3 4
+object cube.obj 1 0 0 0.7 0.3 4
 
 reset
 translate 0 -1 0
-object cube.asc 1 0 0 0.7 0.3 4
+object cube.obj 1 0 0 0.7 0.3 4
 
 background 0 0 1
 observer 5 5 5 0 0 0 0 .1 1000 20

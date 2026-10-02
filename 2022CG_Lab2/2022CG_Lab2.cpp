@@ -148,7 +148,6 @@ double pi = 3.141592653589793;
 /*=============================主程式=========================================*/
 int main(int argc, char* argv[]) {
     glutInit(&argc, argv); //初始化
-    system("pause"); //視窗保留
 
     glutInitDisplayMode(GLUT_RGBA | GLUT_SINGLE);
     glutInitWindowSize(600, 600);
@@ -159,17 +158,10 @@ int main(int argc, char* argv[]) {
     glutDisplayFunc(display);
 
     /*----------------------匯入檔案-----------------------------*/
-    //cout << argv[1] << endl;
-    /*string s = argv[1];
-    string delimiter = "\\";
-    size_t pos = 0;
-    string token;
-    while ((pos = s.find(delimiter)) != std::string::npos) {
-        token = s.substr(0, pos);
-        s.erase(0, pos + delimiter.length());
+    if (argc > 1) {
+        FILE_NAME = argv[1];
     }
-    FILE_NAME = s;*/
-    FILE_NAME = ".\\Data\\" + FILE_NAME;
+    FILE_NAME = "Data/" + FILE_NAME;
     /*----------------------匯入檔案-----------------------------*/
 
     glutTimerFunc(1, timerProc, 1); //即時更新
