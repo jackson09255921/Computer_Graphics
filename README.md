@@ -53,7 +53,10 @@ interpolation frequencies:
 
 - A C++17 compiler
 - CMake 3.16+
-- OpenGL and GLUT/freeglut development packages
+- OpenGL development libraries
+
+If GLUT/freeglut is not installed, CMake downloads and builds a pinned freeglut
+release automatically.
 
 Ubuntu/Debian:
 
