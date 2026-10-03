@@ -1,0 +1,568 @@
+{
+  "format": "computer-graphics-legacy-scene-v1",
+  "source": "legacy/2022CG_Lab2/Data/lab2E.in",
+  "commands": [
+    {
+      "line": 2,
+      "op": "reset",
+      "args": []
+    },
+    {
+      "line": 3,
+      "op": "scale",
+      "args": [
+        4,
+        2
+      ]
+    },
+    {
+      "line": 4,
+      "op": "rotate",
+      "args": [
+        0
+      ]
+    },
+    {
+      "line": 5,
+      "op": "translate",
+      "args": [
+        4,
+        2
+      ]
+    },
+    {
+      "line": 6,
+      "op": "square",
+      "args": []
+    },
+    {
+      "line": 9,
+      "op": "reset",
+      "args": []
+    },
+    {
+      "line": 10,
+      "op": "scale",
+      "args": [
+        20,
+        0.5
+      ]
+    },
+    {
+      "line": 11,
+      "op": "rotate",
+      "args": [
+        0
+      ]
+    },
+    {
+      "line": 12,
+      "op": "translate",
+      "args": [
+        -10,
+        -0.5
+      ]
+    },
+    {
+      "line": 13,
+      "op": "square",
+      "args": []
+    },
+    {
+      "line": 16,
+      "op": "reset",
+      "args": []
+    },
+    {
+      "line": 17,
+      "op": "scale",
+      "args": [
+        0.24,
+        1
+      ]
+    },
+    {
+      "line": 18,
+      "op": "rotate",
+      "args": [
+        0
+      ]
+    },
+    {
+      "line": 19,
+      "op": "translate",
+      "args": [
+        4,
+        1.25
+      ]
+    },
+    {
+      "line": 20,
+      "op": "square",
+      "args": []
+    },
+    {
+      "line": 23,
+      "op": "reset",
+      "args": []
+    },
+    {
+      "line": 24,
+      "op": "scale",
+      "args": [
+        0.25,
+        0.5
+      ]
+    },
+    {
+      "line": 25,
+      "op": "rotate",
+      "args": [
+        0
+      ]
+    },
+    {
+      "line": 26,
+      "op": "translate",
+      "args": [
+        2,
+        2.5
+      ]
+    },
+    {
+      "line": 27,
+      "op": "square",
+      "args": []
+    },
+    {
+      "line": 30,
+      "op": "reset",
+      "args": []
+    },
+    {
+      "line": 31,
+      "op": "scale",
+      "args": [
+        0.25,
+        0.5
+      ]
+    },
+    {
+      "line": 32,
+      "op": "rotate",
+      "args": [
+        0
+      ]
+    },
+    {
+      "line": 33,
+      "op": "translate",
+      "args": [
+        6,
+        2.5
+      ]
+    },
+    {
+      "line": 34,
+      "op": "square",
+      "args": []
+    },
+    {
+      "line": 37,
+      "op": "reset",
+      "args": []
+    },
+    {
+      "line": 38,
+      "op": "scale",
+      "args": [
+        5,
+        1
+      ]
+    },
+    {
+      "line": 39,
+      "op": "rotate",
+      "args": [
+        0
+      ]
+    },
+    {
+      "line": 40,
+      "op": "translate",
+      "args": [
+        4,
+        5
+      ]
+    },
+    {
+      "line": 41,
+      "op": "triangle",
+      "args": []
+    },
+    {
+      "line": 44,
+      "op": "reset",
+      "args": []
+    },
+    {
+      "line": 45,
+      "op": "scale",
+      "args": [
+        0.25,
+        3
+      ]
+    },
+    {
+      "line": 46,
+      "op": "rotate",
+      "args": [
+        0
+      ]
+    },
+    {
+      "line": 47,
+      "op": "translate",
+      "args": [
+        -4,
+        3
+      ]
+    },
+    {
+      "line": 48,
+      "op": "triangle",
+      "args": []
+    },
+    {
+      "line": 51,
+      "op": "reset",
+      "args": []
+    },
+    {
+      "line": 52,
+      "op": "scale",
+      "args": [
+        0.25,
+        3.5
+      ]
+    },
+    {
+      "line": 53,
+      "op": "rotate",
+      "args": [
+        -45
+      ]
+    },
+    {
+      "line": 54,
+      "op": "translate",
+      "args": [
+        -4,
+        5.75
+      ]
+    },
+    {
+      "line": 55,
+      "op": "square",
+      "args": []
+    },
+    {
+      "line": 58,
+      "op": "reset",
+      "args": []
+    },
+    {
+      "line": 59,
+      "op": "scale",
+      "args": [
+        0.25,
+        3.5
+      ]
+    },
+    {
+      "line": 60,
+      "op": "rotate",
+      "args": [
+        45
+      ]
+    },
+    {
+      "line": 61,
+      "op": "translate",
+      "args": [
+        -4,
+        5.75
+      ]
+    },
+    {
+      "line": 62,
+      "op": "square",
+      "args": []
+    },
+    {
+      "line": 65,
+      "op": "view",
+      "args": [
+        -10,
+        10,
+        -2,
+        10,
+        20,
+        220,
+        20,
+        140
+      ]
+    },
+    {
+      "line": 68,
+      "op": "view",
+      "args": [
+        -5,
+        5,
+        -2,
+        10,
+        270,
+        500,
+        20,
+        140
+      ]
+    },
+    {
+      "line": 71,
+      "op": "view",
+      "args": [
+        -10,
+        10,
+        1,
+        4,
+        20,
+        320,
+        20,
+        580
+      ]
+    },
+    {
+      "line": 74,
+      "op": "clearScreen",
+      "args": []
+    },
+    {
+      "line": 77,
+      "op": "view",
+      "args": [
+        -10,
+        10,
+        1,
+        4,
+        20,
+        320,
+        20,
+        380
+      ]
+    },
+    {
+      "line": 80,
+      "op": "view",
+      "args": [
+        -10,
+        10,
+        1,
+        4,
+        340,
+        740,
+        220,
+        340
+      ]
+    },
+    {
+      "line": 83,
+      "op": "clearData",
+      "args": []
+    },
+    {
+      "line": 86,
+      "op": "reset",
+      "args": []
+    },
+    {
+      "line": 87,
+      "op": "scale",
+      "args": [
+        5,
+        4
+      ]
+    },
+    {
+      "line": 88,
+      "op": "rotate",
+      "args": [
+        0
+      ]
+    },
+    {
+      "line": 89,
+      "op": "translate",
+      "args": [
+        0,
+        0
+      ]
+    },
+    {
+      "line": 90,
+      "op": "square",
+      "args": []
+    },
+    {
+      "line": 92,
+      "op": "reset",
+      "args": []
+    },
+    {
+      "line": 93,
+      "op": "scale",
+      "args": [
+        8.5,
+        0.5
+      ]
+    },
+    {
+      "line": 94,
+      "op": "rotate",
+      "args": [
+        45
+      ]
+    },
+    {
+      "line": 95,
+      "op": "translate",
+      "args": [
+        0.5,
+        5.5
+      ]
+    },
+    {
+      "line": 96,
+      "op": "square",
+      "args": []
+    },
+    {
+      "line": 98,
+      "op": "reset",
+      "args": []
+    },
+    {
+      "line": 99,
+      "op": "scale",
+      "args": [
+        8.5,
+        0.5
+      ]
+    },
+    {
+      "line": 100,
+      "op": "rotate",
+      "args": [
+        -45
+      ]
+    },
+    {
+      "line": 101,
+      "op": "translate",
+      "args": [
+        0.5,
+        5.5
+      ]
+    },
+    {
+      "line": 102,
+      "op": "square",
+      "args": []
+    },
+    {
+      "line": 104,
+      "op": "reset",
+      "args": []
+    },
+    {
+      "line": 105,
+      "op": "scale",
+      "args": [
+        8.5,
+        0.5
+      ]
+    },
+    {
+      "line": 106,
+      "op": "rotate",
+      "args": [
+        -135
+      ]
+    },
+    {
+      "line": 107,
+      "op": "translate",
+      "args": [
+        0.5,
+        5.5
+      ]
+    },
+    {
+      "line": 108,
+      "op": "square",
+      "args": []
+    },
+    {
+      "line": 110,
+      "op": "reset",
+      "args": []
+    },
+    {
+      "line": 111,
+      "op": "scale",
+      "args": [
+        8.5,
+        0.5
+      ]
+    },
+    {
+      "line": 112,
+      "op": "rotate",
+      "args": [
+        135
+      ]
+    },
+    {
+      "line": 113,
+      "op": "translate",
+      "args": [
+        0.5,
+        5.5
+      ]
+    },
+    {
+      "line": 114,
+      "op": "square",
+      "args": []
+    },
+    {
+      "line": 117,
+      "op": "view",
+      "args": [
+        -10,
+        10,
+        0,
+        10,
+        500,
+        700,
+        20,
+        140
+      ]
+    },
+    {
+      "line": 119,
+      "op": "end",
+      "args": []
+    }
+  ],
+  "objectReferences": []
+}

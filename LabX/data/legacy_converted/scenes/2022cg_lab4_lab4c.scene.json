@@ -1,0 +1,362 @@
+{
+  "format": "computer-graphics-legacy-scene-v1",
+  "source": "legacy/2022CG_Lab4/Data/lab4C.in",
+  "commands": [
+    {
+      "line": 1,
+      "op": "700",
+      "args": [
+        700
+      ]
+    },
+    {
+      "line": 3,
+      "op": "ambient",
+      "args": [
+        0.4,
+        0.4,
+        0.4
+      ]
+    },
+    {
+      "line": 4,
+      "op": "viewport",
+      "args": [
+        -1,
+        1,
+        -1,
+        1
+      ]
+    },
+    {
+      "line": 5,
+      "op": "background",
+      "args": [
+        0.5,
+        0.5,
+        0
+      ]
+    },
+    {
+      "line": 7,
+      "op": "observer",
+      "args": [
+        0,
+        3,
+        0.5,
+        0,
+        1,
+        -1,
+        0,
+        0.1,
+        1000,
+        40
+      ]
+    },
+    {
+      "line": 9,
+      "op": "light",
+      "args": [
+        1,
+        0.8,
+        0.8,
+        0.8,
+        0,
+        5,
+        5
+      ]
+    },
+    {
+      "line": 10,
+      "op": "scale",
+      "args": [
+        8,
+        8,
+        8
+      ]
+    },
+    {
+      "line": 13,
+      "op": "translate",
+      "args": [
+        0,
+        0,
+        -1
+      ]
+    },
+    {
+      "line": 14,
+      "op": "object",
+      "args": [
+        "bunny.obj",
+        0.5,
+        0.2,
+        0.5,
+        0.7,
+        0.3,
+        5
+      ],
+      "convertedMesh": "../meshes/bunny_from_obj.gltf"
+    },
+    {
+      "line": 15,
+      "op": "translate",
+      "args": [
+        0,
+        0,
+        -1
+      ]
+    },
+    {
+      "line": 16,
+      "op": "object",
+      "args": [
+        "bunny.obj",
+        0.3,
+        0.8,
+        0.1,
+        0.7,
+        0.3,
+        5
+      ],
+      "convertedMesh": "../meshes/bunny_from_obj.gltf"
+    },
+    {
+      "line": 17,
+      "op": "translate",
+      "args": [
+        0,
+        0,
+        -1
+      ]
+    },
+    {
+      "line": 18,
+      "op": "object",
+      "args": [
+        "bunny.obj",
+        0.4,
+        0.25,
+        0.2,
+        0.7,
+        0.3,
+        5
+      ],
+      "convertedMesh": "../meshes/bunny_from_obj.gltf"
+    },
+    {
+      "line": 20,
+      "op": "reset",
+      "args": []
+    },
+    {
+      "line": 21,
+      "op": "scale",
+      "args": [
+        8,
+        8,
+        8
+      ]
+    },
+    {
+      "line": 24,
+      "op": "translate",
+      "args": [
+        2,
+        0,
+        -1
+      ]
+    },
+    {
+      "line": 25,
+      "op": "object",
+      "args": [
+        "bunny.obj",
+        0.8,
+        0.2,
+        0.1,
+        0.7,
+        0.3,
+        5
+      ],
+      "convertedMesh": "../meshes/bunny_from_obj.gltf"
+    },
+    {
+      "line": 26,
+      "op": "translate",
+      "args": [
+        0,
+        0,
+        -1
+      ]
+    },
+    {
+      "line": 27,
+      "op": "object",
+      "args": [
+        "bunny.obj",
+        0,
+        0.4,
+        0.1,
+        0.7,
+        0.3,
+        5
+      ],
+      "convertedMesh": "../meshes/bunny_from_obj.gltf"
+    },
+    {
+      "line": 28,
+      "op": "translate",
+      "args": [
+        0,
+        0,
+        -1
+      ]
+    },
+    {
+      "line": 29,
+      "op": "object",
+      "args": [
+        "bunny.obj",
+        0,
+        0.9,
+        0.5,
+        0.7,
+        0.3,
+        5
+      ],
+      "convertedMesh": "../meshes/bunny_from_obj.gltf"
+    },
+    {
+      "line": 31,
+      "op": "reset",
+      "args": []
+    },
+    {
+      "line": 32,
+      "op": "scale",
+      "args": [
+        8,
+        8,
+        8
+      ]
+    },
+    {
+      "line": 35,
+      "op": "translate",
+      "args": [
+        -2,
+        0,
+        -1
+      ]
+    },
+    {
+      "line": 36,
+      "op": "object",
+      "args": [
+        "bunny.obj",
+        0.6,
+        0,
+        0.5,
+        0.7,
+        0.3,
+        5
+      ],
+      "convertedMesh": "../meshes/bunny_from_obj.gltf"
+    },
+    {
+      "line": 37,
+      "op": "translate",
+      "args": [
+        0,
+        0,
+        -1
+      ]
+    },
+    {
+      "line": 38,
+      "op": "object",
+      "args": [
+        "bunny.obj",
+        0.9,
+        0.2,
+        0.4,
+        0.7,
+        0.3,
+        5
+      ],
+      "convertedMesh": "../meshes/bunny_from_obj.gltf"
+    },
+    {
+      "line": 39,
+      "op": "translate",
+      "args": [
+        0,
+        0,
+        -1
+      ]
+    },
+    {
+      "line": 40,
+      "op": "object",
+      "args": [
+        "bunny.obj",
+        1,
+        0.2,
+        0,
+        0.7,
+        0.3,
+        5
+      ],
+      "convertedMesh": "../meshes/bunny_from_obj.gltf"
+    },
+    {
+      "line": 43,
+      "op": "display",
+      "args": []
+    },
+    {
+      "line": 48,
+      "op": "end",
+      "args": []
+    }
+  ],
+  "objectReferences": [
+    {
+      "legacy": "bunny.obj",
+      "converted": "../meshes/bunny_from_obj.gltf"
+    },
+    {
+      "legacy": "bunny.obj",
+      "converted": "../meshes/bunny_from_obj.gltf"
+    },
+    {
+      "legacy": "bunny.obj",
+      "converted": "../meshes/bunny_from_obj.gltf"
+    },
+    {
+      "legacy": "bunny.obj",
+      "converted": "../meshes/bunny_from_obj.gltf"
+    },
+    {
+      "legacy": "bunny.obj",
+      "converted": "../meshes/bunny_from_obj.gltf"
+    },
+    {
+      "legacy": "bunny.obj",
+      "converted": "../meshes/bunny_from_obj.gltf"
+    },
+    {
+      "legacy": "bunny.obj",
+      "converted": "../meshes/bunny_from_obj.gltf"
+    },
+    {
+      "legacy": "bunny.obj",
+      "converted": "../meshes/bunny_from_obj.gltf"
+    },
+    {
+      "legacy": "bunny.obj",
+      "converted": "../meshes/bunny_from_obj.gltf"
+    }
+  ]
+}

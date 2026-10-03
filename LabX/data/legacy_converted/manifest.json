@@ -1,0 +1,189 @@
+{
+  "format": "computer-graphics-converted-assets-v1",
+  "meshes": [
+    {
+      "name": "bench_from_obj",
+      "source": "legacy/2022CG_Lab3/Mesh/bench.obj",
+      "vertices": 264,
+      "triangles": 448,
+      "gltf": "meshes/bench_from_obj.gltf"
+    },
+    {
+      "name": "bunny_from_obj",
+      "source": "legacy/2022CG_Lab3/Mesh/bunny.obj",
+      "vertices": 2503,
+      "triangles": 4968,
+      "gltf": "meshes/bunny_from_obj.gltf"
+    },
+    {
+      "name": "cube_from_obj",
+      "source": "legacy/2022CG_Lab3/Mesh/cube.obj",
+      "vertices": 8,
+      "triangles": 12,
+      "gltf": "meshes/cube_from_obj.gltf"
+    },
+    {
+      "name": "drop_from_obj",
+      "source": "legacy/2022CG_Lab3/Mesh/drop.obj",
+      "vertices": 144,
+      "triangles": 264,
+      "gltf": "meshes/drop_from_obj.gltf"
+    },
+    {
+      "name": "glass_from_obj",
+      "source": "legacy/2022CG_Lab3/Mesh/glass.obj",
+      "vertices": 880,
+      "triangles": 1680,
+      "gltf": "meshes/glass_from_obj.gltf"
+    },
+    {
+      "name": "quad_from_obj",
+      "source": "legacy/2022CG_Lab4/Mesh/quad.obj",
+      "vertices": 4,
+      "triangles": 2,
+      "gltf": "meshes/quad_from_obj.gltf"
+    },
+    {
+      "name": "skull_from_obj",
+      "source": "legacy/2022CG_Lab3/Mesh/skull.obj",
+      "vertices": 1910,
+      "triangles": 2084,
+      "gltf": "meshes/skull_from_obj.gltf"
+    },
+    {
+      "name": "suzanne_from_obj",
+      "source": "legacy/2022CG_Lab3/Mesh/suzanne.obj",
+      "vertices": 511,
+      "triangles": 968,
+      "gltf": "meshes/suzanne_from_obj.gltf"
+    },
+    {
+      "name": "teapot_from_obj",
+      "source": "legacy/2022CG_Lab3/Mesh/teapot.obj",
+      "vertices": 3644,
+      "triangles": 6320,
+      "gltf": "meshes/teapot_from_obj.gltf"
+    },
+    {
+      "name": "bench_from_asc",
+      "source": "legacy/2022CG_Lab3/Mesh/bench.asc",
+      "vertices": 264,
+      "triangles": 448,
+      "gltf": "meshes/bench_from_asc.gltf"
+    },
+    {
+      "name": "drop_from_asc",
+      "source": "legacy/2022CG_Lab3/Mesh/drop.asc",
+      "vertices": 144,
+      "triangles": 264,
+      "gltf": "meshes/drop_from_asc.gltf"
+    },
+    {
+      "name": "glass_from_asc",
+      "source": "legacy/2022CG_Lab3/Mesh/glass.asc",
+      "vertices": 880,
+      "triangles": 1680,
+      "gltf": "meshes/glass_from_asc.gltf"
+    },
+    {
+      "name": "grid4x4_from_asc",
+      "source": "legacy/2022CG_Lab4/Mesh/Grid4x4.asc",
+      "vertices": 25,
+      "triangles": 32,
+      "gltf": "meshes/grid4x4_from_asc.gltf"
+    },
+    {
+      "name": "skull_from_asc",
+      "source": "legacy/2022CG_Lab3/Mesh/skull.asc",
+      "vertices": 1910,
+      "triangles": 2084,
+      "gltf": "meshes/skull_from_asc.gltf"
+    }
+  ],
+  "scenes": [
+    {
+      "name": "2022cg_lab2_lab2a",
+      "source": "legacy/2022CG_Lab2/Data/lab2A.in",
+      "scene": "scenes/2022cg_lab2_lab2a.scene.json",
+      "unresolvedObjects": []
+    },
+    {
+      "name": "2022cg_lab2_lab2b",
+      "source": "legacy/2022CG_Lab2/Data/lab2B.in",
+      "scene": "scenes/2022cg_lab2_lab2b.scene.json",
+      "unresolvedObjects": []
+    },
+    {
+      "name": "2022cg_lab2_lab2c",
+      "source": "legacy/2022CG_Lab2/Data/lab2C.in",
+      "scene": "scenes/2022cg_lab2_lab2c.scene.json",
+      "unresolvedObjects": []
+    },
+    {
+      "name": "2022cg_lab2_lab2d",
+      "source": "legacy/2022CG_Lab2/Data/lab2D.in",
+      "scene": "scenes/2022cg_lab2_lab2d.scene.json",
+      "unresolvedObjects": []
+    },
+    {
+      "name": "2022cg_lab2_lab2e",
+      "source": "legacy/2022CG_Lab2/Data/lab2E.in",
+      "scene": "scenes/2022cg_lab2_lab2e.scene.json",
+      "unresolvedObjects": []
+    },
+    {
+      "name": "2022cg_lab3_lab3a",
+      "source": "legacy/2022CG_Lab3/Data/Lab3A.in",
+      "scene": "scenes/2022cg_lab3_lab3a.scene.json",
+      "unresolvedObjects": []
+    },
+    {
+      "name": "2022cg_lab3_lab3b",
+      "source": "legacy/2022CG_Lab3/Data/Lab3B.in",
+      "scene": "scenes/2022cg_lab3_lab3b.scene.json",
+      "unresolvedObjects": []
+    },
+    {
+      "name": "2022cg_lab3_lab3c",
+      "source": "legacy/2022CG_Lab3/Data/Lab3C.in",
+      "scene": "scenes/2022cg_lab3_lab3c.scene.json",
+      "unresolvedObjects": []
+    },
+    {
+      "name": "2022cg_lab3_lab3d",
+      "source": "legacy/2022CG_Lab3/Data/Lab3D.in",
+      "scene": "scenes/2022cg_lab3_lab3d.scene.json",
+      "unresolvedObjects": []
+    },
+    {
+      "name": "2022cg_lab4_lab4a",
+      "source": "legacy/2022CG_Lab4/Data/lab4A.in",
+      "scene": "scenes/2022cg_lab4_lab4a.scene.json",
+      "unresolvedObjects": []
+    },
+    {
+      "name": "2022cg_lab4_lab4b",
+      "source": "legacy/2022CG_Lab4/Data/lab4B.in",
+      "scene": "scenes/2022cg_lab4_lab4b.scene.json",
+      "unresolvedObjects": []
+    },
+    {
+      "name": "2022cg_lab4_lab4c",
+      "source": "legacy/2022CG_Lab4/Data/lab4C.in",
+      "scene": "scenes/2022cg_lab4_lab4c.scene.json",
+      "unresolvedObjects": []
+    },
+    {
+      "name": "2022cg_lab4_simple",
+      "source": "legacy/2022CG_Lab4/Data/simple.in",
+      "scene": "scenes/2022cg_lab4_simple.scene.json",
+      "unresolvedObjects": []
+    },
+    {
+      "name": "2022cg_lab4_test",
+      "source": "legacy/2022CG_Lab4/Data/test.in",
+      "scene": "scenes/2022cg_lab4_test.scene.json",
+      "unresolvedObjects": []
+    }
+  ]
+}

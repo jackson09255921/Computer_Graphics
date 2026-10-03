@@ -1,0 +1,84 @@
+{
+  "format": "computer-graphics-legacy-scene-v1",
+  "source": "legacy/2022CG_Lab3/Data/Lab3C.in",
+  "commands": [
+    {
+      "line": 1,
+      "op": "600",
+      "args": [
+        600
+      ]
+    },
+    {
+      "line": 3,
+      "op": "object",
+      "args": [
+        "teapot.obj"
+      ],
+      "convertedMesh": "../meshes/teapot_from_obj.gltf"
+    },
+    {
+      "line": 5,
+      "op": "observer",
+      "args": [
+        7,
+        7,
+        9,
+        0,
+        0,
+        0,
+        0,
+        1,
+        1000,
+        20
+      ]
+    },
+    {
+      "line": 7,
+      "op": "viewport",
+      "args": [
+        -0.8,
+        0.8,
+        -0.8,
+        0.8
+      ]
+    },
+    {
+      "line": 9,
+      "op": "display",
+      "args": []
+    },
+    {
+      "line": 11,
+      "op": "observer",
+      "args": [
+        3,
+        6,
+        3,
+        0,
+        0,
+        0,
+        0,
+        1,
+        1000,
+        20
+      ]
+    },
+    {
+      "line": 13,
+      "op": "display",
+      "args": []
+    },
+    {
+      "line": 15,
+      "op": "end",
+      "args": []
+    }
+  ],
+  "objectReferences": [
+    {
+      "legacy": "teapot.obj",
+      "converted": "../meshes/teapot_from_obj.gltf"
+    }
+  ]
+}

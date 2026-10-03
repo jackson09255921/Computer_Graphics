@@ -135,6 +135,11 @@ if(BUILD_TESTING)
     add_executable(asc_tests LabX/assets/asc_tests.cpp)
     target_link_libraries(asc_tests PRIVATE cg_core)
     add_test(NAME asc_tests COMMAND asc_tests)
+
+    add_executable(converted_asset_tests LabX/assets/converted_asset_tests.cpp)
+    target_link_libraries(converted_asset_tests PRIVATE cg_core)
+    add_test(NAME converted_asset_tests COMMAND converted_asset_tests
+        "${CMAKE_CURRENT_SOURCE_DIR}/LabX/data/legacy_converted/meshes")
 endif()
 
 add_executable(visual_compare LabX/visual/visual_compare.cpp)

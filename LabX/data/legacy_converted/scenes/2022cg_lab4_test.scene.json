@@ -1,0 +1,743 @@
+{
+  "format": "computer-graphics-legacy-scene-v1",
+  "source": "legacy/2022CG_Lab4/Data/test.in",
+  "commands": [
+    {
+      "line": 1,
+      "op": "500",
+      "args": [
+        500
+      ]
+    },
+    {
+      "line": 3,
+      "op": "ambient",
+      "args": [
+        0.5,
+        0.5,
+        0.5
+      ]
+    },
+    {
+      "line": 5,
+      "op": "scale",
+      "args": [
+        0.7,
+        0.7,
+        0.7
+      ]
+    },
+    {
+      "line": 6,
+      "op": "translate",
+      "args": [
+        1.7,
+        1.3,
+        -0.5
+      ]
+    },
+    {
+      "line": 7,
+      "op": "object",
+      "args": [
+        "glass.obj",
+        0.6,
+        1,
+        1,
+        0.7,
+        0.3,
+        50
+      ],
+      "convertedMesh": "../meshes/glass_from_obj.gltf"
+    },
+    {
+      "line": 8,
+      "op": "translate",
+      "args": [
+        -1,
+        0,
+        -0.5
+      ]
+    },
+    {
+      "line": 9,
+      "op": "object",
+      "args": [
+        "glass.obj",
+        0.6,
+        1,
+        1,
+        0.7,
+        0.3,
+        50
+      ],
+      "convertedMesh": "../meshes/glass_from_obj.gltf"
+    },
+    {
+      "line": 11,
+      "op": "reset",
+      "args": []
+    },
+    {
+      "line": 12,
+      "op": "scale",
+      "args": [
+        6,
+        0.1,
+        6
+      ]
+    },
+    {
+      "line": 13,
+      "op": "object",
+      "args": [
+        "cube.obj",
+        0.4,
+        0.2,
+        0,
+        0.7,
+        0.3,
+        4
+      ],
+      "convertedMesh": "../meshes/cube_from_obj.gltf"
+    },
+    {
+      "line": 14,
+      "op": "scale",
+      "args": [
+        0.5,
+        15,
+        0.5
+      ]
+    },
+    {
+      "line": 15,
+      "op": "translate",
+      "args": [
+        0,
+        -1,
+        0
+      ]
+    },
+    {
+      "line": 16,
+      "op": "object",
+      "args": [
+        "cube.obj",
+        0.4,
+        0.2,
+        0,
+        0.7,
+        0.3,
+        4
+      ],
+      "convertedMesh": "../meshes/cube_from_obj.gltf"
+    },
+    {
+      "line": 18,
+      "op": "reset",
+      "args": []
+    },
+    {
+      "line": 19,
+      "op": "scale",
+      "args": [
+        0.4,
+        0.4,
+        0.4
+      ]
+    },
+    {
+      "line": 20,
+      "op": "rotate",
+      "args": [
+        0,
+        20,
+        0
+      ]
+    },
+    {
+      "line": 21,
+      "op": "translate",
+      "args": [
+        -1.2,
+        0,
+        0
+      ]
+    },
+    {
+      "line": 22,
+      "op": "object",
+      "args": [
+        "teapot.obj",
+        0.75294,
+        0.75294,
+        0.75294,
+        0.7,
+        0.3,
+        30
+      ],
+      "convertedMesh": "../meshes/teapot_from_obj.gltf"
+    },
+    {
+      "line": 24,
+      "op": "reset",
+      "args": []
+    },
+    {
+      "line": 25,
+      "op": "scale",
+      "args": [
+        0.3,
+        1,
+        0.3
+      ]
+    },
+    {
+      "line": 26,
+      "op": "translate",
+      "args": [
+        -1.5,
+        1.15,
+        -1.5
+      ]
+    },
+    {
+      "line": 27,
+      "op": "object",
+      "args": [
+        "drop.obj",
+        1,
+        0.6,
+        0.2,
+        0.7,
+        0.3,
+        100
+      ],
+      "convertedMesh": "../meshes/drop_from_obj.gltf"
+    },
+    {
+      "line": 29,
+      "op": "reset",
+      "args": []
+    },
+    {
+      "line": 30,
+      "op": "scale",
+      "args": [
+        0.15,
+        2.3,
+        0.15
+      ]
+    },
+    {
+      "line": 31,
+      "op": "translate",
+      "args": [
+        -1.5,
+        0,
+        -1.5
+      ]
+    },
+    {
+      "line": 32,
+      "op": "object",
+      "args": [
+        "cube.obj",
+        0.95,
+        0.95,
+        0.95,
+        0.7,
+        0.3,
+        10
+      ],
+      "convertedMesh": "../meshes/cube_from_obj.gltf"
+    },
+    {
+      "line": 34,
+      "op": "background",
+      "args": [
+        1,
+        1,
+        0.6
+      ]
+    },
+    {
+      "line": 35,
+      "op": "viewport",
+      "args": [
+        -1,
+        1,
+        -1,
+        1
+      ]
+    },
+    {
+      "line": 36,
+      "op": "light",
+      "args": [
+        1,
+        0.7,
+        0.7,
+        0.7,
+        1,
+        5,
+        5
+      ]
+    },
+    {
+      "line": 37,
+      "op": "observer",
+      "args": [
+        4,
+        3,
+        4,
+        0,
+        0,
+        0,
+        0,
+        0.1,
+        1000,
+        20
+      ]
+    },
+    {
+      "line": 38,
+      "op": "display",
+      "args": []
+    },
+    {
+      "line": 40,
+      "op": "reset",
+      "args": []
+    },
+    {
+      "line": 41,
+      "op": "scale",
+      "args": [
+        1,
+        2,
+        2.5
+      ]
+    },
+    {
+      "line": 42,
+      "op": "rotate",
+      "args": [
+        0,
+        180,
+        0
+      ]
+    },
+    {
+      "line": 43,
+      "op": "translate",
+      "args": [
+        0,
+        0,
+        -4
+      ]
+    },
+    {
+      "line": 44,
+      "op": "object",
+      "args": [
+        "bench.obj",
+        0.5,
+        0.3,
+        0.1,
+        0.7,
+        0.3,
+        4
+      ],
+      "convertedMesh": "../meshes/bench_from_obj.gltf"
+    },
+    {
+      "line": 46,
+      "op": "rotate",
+      "args": [
+        0,
+        90,
+        0
+      ]
+    },
+    {
+      "line": 47,
+      "op": "object",
+      "args": [
+        "bench.obj",
+        0.5,
+        0.3,
+        0.1,
+        0.7,
+        0.3,
+        4
+      ],
+      "convertedMesh": "../meshes/bench_from_obj.gltf"
+    },
+    {
+      "line": 50,
+      "op": "reset",
+      "args": []
+    },
+    {
+      "line": 51,
+      "op": "scale",
+      "args": [
+        4,
+        0.3,
+        0.1
+      ]
+    },
+    {
+      "line": 52,
+      "op": "rotate",
+      "args": [
+        0,
+        25,
+        0
+      ]
+    },
+    {
+      "line": 53,
+      "op": "translate",
+      "args": [
+        -2,
+        5.5,
+        -7
+      ]
+    },
+    {
+      "line": 54,
+      "op": "object",
+      "args": [
+        "cube.obj",
+        0.6,
+        0,
+        0,
+        0.7,
+        0.3,
+        50
+      ],
+      "convertedMesh": "../meshes/cube_from_obj.gltf"
+    },
+    {
+      "line": 56,
+      "op": "reset",
+      "args": []
+    },
+    {
+      "line": 57,
+      "op": "scale",
+      "args": [
+        4,
+        0.3,
+        0.1
+      ]
+    },
+    {
+      "line": 58,
+      "op": "rotate",
+      "args": [
+        0,
+        25,
+        0
+      ]
+    },
+    {
+      "line": 59,
+      "op": "translate",
+      "args": [
+        -2,
+        3.5,
+        -7
+      ]
+    },
+    {
+      "line": 60,
+      "op": "object",
+      "args": [
+        "cube.obj",
+        0.6,
+        0,
+        0,
+        0.7,
+        0.3,
+        50
+      ],
+      "convertedMesh": "../meshes/cube_from_obj.gltf"
+    },
+    {
+      "line": 62,
+      "op": "reset",
+      "args": []
+    },
+    {
+      "line": 63,
+      "op": "scale",
+      "args": [
+        4,
+        0.3,
+        0.1
+      ]
+    },
+    {
+      "line": 64,
+      "op": "rotate",
+      "args": [
+        0,
+        25,
+        0
+      ]
+    },
+    {
+      "line": 65,
+      "op": "translate",
+      "args": [
+        -2,
+        1.5,
+        -7
+      ]
+    },
+    {
+      "line": 66,
+      "op": "object",
+      "args": [
+        "cube.obj",
+        0.6,
+        0,
+        0,
+        0.7,
+        0.3,
+        50
+      ],
+      "convertedMesh": "../meshes/cube_from_obj.gltf"
+    },
+    {
+      "line": 68,
+      "op": "reset",
+      "args": []
+    },
+    {
+      "line": 69,
+      "op": "scale",
+      "args": [
+        0.3,
+        4,
+        0.1
+      ]
+    },
+    {
+      "line": 70,
+      "op": "rotate",
+      "args": [
+        0,
+        25,
+        0
+      ]
+    },
+    {
+      "line": 71,
+      "op": "translate",
+      "args": [
+        0.05,
+        3.5,
+        -7.2
+      ]
+    },
+    {
+      "line": 72,
+      "op": "object",
+      "args": [
+        "cube.obj",
+        0.6,
+        0,
+        0,
+        0.7,
+        0.3,
+        50
+      ],
+      "convertedMesh": "../meshes/cube_from_obj.gltf"
+    },
+    {
+      "line": 74,
+      "op": "reset",
+      "args": []
+    },
+    {
+      "line": 75,
+      "op": "scale",
+      "args": [
+        0.3,
+        4,
+        0.1
+      ]
+    },
+    {
+      "line": 76,
+      "op": "rotate",
+      "args": [
+        0,
+        25,
+        0
+      ]
+    },
+    {
+      "line": 77,
+      "op": "translate",
+      "args": [
+        -2,
+        3.5,
+        -7
+      ]
+    },
+    {
+      "line": 78,
+      "op": "object",
+      "args": [
+        "cube.obj",
+        0.6,
+        0,
+        0,
+        0.7,
+        0.3,
+        50
+      ],
+      "convertedMesh": "../meshes/cube_from_obj.gltf"
+    },
+    {
+      "line": 80,
+      "op": "reset",
+      "args": []
+    },
+    {
+      "line": 81,
+      "op": "scale",
+      "args": [
+        0.3,
+        4,
+        0.1
+      ]
+    },
+    {
+      "line": 82,
+      "op": "rotate",
+      "args": [
+        0,
+        25,
+        0
+      ]
+    },
+    {
+      "line": 83,
+      "op": "translate",
+      "args": [
+        -3.6,
+        3.5,
+        -6.1
+      ]
+    },
+    {
+      "line": 84,
+      "op": "object",
+      "args": [
+        "cube.obj",
+        0.6,
+        0,
+        0,
+        0.7,
+        0.3,
+        50
+      ],
+      "convertedMesh": "../meshes/cube_from_obj.gltf"
+    },
+    {
+      "line": 86,
+      "op": "observer",
+      "args": [
+        10,
+        3,
+        10,
+        0,
+        0,
+        0,
+        0,
+        0.1,
+        1000,
+        20
+      ]
+    },
+    {
+      "line": 87,
+      "op": "display",
+      "args": []
+    },
+    {
+      "line": 89,
+      "op": "end",
+      "args": []
+    }
+  ],
+  "objectReferences": [
+    {
+      "legacy": "glass.obj",
+      "converted": "../meshes/glass_from_obj.gltf"
+    },
+    {
+      "legacy": "glass.obj",
+      "converted": "../meshes/glass_from_obj.gltf"
+    },
+    {
+      "legacy": "cube.obj",
+      "converted": "../meshes/cube_from_obj.gltf"
+    },
+    {
+      "legacy": "cube.obj",
+      "converted": "../meshes/cube_from_obj.gltf"
+    },
+    {
+      "legacy": "teapot.obj",
+      "converted": "../meshes/teapot_from_obj.gltf"
+    },
+    {
+      "legacy": "drop.obj",
+      "converted": "../meshes/drop_from_obj.gltf"
+    },
+    {
+      "legacy": "cube.obj",
+      "converted": "../meshes/cube_from_obj.gltf"
+    },
+    {
+      "legacy": "bench.obj",
+      "converted": "../meshes/bench_from_obj.gltf"
+    },
+    {
+      "legacy": "bench.obj",
+      "converted": "../meshes/bench_from_obj.gltf"
+    },
+    {
+      "legacy": "cube.obj",
+      "converted": "../meshes/cube_from_obj.gltf"
+    },
+    {
+      "legacy": "cube.obj",
+      "converted": "../meshes/cube_from_obj.gltf"
+    },
+    {
+      "legacy": "cube.obj",
+      "converted": "../meshes/cube_from_obj.gltf"
+    },
+    {
+      "legacy": "cube.obj",
+      "converted": "../meshes/cube_from_obj.gltf"
+    },
+    {
+      "legacy": "cube.obj",
+      "converted": "../meshes/cube_from_obj.gltf"
+    },
+    {
+      "legacy": "cube.obj",
+      "converted": "../meshes/cube_from_obj.gltf"
+    }
+  ]
+}

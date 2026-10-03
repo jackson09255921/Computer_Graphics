@@ -1,0 +1,294 @@
+{
+  "format": "computer-graphics-legacy-scene-v1",
+  "source": "legacy/2022CG_Lab2/Data/lab2C.in",
+  "commands": [
+    {
+      "line": 1,
+      "op": "reset",
+      "args": []
+    },
+    {
+      "line": 2,
+      "op": "scale",
+      "args": [
+        1,
+        1
+      ]
+    },
+    {
+      "line": 3,
+      "op": "rotate",
+      "args": [
+        0
+      ]
+    },
+    {
+      "line": 4,
+      "op": "translate",
+      "args": [
+        0,
+        0
+      ]
+    },
+    {
+      "line": 5,
+      "op": "square",
+      "args": []
+    },
+    {
+      "line": 7,
+      "op": "view",
+      "args": [
+        -3,
+        3,
+        -3,
+        3,
+        20,
+        220,
+        20,
+        220
+      ]
+    },
+    {
+      "line": 9,
+      "op": "reset",
+      "args": []
+    },
+    {
+      "line": 10,
+      "op": "scale",
+      "args": [
+        0.9,
+        0.9
+      ]
+    },
+    {
+      "line": 11,
+      "op": "rotate",
+      "args": [
+        15
+      ]
+    },
+    {
+      "line": 12,
+      "op": "translate",
+      "args": [
+        0,
+        0
+      ]
+    },
+    {
+      "line": 13,
+      "op": "square",
+      "args": []
+    },
+    {
+      "line": 15,
+      "op": "view",
+      "args": [
+        -3,
+        3,
+        -3,
+        3,
+        240,
+        440,
+        20,
+        220
+      ]
+    },
+    {
+      "line": 17,
+      "op": "reset",
+      "args": []
+    },
+    {
+      "line": 18,
+      "op": "scale",
+      "args": [
+        0.8,
+        0.8
+      ]
+    },
+    {
+      "line": 19,
+      "op": "rotate",
+      "args": [
+        30
+      ]
+    },
+    {
+      "line": 20,
+      "op": "translate",
+      "args": [
+        0,
+        0
+      ]
+    },
+    {
+      "line": 21,
+      "op": "square",
+      "args": []
+    },
+    {
+      "line": 23,
+      "op": "view",
+      "args": [
+        -3,
+        3,
+        -3,
+        3,
+        460,
+        680,
+        20,
+        220
+      ]
+    },
+    {
+      "line": 25,
+      "op": "reset",
+      "args": []
+    },
+    {
+      "line": 26,
+      "op": "scale",
+      "args": [
+        0.7,
+        0.7
+      ]
+    },
+    {
+      "line": 27,
+      "op": "rotate",
+      "args": [
+        45
+      ]
+    },
+    {
+      "line": 28,
+      "op": "translate",
+      "args": [
+        0,
+        0
+      ]
+    },
+    {
+      "line": 29,
+      "op": "square",
+      "args": []
+    },
+    {
+      "line": 31,
+      "op": "view",
+      "args": [
+        -3,
+        3,
+        -3,
+        3,
+        20,
+        220,
+        240,
+        440
+      ]
+    },
+    {
+      "line": 33,
+      "op": "reset",
+      "args": []
+    },
+    {
+      "line": 34,
+      "op": "scale",
+      "args": [
+        0.6,
+        0.6
+      ]
+    },
+    {
+      "line": 35,
+      "op": "rotate",
+      "args": [
+        60
+      ]
+    },
+    {
+      "line": 36,
+      "op": "translate",
+      "args": [
+        0,
+        0
+      ]
+    },
+    {
+      "line": 37,
+      "op": "square",
+      "args": []
+    },
+    {
+      "line": 39,
+      "op": "view",
+      "args": [
+        -3,
+        3,
+        -3,
+        3,
+        240,
+        440,
+        240,
+        440
+      ]
+    },
+    {
+      "line": 41,
+      "op": "reset",
+      "args": []
+    },
+    {
+      "line": 42,
+      "op": "scale",
+      "args": [
+        0.5,
+        0.5
+      ]
+    },
+    {
+      "line": 43,
+      "op": "rotate",
+      "args": [
+        75
+      ]
+    },
+    {
+      "line": 44,
+      "op": "translate",
+      "args": [
+        0,
+        0
+      ]
+    },
+    {
+      "line": 45,
+      "op": "square",
+      "args": []
+    },
+    {
+      "line": 47,
+      "op": "view",
+      "args": [
+        -3,
+        3,
+        -3,
+        3,
+        460,
+        660,
+        240,
+        440
+      ]
+    },
+    {
+      "line": 49,
+      "op": "end",
+      "args": []
+    }
+  ],
+  "objectReferences": []
+}

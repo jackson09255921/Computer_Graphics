@@ -1,0 +1,105 @@
+{
+  "format": "computer-graphics-legacy-scene-v1",
+  "source": "legacy/2022CG_Lab3/Data/Lab3B.in",
+  "commands": [
+    {
+      "line": 1,
+      "op": "500",
+      "args": [
+        500
+      ]
+    },
+    {
+      "line": 3,
+      "op": "object",
+      "args": [
+        "bench.obj"
+      ],
+      "convertedMesh": "../meshes/bench_from_obj.gltf"
+    },
+    {
+      "line": 5,
+      "op": "observer",
+      "args": [
+        10,
+        10,
+        -10,
+        0,
+        0,
+        0,
+        0,
+        1,
+        1000,
+        10
+      ]
+    },
+    {
+      "line": 7,
+      "op": "viewport",
+      "args": [
+        -0.5,
+        0.5,
+        -0.5,
+        0.5
+      ]
+    },
+    {
+      "line": 9,
+      "op": "display",
+      "args": []
+    },
+    {
+      "line": 11,
+      "op": "observer",
+      "args": [
+        -10,
+        10,
+        10,
+        0,
+        0,
+        0,
+        0,
+        1,
+        1000,
+        10
+      ]
+    },
+    {
+      "line": 13,
+      "op": "display",
+      "args": []
+    },
+    {
+      "line": 15,
+      "op": "observer",
+      "args": [
+        2,
+        2,
+        -2,
+        0,
+        0,
+        0,
+        0,
+        1,
+        1000,
+        10
+      ]
+    },
+    {
+      "line": 17,
+      "op": "display",
+      "args": []
+    },
+    {
+      "line": 19,
+      "op": "end",
+      "args": []
+    }
+  ],
+  "objectReferences": [
+    {
+      "legacy": "bench.obj",
+      "converted": "../meshes/bench_from_obj.gltf"
+    }
+  ]
+}

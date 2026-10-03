@@ -1,0 +1,195 @@
+{
+  "format": "computer-graphics-legacy-scene-v1",
+  "source": "legacy/2022CG_Lab2/Data/lab2D.in",
+  "commands": [
+    {
+      "line": 1,
+      "op": "reset",
+      "args": []
+    },
+    {
+      "line": 2,
+      "op": "scale",
+      "args": [
+        0.5,
+        0.5
+      ]
+    },
+    {
+      "line": 3,
+      "op": "rotate",
+      "args": [
+        0
+      ]
+    },
+    {
+      "line": 4,
+      "op": "translate",
+      "args": [
+        -0.3,
+        -1
+      ]
+    },
+    {
+      "line": 5,
+      "op": "square",
+      "args": []
+    },
+    {
+      "line": 7,
+      "op": "reset",
+      "args": []
+    },
+    {
+      "line": 8,
+      "op": "scale",
+      "args": [
+        1.5,
+        1.5
+      ]
+    },
+    {
+      "line": 9,
+      "op": "rotate",
+      "args": [
+        45
+      ]
+    },
+    {
+      "line": 10,
+      "op": "translate",
+      "args": [
+        0.6,
+        -0.2
+      ]
+    },
+    {
+      "line": 11,
+      "op": "square",
+      "args": []
+    },
+    {
+      "line": 13,
+      "op": "reset",
+      "args": []
+    },
+    {
+      "line": 14,
+      "op": "scale",
+      "args": [
+        0.5,
+        0.5
+      ]
+    },
+    {
+      "line": 15,
+      "op": "rotate",
+      "args": [
+        0
+      ]
+    },
+    {
+      "line": 16,
+      "op": "translate",
+      "args": [
+        -0.2,
+        0.2
+      ]
+    },
+    {
+      "line": 17,
+      "op": "square",
+      "args": []
+    },
+    {
+      "line": 19,
+      "op": "view",
+      "args": [
+        -2,
+        2,
+        -2,
+        2,
+        100,
+        400,
+        100,
+        400
+      ]
+    },
+    {
+      "line": 21,
+      "op": "view",
+      "args": [
+        0,
+        2,
+        0,
+        2,
+        420,
+        450,
+        100,
+        500
+      ]
+    },
+    {
+      "line": 23,
+      "op": "view",
+      "args": [
+        0,
+        2,
+        0,
+        2,
+        600,
+        650,
+        200,
+        300
+      ]
+    },
+    {
+      "line": 25,
+      "op": "view",
+      "args": [
+        -2,
+        0,
+        0,
+        2,
+        550,
+        600,
+        200,
+        300
+      ]
+    },
+    {
+      "line": 27,
+      "op": "view",
+      "args": [
+        -2,
+        0,
+        -2,
+        0,
+        550,
+        600,
+        100,
+        200
+      ]
+    },
+    {
+      "line": 29,
+      "op": "view",
+      "args": [
+        0,
+        2,
+        -2,
+        0,
+        600,
+        650,
+        100,
+        200
+      ]
+    },
+    {
+      "line": 31,
+      "op": "end",
+      "args": []
+    }
+  ],
+  "objectReferences": []
+}

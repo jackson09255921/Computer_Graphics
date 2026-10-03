@@ -1,0 +1,207 @@
+{
+  "format": "computer-graphics-legacy-scene-v1",
+  "source": "legacy/2022CG_Lab2/Data/lab2A.in",
+  "commands": [
+    {
+      "line": 4,
+      "op": "reset",
+      "args": []
+    },
+    {
+      "line": 5,
+      "op": "scale",
+      "args": [
+        2,
+        2
+      ]
+    },
+    {
+      "line": 6,
+      "op": "rotate",
+      "args": [
+        220
+      ]
+    },
+    {
+      "line": 7,
+      "op": "triangle",
+      "args": []
+    },
+    {
+      "line": 9,
+      "op": "reset",
+      "args": []
+    },
+    {
+      "line": 10,
+      "op": "scale",
+      "args": [
+        2,
+        2
+      ]
+    },
+    {
+      "line": 11,
+      "op": "rotate",
+      "args": [
+        80
+      ]
+    },
+    {
+      "line": 12,
+      "op": "translate",
+      "args": [
+        2,
+        2
+      ]
+    },
+    {
+      "line": 13,
+      "op": "triangle",
+      "args": []
+    },
+    {
+      "line": 15,
+      "op": "view",
+      "args": [
+        -6,
+        6,
+        -6,
+        6,
+        200,
+        600,
+        200,
+        600
+      ]
+    },
+    {
+      "line": 18,
+      "op": "clearData",
+      "args": []
+    },
+    {
+      "line": 19,
+      "op": "clearScreen",
+      "args": []
+    },
+    {
+      "line": 22,
+      "op": "reset",
+      "args": []
+    },
+    {
+      "line": 23,
+      "op": "scale",
+      "args": [
+        2,
+        2
+      ]
+    },
+    {
+      "line": 24,
+      "op": "rotate",
+      "args": [
+        45
+      ]
+    },
+    {
+      "line": 25,
+      "op": "translate",
+      "args": [
+        10,
+        10
+      ]
+    },
+    {
+      "line": 26,
+      "op": "square",
+      "args": []
+    },
+    {
+      "line": 29,
+      "op": "reset",
+      "args": []
+    },
+    {
+      "line": 30,
+      "op": "translate",
+      "args": [
+        5,
+        5
+      ]
+    },
+    {
+      "line": 31,
+      "op": "scale",
+      "args": [
+        0.5,
+        0.5
+      ]
+    },
+    {
+      "line": 32,
+      "op": "rotate",
+      "args": [
+        20
+      ]
+    },
+    {
+      "line": 33,
+      "op": "triangle",
+      "args": []
+    },
+    {
+      "line": 36,
+      "op": "view",
+      "args": [
+        0,
+        20,
+        0,
+        20,
+        100,
+        200,
+        100,
+        200
+      ]
+    },
+    {
+      "line": 37,
+      "op": "view",
+      "args": [
+        0,
+        20,
+        0,
+        20,
+        210,
+        600,
+        210,
+        600
+      ]
+    },
+    {
+      "line": 40,
+      "op": "clearScreen",
+      "args": []
+    },
+    {
+      "line": 43,
+      "op": "view",
+      "args": [
+        0,
+        10,
+        0,
+        10,
+        200,
+        600,
+        200,
+        600
+      ]
+    },
+    {
+      "line": 46,
+      "op": "end",
+      "args": []
+    }
+  ],
+  "objectReferences": []
+}

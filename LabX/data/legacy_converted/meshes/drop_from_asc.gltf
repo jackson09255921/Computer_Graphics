@@ -1,0 +1,93 @@
+{
+  "asset": {
+    "version": "2.0",
+    "generator": "Computer_Graphics legacy converter"
+  },
+  "extras": {
+    "source": "legacy/2022CG_Lab3/Mesh/drop.asc"
+  },
+  "buffers": [
+    {
+      "uri": "drop_from_asc.bin",
+      "byteLength": 4896
+    }
+  ],
+  "bufferViews": [
+    {
+      "buffer": 0,
+      "byteOffset": 0,
+      "byteLength": 1728,
+      "target": 34962
+    },
+    {
+      "buffer": 0,
+      "byteOffset": 1728,
+      "byteLength": 3168,
+      "target": 34963
+    }
+  ],
+  "accessors": [
+    {
+      "bufferView": 0,
+      "componentType": 5126,
+      "count": 144,
+      "type": "VEC3",
+      "min": [
+        -0.269773,
+        -0.000336051,
+        -0.269773
+      ],
+      "max": [
+        0.269773,
+        0.537298,
+        0.269773
+      ]
+    },
+    {
+      "bufferView": 1,
+      "componentType": 5125,
+      "count": 792,
+      "type": "SCALAR"
+    }
+  ],
+  "materials": [
+    {
+      "pbrMetallicRoughness": {
+        "baseColorFactor": [
+          0.18,
+          0.52,
+          0.92,
+          1.0
+        ],
+        "metallicFactor": 0.05,
+        "roughnessFactor": 0.48
+      }
+    }
+  ],
+  "meshes": [
+    {
+      "primitives": [
+        {
+          "attributes": {
+            "POSITION": 0
+          },
+          "indices": 1,
+          "material": 0
+        }
+      ]
+    }
+  ],
+  "nodes": [
+    {
+      "mesh": 0
+    }
+  ],
+  "scenes": [
+    {
+      "nodes": [
+        0
+      ]
+    }
+  ],
+  "scene": 0
+}

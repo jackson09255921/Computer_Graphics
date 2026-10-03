@@ -1,0 +1,95 @@
+{
+  "format": "computer-graphics-legacy-scene-v1",
+  "source": "legacy/2022CG_Lab2/Data/lab2B.in",
+  "commands": [
+    {
+      "line": 4,
+      "op": "reset",
+      "args": []
+    },
+    {
+      "line": 5,
+      "op": "translate",
+      "args": [
+        0,
+        -1
+      ]
+    },
+    {
+      "line": 6,
+      "op": "scale",
+      "args": [
+        0.5,
+        1
+      ]
+    },
+    {
+      "line": 7,
+      "op": "rotate",
+      "args": [
+        0
+      ]
+    },
+    {
+      "line": 8,
+      "op": "triangle",
+      "args": []
+    },
+    {
+      "line": 10,
+      "op": "rotate",
+      "args": [
+        90
+      ]
+    },
+    {
+      "line": 11,
+      "op": "triangle",
+      "args": []
+    },
+    {
+      "line": 13,
+      "op": "rotate",
+      "args": [
+        90
+      ]
+    },
+    {
+      "line": 14,
+      "op": "triangle",
+      "args": []
+    },
+    {
+      "line": 16,
+      "op": "rotate",
+      "args": [
+        90
+      ]
+    },
+    {
+      "line": 17,
+      "op": "triangle",
+      "args": []
+    },
+    {
+      "line": 19,
+      "op": "view",
+      "args": [
+        -3,
+        3,
+        -3,
+        3,
+        200,
+        600,
+        200,
+        600
+      ]
+    },
+    {
+      "line": 21,
+      "op": "end",
+      "args": []
+    }
+  ],
+  "objectReferences": []
+}

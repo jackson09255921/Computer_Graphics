@@ -27,6 +27,12 @@ the object automatically, and produces a deterministic ray-traced image. The
 reviewed bench, drop, glass, and skull PNGs are stored in `LabX/images/`; their
 lossless PPM references are exercised by CTest visual regressions.
 
+Reusable conversions live under `LabX/data/legacy_converted`. OBJ and ASC
+meshes become glTF 2.0 plus external binary buffers; legacy `.in` files become
+normalized scene-command JSON with resolved glTF references where the original
+object exists. `converted_asset_tests` loads every generated glTF through the
+project loader and checks its triangle count.
+
 ## GPU profile and constraints
 
 The initial GPU target is an NVIDIA GeForce RTX 4060 Laptop GPU with 8 GiB

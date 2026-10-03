@@ -1,0 +1,93 @@
+{
+  "asset": {
+    "version": "2.0",
+    "generator": "Computer_Graphics legacy converter"
+  },
+  "extras": {
+    "source": "legacy/2022CG_Lab3/Mesh/glass.obj"
+  },
+  "buffers": [
+    {
+      "uri": "glass_from_obj.bin",
+      "byteLength": 30720
+    }
+  ],
+  "bufferViews": [
+    {
+      "buffer": 0,
+      "byteOffset": 0,
+      "byteLength": 10560,
+      "target": 34962
+    },
+    {
+      "buffer": 0,
+      "byteOffset": 10560,
+      "byteLength": 20160,
+      "target": 34963
+    }
+  ],
+  "accessors": [
+    {
+      "bufferView": 0,
+      "componentType": 5126,
+      "count": 880,
+      "type": "VEC3",
+      "min": [
+        -1.38159,
+        -1.55444,
+        -0.381591
+      ],
+      "max": [
+        -0.618409,
+        -0.112567,
+        0.381591
+      ]
+    },
+    {
+      "bufferView": 1,
+      "componentType": 5125,
+      "count": 5040,
+      "type": "SCALAR"
+    }
+  ],
+  "materials": [
+    {
+      "pbrMetallicRoughness": {
+        "baseColorFactor": [
+          0.18,
+          0.52,
+          0.92,
+          1.0
+        ],
+        "metallicFactor": 0.05,
+        "roughnessFactor": 0.48
+      }
+    }
+  ],
+  "meshes": [
+    {
+      "primitives": [
+        {
+          "attributes": {
+            "POSITION": 0
+          },
+          "indices": 1,
+          "material": 0
+        }
+      ]
+    }
+  ],
+  "nodes": [
+    {
+      "mesh": 0
+    }
+  ],
+  "scenes": [
+    {
+      "nodes": [
+        0
+      ]
+    }
+  ],
+  "scene": 0
+}
