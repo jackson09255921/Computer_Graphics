@@ -14,7 +14,7 @@ implementation of an engineering technique.
 | 1995 | Veach–Guibas multiple importance sampling | Implemented on CPU and CUDA |
 | 1998 | High-dynamic-range image-based lighting | Implemented on CPU and CUDA |
 | 2002 | Ray tracing on programmable GPU hardware | Implemented baseline |
-| 2007 | GGX microfacet reflection and rough transmission | Matched reflection on CPU/CUDA and matched rough BTDF on CUDA |
+| 2007 | GGX microfacet reflection and rough transmission | Matched reflection on CPU/CUDA, matched rough BTDF on CUDA, and recursive GGX reflection-direction sampling on OptiX |
 | 2010 | NVIDIA OptiX programmable ray tracing engine | Native Windows indexed/glTF GAS, multi-ray-type SBT, Lambert lighting, recursive reflections, hard shadows, and RTX launch implemented |
 | 2017 | glTF 2.0 scene and physically based material interchange | Implemented |
 | 2020 | ReSTIR direct illumination | CUDA reservoir core implemented; renderer integration planned |

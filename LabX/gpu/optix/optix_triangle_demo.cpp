@@ -47,6 +47,7 @@ struct MeshData {
     std::vector<uint3> indices;
     std::vector<float3> colors;
     std::vector<float> reflectivity;
+    std::vector<float> roughness;
 };
 
 MeshData default_mesh() {
@@ -57,7 +58,8 @@ MeshData default_mesh() {
             {{0, 1, 2}, {0, 2, 3}, {4, 5, 6}},
             {{0.72f, 0.72f, 0.72f}, {0.72f, 0.72f, 0.72f},
              {0.95f, 0.22f, 0.12f}},
-            {0.08f, 0.08f, 0.72f}};
+            {0.08f, 0.08f, 0.72f},
+            {0.55f, 0.55f, 0.12f}};
 }
 
 MeshData load_gltf_mesh(const std::string& path) {
@@ -82,7 +84,8 @@ MeshData load_gltf_mesh(const std::string& path) {
         const float metallic = static_cast<float>(triangle.material.metallic);
         const float roughness = static_cast<float>(triangle.material.roughness);
         const float fresnel = 0.04f * (1.0f - metallic) + metallic;
-        mesh.reflectivity.push_back(std::clamp(fresnel * (1.0f - 0.65f * roughness), 0.0f, 0.95f));
+        mesh.reflectivity.push_back(std::clamp(fresnel, 0.0f, 0.95f));
+        mesh.roughness.push_back(std::clamp(roughness, 0.02f, 1.0f));
     }
     return mesh;
 }
@@ -119,6 +122,7 @@ int main(int argc, char** argv) {
     OptixProgramGroup radiance_hit = nullptr, shadow_hit = nullptr;
     CUdeviceptr gas = 0, raygen_record = 0, miss_record = 0, hit_record = 0;
     CUdeviceptr device_image = 0, device_params = 0, device_colors = 0, device_reflectivity = 0;
+    CUdeviceptr device_roughness = 0;
     CUdeviceptr device_vertices = 0, device_indices = 0;
 
     try {
@@ -268,6 +272,12 @@ int main(int argc, char** argv) {
         check_cuda(cudaMemcpy(reinterpret_cast<void*>(device_reflectivity), mesh.reflectivity.data(),
                               mesh.reflectivity.size() * sizeof(float), cudaMemcpyHostToDevice),
                    "cudaMemcpy primitive reflectivity");
+        check_cuda(cudaMalloc(reinterpret_cast<void**>(&device_roughness),
+                              mesh.roughness.size() * sizeof(float)),
+                   "cudaMalloc primitive roughness");
+        check_cuda(cudaMemcpy(reinterpret_cast<void*>(device_roughness), mesh.roughness.data(),
+                              mesh.roughness.size() * sizeof(float), cudaMemcpyHostToDevice),
+                   "cudaMemcpy primitive roughness");
         float3 minimum = make_float3(std::numeric_limits<float>::max(), std::numeric_limits<float>::max(),
                                      std::numeric_limits<float>::max());
         float3 maximum = make_float3(std::numeric_limits<float>::lowest(), std::numeric_limits<float>::lowest(),
@@ -291,8 +301,9 @@ int main(int argc, char** argv) {
                                          reinterpret_cast<float3*>(device_vertices),
                                          reinterpret_cast<uint3*>(device_indices),
                                          reinterpret_cast<float3*>(device_colors),
-                                         reinterpret_cast<float*>(device_reflectivity), camera_origin,
-                                         view_scale, light_position};
+                                         reinterpret_cast<float*>(device_reflectivity),
+                                         reinterpret_cast<float*>(device_roughness), camera_origin, view_scale,
+                                         light_position};
         check_cuda(cudaMalloc(reinterpret_cast<void**>(&device_params), sizeof(params)), "cudaMalloc params");
         check_cuda(cudaMemcpy(reinterpret_cast<void*>(device_params), &params, sizeof(params),
                               cudaMemcpyHostToDevice), "cudaMemcpy params");
@@ -324,6 +335,7 @@ int main(int argc, char** argv) {
                   << static_cast<int>(center_pixel.z) << ")\n";
 
         cudaFree(reinterpret_cast<void*>(device_params));
+        cudaFree(reinterpret_cast<void*>(device_roughness));
         cudaFree(reinterpret_cast<void*>(device_reflectivity));
         cudaFree(reinterpret_cast<void*>(device_colors));
         cudaFree(reinterpret_cast<void*>(device_indices));
