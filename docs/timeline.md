@@ -15,8 +15,9 @@ implementation of an engineering technique.
 | 1998 | High-dynamic-range image-based lighting | Implemented on CPU and CUDA |
 | 2002 | Ray tracing on programmable GPU hardware | Implemented baseline |
 | 2007 | GGX microfacet reflection and rough transmission | Matched reflection on CPU/CUDA and matched rough BTDF on CUDA |
+| 2010 | NVIDIA OptiX programmable ray tracing engine | Optional context probe ready; SDK not installed locally |
 | 2017 | glTF 2.0 scene and physically based material interchange | Implemented |
-| 2020 | ReSTIR direct illumination | Planned |
+| 2020 | ReSTIR direct illumination | CUDA reservoir core implemented; renderer integration planned |
 
 Multi-threaded tile scheduling and GPU execution evolved across many systems,
 so they are tracked as engineering capabilities rather than assigned a single
@@ -33,4 +34,6 @@ invention date.
 - Debevec, *Rendering Synthetic Objects into Real Scenes*, SIGGRAPH 1998.
 - Purcell et al., *Ray Tracing on Programmable Graphics Hardware*, 2002.
 - Walter et al., *Microfacet Models for Refraction through Rough Surfaces*, 2007.
+- Parker et al., *OptiX: A General Purpose Ray Tracing Engine*, SIGGRAPH 2010.
 - Khronos Group, *glTF 2.0 Specification*, 2017.
+- Bitterli et al., *Spatiotemporal Reservoir Resampling for Real-Time Ray Tracing with Dynamic Direct Lighting*, SIGGRAPH 2020.

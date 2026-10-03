@@ -11,6 +11,7 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 option(BUILD_LEGACY_LABS "Build the original OpenGL/GLUT lab applications" ON)
 option(BUILD_CUDA_DEMOS "Build CUDA experiments under LabX/gpu" OFF)
+option(BUILD_OPTIX_DEMOS "Build optional OptiX experiments (requires NVIDIA OptiX SDK)" OFF)
 set(CG_CUDA_ARCHITECTURES "89" CACHE STRING "CUDA architectures for LabX GPU experiments")
 
 add_library(cg_core
@@ -32,6 +33,28 @@ if(MSVC)
     target_compile_options(cg_core PRIVATE /W4 /permissive-)
 else()
     target_compile_options(cg_core PRIVATE -Wall -Wextra -Wpedantic)
+endif()
+
+if(BUILD_OPTIX_DEMOS)
+    if(NOT BUILD_CUDA_DEMOS)
+        message(FATAL_ERROR "BUILD_OPTIX_DEMOS requires BUILD_CUDA_DEMOS=ON")
+    endif()
+    if(NOT OPTIX_ROOT AND DEFINED ENV{OPTIX_ROOT})
+        set(OPTIX_ROOT "$ENV{OPTIX_ROOT}")
+    endif()
+    set(OPTIX_INCLUDE_DIR "${OPTIX_ROOT}/include")
+    if(NOT OPTIX_ROOT OR NOT EXISTS "${OPTIX_INCLUDE_DIR}/optix.h" OR
+       NOT EXISTS "${OPTIX_INCLUDE_DIR}/optix_stubs.h")
+        message(FATAL_ERROR
+            "OptiX SDK headers were not found. Download the NVIDIA OptiX SDK, then set OPTIX_ROOT to its root directory.")
+    endif()
+    find_package(CUDAToolkit REQUIRED)
+    add_executable(optix_context_probe LabX/gpu/optix_context_probe.cpp)
+    target_include_directories(optix_context_probe PRIVATE "${OPTIX_INCLUDE_DIR}")
+    target_link_libraries(optix_context_probe PRIVATE CUDA::cuda_driver ${CMAKE_DL_LIBS})
+    if(BUILD_TESTING)
+        add_test(NAME optix_context_probe COMMAND optix_context_probe)
+    endif()
 endif()
 
 if(BUILD_TESTING)
@@ -96,6 +119,7 @@ if(BUILD_CUDA_DEMOS)
     enable_language(CUDA)
     add_executable(cuda_capability LabX/gpu/cuda_capability.cu)
     add_executable(cuda_pathtracer LabX/gpu/cuda_pathtracer.cu)
+    add_executable(restir_di LabX/gpu/restir_di.cu)
     target_link_libraries(cuda_pathtracer PRIVATE cg_core)
     set_target_properties(cuda_capability PROPERTIES
         CUDA_ARCHITECTURES "${CG_CUDA_ARCHITECTURES}"
@@ -107,12 +131,18 @@ if(BUILD_CUDA_DEMOS)
         CUDA_STANDARD 17
         CUDA_STANDARD_REQUIRED ON
     )
+    set_target_properties(restir_di PROPERTIES
+        CUDA_ARCHITECTURES "${CG_CUDA_ARCHITECTURES}"
+        CUDA_STANDARD 17
+        CUDA_STANDARD_REQUIRED ON
+    )
     if(MSVC AND CMAKE_CUDA_COMPILER_VERSION VERSION_LESS 12.0)
         target_compile_options(cuda_capability PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:-allow-unsupported-compiler>)
     endif()
     if(BUILD_TESTING)
         add_test(NAME cuda_capability COMMAND cuda_capability)
         add_test(NAME cuda_pathtracer COMMAND cuda_pathtracer --self-test)
+        add_test(NAME restir_di COMMAND restir_di)
     endif()
 endif()
 

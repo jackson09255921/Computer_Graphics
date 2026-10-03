@@ -117,6 +117,15 @@ the same MIS framework. Rough dielectric transmission uses the Walter
 transmission Jacobian, matched microfacet BTDF/PDF, and
 `BTDF * abs(cos) / PDF` throughput.
 
+The optional `restir_di` CUDA target contains the 2020 ReSTIR DI reservoir
+foundation: weighted candidate streaming, temporal reuse, spatial reuse, and
+final normalization with deterministic invariant tests. It is not yet wired
+into the image renderer or backed by temporal G-buffers.
+
+OptiX is also opt-in. `BUILD_OPTIX_DEMOS=ON` builds a real CUDA-driver/OptiX
+device-context probe when the separately downloaded SDK is provided through
+`OPTIX_ROOT`; the normal WSL2 CUDA renderer does not depend on it.
+
 The dependency-free `LabX/assets` loader imports glTF 2.x triangle primitives
 from external binary buffers, including indexed or non-indexed geometry, scene
 node transforms, and metallic/roughness material factors:

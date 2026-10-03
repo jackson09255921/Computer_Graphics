@@ -54,8 +54,25 @@ ctest --test-dir build-cuda -R cuda_capability --output-on-failure
 3. Importance sampling and multiple importance sampling.
 4. Refraction, dielectric materials, HDR environment lighting, and glTF input (implemented).
 5. CUDA tiled path tracing sized for the 8 GiB GPU budget (geometry, glTF, matched GGX reflection/BTDF, MIS, and HDR implemented).
-6. OptiX/DXR evaluation, then ReSTIR direct illumination.
+6. OptiX context probe scaffold and ReSTIR DI reservoir core (implemented); renderer integration follows.
 7. Denoising and neural reconstruction only after stable temporal buffers exist.
 
 Every milestone must retain a CPU build, deterministic tests, and a small demo
 scene before the next one begins.
+
+## Optional OptiX probe
+
+The WSL driver exposes the OptiX runtime, but the separately distributed NVIDIA
+OptiX SDK headers are not installed automatically. After downloading the SDK,
+point `OPTIX_ROOT` at its extracted root and enable the opt-in probe:
+
+```bash
+export OPTIX_ROOT=/opt/optix
+cmake -S . -B build-optix -G Ninja \
+  -DBUILD_LEGACY_LABS=OFF -DBUILD_CUDA_DEMOS=ON -DBUILD_OPTIX_DEMOS=ON
+cmake --build build-optix --target optix_context_probe
+ctest --test-dir build-optix -R optix_context_probe --output-on-failure
+```
+
+Without the SDK, configuration stops immediately with an actionable message;
+normal CPU and CUDA builds remain unaffected.
