@@ -3,11 +3,33 @@ cmake_minimum_required(VERSION 3.16)
 project(cpu_rasterization_labs LANGUAGES CXX)
 
 include(FetchContent)
+include(CTest)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
+option(BUILD_LEGACY_LABS "Build the original OpenGL/GLUT lab applications" ON)
+
+add_library(cg_core
+    src/core/image.cpp
+)
+target_include_directories(cg_core PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/src")
+target_compile_features(cg_core PUBLIC cxx_std_17)
+
+if(MSVC)
+    target_compile_options(cg_core PRIVATE /W4 /permissive-)
+else()
+    target_compile_options(cg_core PRIVATE -Wall -Wextra -Wpedantic)
+endif()
+
+if(BUILD_TESTING)
+    add_executable(core_tests tests/core_tests.cpp)
+    target_link_libraries(core_tests PRIVATE cg_core)
+    add_test(NAME core_tests COMMAND core_tests)
+endif()
+
+if(BUILD_LEGACY_LABS)
 find_package(OpenGL REQUIRED)
 find_package(GLUT QUIET)
 
@@ -52,3 +74,4 @@ set_target_properties(lab3 PROPERTIES
     VS_DEBUGGER_WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}/2022CG_Lab3")
 set_target_properties(lab4 PROPERTIES
     VS_DEBUGGER_WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}/2022CG_Lab4")
+endif()

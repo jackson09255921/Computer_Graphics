@@ -115,7 +115,24 @@ the selected input file. Some inherited drawing controls are also available:
 ├── 2022CG_Lab3/       # 3D rendering pipeline and OBJ meshes
 ├── 2022CG_Lab4/       # lighting, shading, and Z-buffering
 ├── images/            # diagrams and rendered results
+├── src/core/          # API-agnostic math and image primitives
+├── tests/             # portable core tests
 └── CMakeLists.txt      # reproducible build configuration
+```
+
+## Architecture
+
+The original labs are preserved as legacy OpenGL presentation targets. New
+renderer features build on `cg_core`, which has no OpenGL or DirectX dependency
+and writes to an owned CPU framebuffer. This keeps the rendering algorithms
+portable while allowing different presentation backends later.
+
+For a headless build of only the portable core and its tests:
+
+```bash
+cmake -S . -B build-core -DBUILD_LEGACY_LABS=OFF
+cmake --build build-core
+ctest --test-dir build-core --output-on-failure
 ```
 
 ## Current limitations

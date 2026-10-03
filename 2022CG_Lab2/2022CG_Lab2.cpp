@@ -1003,9 +1003,9 @@ void undo()
     glColor3d(color_r, color_g, color_b);
     init_x = prev_x = 0;
     init_y = prev_y = 0;
-    printf("The number of remain dots is = %d \n", dotsBuffer.size());
-    printf("The number of remain shapes is = %d \n", shapesBuffer.size());
-    printf("The number of colors is = %d \n", colorBuffer.size());
+    cout << "The number of remaining dots is = " << dotsBuffer.size() << '\n';
+    cout << "The number of remaining shapes is = " << shapesBuffer.size() << '\n';
+    cout << "The number of colors is = " << colorBuffer.size() << '\n';
 }
 
 
