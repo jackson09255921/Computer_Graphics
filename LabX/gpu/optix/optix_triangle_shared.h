@@ -8,5 +8,7 @@ struct OptixTriangleParams {
     unsigned int width;
     unsigned int height;
     OptixTraversableHandle handle;
+    const float3* primitive_colors;
+    float3 camera_origin;
+    float view_scale;
 };
-

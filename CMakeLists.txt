@@ -76,7 +76,7 @@ if(BUILD_OPTIX_DEMOS)
     target_include_directories(optix_triangle_demo PRIVATE "${OPTIX_INCLUDE_DIR}" "${OPTIX_TRIANGLE_DIR}")
     target_compile_definitions(optix_triangle_demo PRIVATE
         OPTIX_TRIANGLE_PTX_PATH="${OPTIX_TRIANGLE_PTX}")
-    target_link_libraries(optix_triangle_demo PRIVATE CUDA::cudart CUDA::cuda_driver ${CMAKE_DL_LIBS})
+    target_link_libraries(optix_triangle_demo PRIVATE cg_core CUDA::cudart CUDA::cuda_driver ${CMAKE_DL_LIBS})
     if(BUILD_TESTING)
         add_test(NAME optix_context_probe COMMAND optix_context_probe)
         add_test(NAME optix_triangle_demo COMMAND optix_triangle_demo

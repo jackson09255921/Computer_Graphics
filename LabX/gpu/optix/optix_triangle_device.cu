@@ -20,8 +20,10 @@ extern "C" __global__ void __raygen__triangle() {
             (static_cast<float>(dimensions.x) / static_cast<float>(dimensions.y)),
         2.0f * (static_cast<float>(index.y) + 0.5f) / static_cast<float>(dimensions.y) - 1.0f);
 
-    const float3 origin = make_float3(0.0f, 0.0f, 2.0f);
-    const float3 raw_direction = make_float3(screen.x, screen.y, -2.0f);
+    const float3 origin = params.camera_origin;
+    const float3 raw_direction = make_float3(screen.x * params.view_scale,
+                                             screen.y * params.view_scale,
+                                             -2.5f * params.view_scale);
     const float inverse_length = rsqrtf(raw_direction.x * raw_direction.x +
                                         raw_direction.y * raw_direction.y +
                                         raw_direction.z * raw_direction.z);
@@ -51,5 +53,7 @@ extern "C" __global__ void __miss__background() {
 
 extern "C" __global__ void __closesthit__barycentric() {
     const float2 barycentric = optixGetTriangleBarycentrics();
-    set_color(1.0f - barycentric.x - barycentric.y, barycentric.x, barycentric.y);
+    const float3 base_color = params.primitive_colors[optixGetPrimitiveIndex()];
+    const float shade = 0.55f + 0.45f * (1.0f - barycentric.y);
+    set_color(base_color.x * shade, base_color.y * shade, base_color.z * shade);
 }

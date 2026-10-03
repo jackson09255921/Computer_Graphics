@@ -1,3 +1,7 @@
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+
 #include <cuda_runtime.h>
 #include <optix.h>
 #include <optix_function_table_definition.h>
@@ -5,11 +9,14 @@
 #include <optix_stubs.h>
 
 #include "optix_triangle_shared.h"
+#include "assets/gltf_loader.hpp"
 
+#include <algorithm>
 #include <array>
 #include <cstdint>
 #include <fstream>
 #include <iostream>
+#include <limits>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -34,6 +41,42 @@ struct alignas(OPTIX_SBT_RECORD_ALIGNMENT) SbtRecord {
 struct EmptyData {};
 using EmptyRecord = SbtRecord<EmptyData>;
 
+struct MeshData {
+    std::vector<float3> vertices;
+    std::vector<uint3> indices;
+    std::vector<float3> colors;
+};
+
+MeshData default_mesh() {
+    return {{{-0.85f, -0.65f, 0.0f}, {0.85f, -0.65f, 0.0f},
+             {0.85f, 0.65f, 0.0f}, {-0.85f, 0.65f, 0.0f}},
+            {{0, 1, 2}, {0, 2, 3}},
+            {{0.95f, 0.25f, 0.15f}, {0.15f, 0.45f, 0.95f}}};
+}
+
+MeshData load_gltf_mesh(const std::string& path) {
+    const cg::assets::GltfAsset asset = cg::assets::GltfAsset::load(path);
+    if (asset.triangles().empty()) throw std::runtime_error("glTF scene contains no triangles");
+    MeshData mesh;
+    for (const auto& triangle : asset.triangles()) {
+        const unsigned int first = static_cast<unsigned int>(mesh.vertices.size());
+        mesh.vertices.push_back(make_float3(static_cast<float>(triangle.first.x),
+                                            static_cast<float>(triangle.first.y),
+                                            static_cast<float>(triangle.first.z)));
+        mesh.vertices.push_back(make_float3(static_cast<float>(triangle.second.x),
+                                            static_cast<float>(triangle.second.y),
+                                            static_cast<float>(triangle.second.z)));
+        mesh.vertices.push_back(make_float3(static_cast<float>(triangle.third.x),
+                                            static_cast<float>(triangle.third.y),
+                                            static_cast<float>(triangle.third.z)));
+        mesh.indices.push_back(make_uint3(first, first + 1, first + 2));
+        mesh.colors.push_back(make_float3(static_cast<float>(triangle.material.albedo.x),
+                                          static_cast<float>(triangle.material.albedo.y),
+                                          static_cast<float>(triangle.material.albedo.z)));
+    }
+    return mesh;
+}
+
 std::string read_binary(const char* path) {
     std::ifstream input(path, std::ios::binary);
     if (!input) throw std::runtime_error(std::string("Cannot open PTX: ") + path);
@@ -57,35 +100,42 @@ int main(int argc, char** argv) {
     constexpr unsigned int width = 256;
     constexpr unsigned int height = 192;
     const std::string output_path = argc > 1 ? argv[1] : "optix_triangle.ppm";
+    MeshData mesh;
 
     OptixDeviceContext context = nullptr;
     OptixModule module = nullptr;
     OptixPipeline pipeline = nullptr;
     OptixProgramGroup raygen = nullptr, miss = nullptr, hitgroup = nullptr;
     CUdeviceptr gas = 0, raygen_record = 0, miss_record = 0, hit_record = 0;
-    CUdeviceptr device_image = 0, device_params = 0;
+    CUdeviceptr device_image = 0, device_params = 0, device_colors = 0;
 
     try {
+        mesh = argc > 2 ? load_gltf_mesh(argv[2]) : default_mesh();
         check_cuda(cudaFree(nullptr), "cudaFree initialization");
         check_optix(optixInit(), "optixInit");
         OptixDeviceContextOptions context_options{};
         check_optix(optixDeviceContextCreate(nullptr, &context_options, &context),
                     "optixDeviceContextCreate");
 
-        const std::array<float3, 3> vertices{{
-            make_float3(-0.75f, -0.60f, 0.0f),
-            make_float3( 0.75f, -0.60f, 0.0f),
-            make_float3( 0.00f,  0.75f, 0.0f)}};
         CUdeviceptr device_vertices = 0;
-        check_cuda(cudaMalloc(reinterpret_cast<void**>(&device_vertices), sizeof(vertices)), "cudaMalloc vertices");
-        check_cuda(cudaMemcpy(reinterpret_cast<void*>(device_vertices), vertices.data(), sizeof(vertices),
+        CUdeviceptr device_indices = 0;
+        const std::size_t vertices_size = mesh.vertices.size() * sizeof(float3);
+        const std::size_t indices_size = mesh.indices.size() * sizeof(uint3);
+        check_cuda(cudaMalloc(reinterpret_cast<void**>(&device_vertices), vertices_size), "cudaMalloc vertices");
+        check_cuda(cudaMemcpy(reinterpret_cast<void*>(device_vertices), mesh.vertices.data(), vertices_size,
                               cudaMemcpyHostToDevice), "cudaMemcpy vertices");
+        check_cuda(cudaMalloc(reinterpret_cast<void**>(&device_indices), indices_size), "cudaMalloc indices");
+        check_cuda(cudaMemcpy(reinterpret_cast<void*>(device_indices), mesh.indices.data(), indices_size,
+                              cudaMemcpyHostToDevice), "cudaMemcpy indices");
         const unsigned int geometry_flags[] = {OPTIX_GEOMETRY_FLAG_NONE};
         OptixBuildInput build_input{};
         build_input.type = OPTIX_BUILD_INPUT_TYPE_TRIANGLES;
         build_input.triangleArray.vertexFormat = OPTIX_VERTEX_FORMAT_FLOAT3;
-        build_input.triangleArray.numVertices = 3;
+        build_input.triangleArray.numVertices = static_cast<unsigned int>(mesh.vertices.size());
         build_input.triangleArray.vertexBuffers = &device_vertices;
+        build_input.triangleArray.indexFormat = OPTIX_INDICES_FORMAT_UNSIGNED_INT3;
+        build_input.triangleArray.numIndexTriplets = static_cast<unsigned int>(mesh.indices.size());
+        build_input.triangleArray.indexBuffer = device_indices;
         build_input.triangleArray.flags = geometry_flags;
         build_input.triangleArray.numSbtRecords = 1;
         OptixAccelBuildOptions accel_options{};
@@ -103,6 +153,7 @@ int main(int argc, char** argv) {
                                     &gas_handle, nullptr, 0), "optixAccelBuild");
         check_cuda(cudaFree(reinterpret_cast<void*>(scratch)), "cudaFree GAS scratch");
         check_cuda(cudaFree(reinterpret_cast<void*>(device_vertices)), "cudaFree vertices");
+        check_cuda(cudaFree(reinterpret_cast<void*>(device_indices)), "cudaFree indices");
 
         OptixPipelineCompileOptions compile_options{};
         compile_options.traversableGraphFlags = OPTIX_TRAVERSABLE_GRAPH_FLAG_ALLOW_SINGLE_GAS;
@@ -183,7 +234,29 @@ int main(int argc, char** argv) {
 
         check_cuda(cudaMalloc(reinterpret_cast<void**>(&device_image), width * height * sizeof(uchar4)),
                    "cudaMalloc image");
-        const OptixTriangleParams params{reinterpret_cast<uchar4*>(device_image), width, height, gas_handle};
+        check_cuda(cudaMalloc(reinterpret_cast<void**>(&device_colors), mesh.colors.size() * sizeof(float3)),
+                   "cudaMalloc primitive colors");
+        check_cuda(cudaMemcpy(reinterpret_cast<void*>(device_colors), mesh.colors.data(),
+                              mesh.colors.size() * sizeof(float3), cudaMemcpyHostToDevice),
+                   "cudaMemcpy primitive colors");
+        float3 minimum = make_float3(std::numeric_limits<float>::max(), std::numeric_limits<float>::max(),
+                                     std::numeric_limits<float>::max());
+        float3 maximum = make_float3(std::numeric_limits<float>::lowest(), std::numeric_limits<float>::lowest(),
+                                     std::numeric_limits<float>::lowest());
+        for (const float3 vertex : mesh.vertices) {
+            minimum.x = std::min(minimum.x, vertex.x); minimum.y = std::min(minimum.y, vertex.y);
+            minimum.z = std::min(minimum.z, vertex.z); maximum.x = std::max(maximum.x, vertex.x);
+            maximum.y = std::max(maximum.y, vertex.y); maximum.z = std::max(maximum.z, vertex.z);
+        }
+        const float3 scene_center = make_float3((minimum.x + maximum.x) * 0.5f,
+                                                (minimum.y + maximum.y) * 0.5f,
+                                                (minimum.z + maximum.z) * 0.5f);
+        const float view_scale = std::max(0.001f, std::max(maximum.x - minimum.x,
+                                                          maximum.y - minimum.y) * 0.65f);
+        const float3 camera_origin = make_float3(scene_center.x, scene_center.y,
+                                                 maximum.z + 2.5f * view_scale);
+        const OptixTriangleParams params{reinterpret_cast<uchar4*>(device_image), width, height, gas_handle,
+                                         reinterpret_cast<float3*>(device_colors), camera_origin, view_scale};
         check_cuda(cudaMalloc(reinterpret_cast<void**>(&device_params), sizeof(params)), "cudaMalloc params");
         check_cuda(cudaMemcpy(reinterpret_cast<void*>(device_params), &params, sizeof(params),
                               cudaMemcpyHostToDevice), "cudaMemcpy params");
@@ -193,15 +266,20 @@ int main(int argc, char** argv) {
         std::vector<uchar4> image(width * height);
         check_cuda(cudaMemcpy(image.data(), reinterpret_cast<void*>(device_image), image.size() * sizeof(uchar4),
                               cudaMemcpyDeviceToHost), "cudaMemcpy image");
-        const uchar4 center = image[(height / 2) * width + width / 2];
-        if (center.x < 16 && center.y < 16 && center.z < 32)
-            throw std::runtime_error("center pixel missed the triangle");
+        const uchar4 center_pixel = image[(height / 2) * width + width / 2];
+        const std::size_t hit_pixels = static_cast<std::size_t>(std::count_if(
+            image.begin(), image.end(), [](uchar4 pixel) {
+                return pixel.x != 7 || pixel.y != 12 || pixel.z != 25;
+            }));
+        if (hit_pixels == 0) throw std::runtime_error("rendered mesh produced no visible pixels");
         write_ppm(output_path, image, width, height);
-        std::cout << "OptiX triangle rendered to " << output_path << " (center RGB "
-                  << static_cast<int>(center.x) << ", " << static_cast<int>(center.y) << ", "
-                  << static_cast<int>(center.z) << ")\n";
+        std::cout << "OptiX indexed mesh rendered " << mesh.indices.size() << " triangles to "
+                  << output_path << " (" << hit_pixels << " hit pixels, center RGB "
+                  << static_cast<int>(center_pixel.x) << ", " << static_cast<int>(center_pixel.y) << ", "
+                  << static_cast<int>(center_pixel.z) << ")\n";
 
         cudaFree(reinterpret_cast<void*>(device_params));
+        cudaFree(reinterpret_cast<void*>(device_colors));
         cudaFree(reinterpret_cast<void*>(device_image));
         cudaFree(reinterpret_cast<void*>(hit_record));
         cudaFree(reinterpret_cast<void*>(miss_record));
@@ -219,4 +297,3 @@ int main(int argc, char** argv) {
         return 1;
     }
 }
-

@@ -54,7 +54,7 @@ ctest --test-dir build-cuda -R cuda_capability --output-on-failure
 3. Importance sampling and multiple importance sampling.
 4. Refraction, dielectric materials, HDR environment lighting, and glTF input (implemented).
 5. CUDA tiled path tracing sized for the 8 GiB GPU budget (geometry, glTF, matched GGX reflection/BTDF, MIS, and HDR implemented).
-6. OptiX context plus a hardware-traversed triangle pipeline, and the ReSTIR DI reservoir core (implemented); full renderer integration follows.
+6. OptiX context plus a hardware-traversed indexed-mesh/glTF pipeline, and the ReSTIR DI reservoir core (implemented); full renderer integration follows.
 7. Denoising and neural reconstruction only after stable temporal buffers exist.
 
 Every milestone must retain a CPU build, deterministic tests, and a small demo
@@ -76,8 +76,14 @@ ctest --test-dir build-optix-windows -C Release -R optix_ --output-on-failure
 ```
 
 `optix_triangle_demo` compiles its raygen, miss, and closest-hit programs to
-PTX, builds a triangle geometry acceleration structure and shader binding
-table, launches RTX traversal, validates the center hit, and writes a PPM.
+PTX, builds an indexed triangle geometry acceleration structure and shader
+binding table, launches RTX traversal, validates visible hits, and writes a
+PPM. Its default scene is a two-triangle indexed mesh; pass an output path and
+then a `.gltf` path to upload a scene through the shared loader:
+
+```powershell
+.\build-optix-windows\Release\optix_triangle_demo.exe output.ppm model.gltf
+```
 
 Without the SDK, configuration stops immediately with an actionable message;
 normal CPU and CUDA builds remain unaffected.
