@@ -28,6 +28,7 @@ struct OptixTriangleParams {
     unsigned int* temporal_validity;
     OptixLightReservoir* reservoirs;
     const OptixLightReservoir* previous_reservoirs;
+    OptixLightReservoir* spatial_reservoirs;
     unsigned int width;
     unsigned int height;
     unsigned int sample_index;

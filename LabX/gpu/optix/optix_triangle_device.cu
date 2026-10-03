@@ -149,6 +149,46 @@ extern "C" __global__ void __raygen__triangle() {
         static_cast<unsigned char>(fminf(fmaxf(accumulated.z * inverse_samples, 0.0f), 1.0f) * 255.0f), 255);
 }
 
+extern "C" __global__ void __raygen__spatial_reuse() {
+    const uint3 index = optixGetLaunchIndex();
+    const unsigned int pixel = index.y * params.width + index.x;
+    const float center_depth = params.gbuffer_depth[pixel];
+    const float3 center_normal = params.gbuffer_normal[pixel];
+    const float3 center_albedo = params.gbuffer_albedo[pixel];
+    OptixLightReservoir result{};
+    unsigned int random_state = hash(pixel + 0xa511e9b3u);
+    const OptixLightReservoir center = params.reservoirs[pixel];
+    reservoir_update(result, center.light_index, center.weight_sum, center.selected_weight,
+                     center.candidate_count, random_state);
+
+    const int2 offsets[4] = {make_int2(-1, 0), make_int2(1, 0), make_int2(0, -1), make_int2(0, 1)};
+    for (unsigned int neighbor_index = 0; neighbor_index < 4; ++neighbor_index) {
+        const int x = static_cast<int>(index.x) + offsets[neighbor_index].x;
+        const int y = static_cast<int>(index.y) + offsets[neighbor_index].y;
+        if (x < 0 || x >= static_cast<int>(params.width) || y < 0 || y >= static_cast<int>(params.height))
+            continue;
+        const unsigned int neighbor_pixel = static_cast<unsigned int>(y) * params.width +
+                                            static_cast<unsigned int>(x);
+        const float neighbor_depth = params.gbuffer_depth[neighbor_pixel];
+        const float3 neighbor_normal = params.gbuffer_normal[neighbor_pixel];
+        const float3 neighbor_albedo = params.gbuffer_albedo[neighbor_pixel];
+        const float normal_similarity = center_normal.x * neighbor_normal.x +
+                                        center_normal.y * neighbor_normal.y +
+                                        center_normal.z * neighbor_normal.z;
+        const float albedo_difference = fabsf(center_albedo.x - neighbor_albedo.x) +
+                                        fabsf(center_albedo.y - neighbor_albedo.y) +
+                                        fabsf(center_albedo.z - neighbor_albedo.z);
+        const bool compatible = center_depth > 0.0f && neighbor_depth > 0.0f &&
+            fabsf(center_depth - neighbor_depth) <= fmaxf(1.0e-3f, center_depth * 0.02f) &&
+            normal_similarity >= 0.90f && albedo_difference <= 0.10f;
+        if (!compatible) continue;
+        const OptixLightReservoir neighbor = params.reservoirs[neighbor_pixel];
+        reservoir_update(result, neighbor.light_index, neighbor.weight_sum, neighbor.selected_weight,
+                         neighbor.candidate_count, random_state);
+    }
+    params.spatial_reservoirs[pixel] = result;
+}
+
 extern "C" __global__ void __miss__background() {
     set_color(0.03f, 0.05f, 0.10f);
 }

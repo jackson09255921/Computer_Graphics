@@ -120,15 +120,16 @@ int main(int argc, char** argv) {
     OptixDeviceContext context = nullptr;
     OptixModule module = nullptr;
     OptixPipeline pipeline = nullptr;
-    OptixProgramGroup raygen = nullptr, radiance_miss = nullptr, shadow_miss = nullptr;
+    OptixProgramGroup raygen = nullptr, spatial_raygen = nullptr;
+    OptixProgramGroup radiance_miss = nullptr, shadow_miss = nullptr;
     OptixProgramGroup radiance_hit = nullptr, shadow_hit = nullptr;
-    CUdeviceptr gas = 0, raygen_record = 0, miss_record = 0, hit_record = 0;
+    CUdeviceptr gas = 0, raygen_record = 0, spatial_raygen_record = 0, miss_record = 0, hit_record = 0;
     CUdeviceptr device_image = 0, device_accumulation = 0, device_params = 0;
     CUdeviceptr device_colors = 0, device_reflectivity = 0;
     CUdeviceptr device_roughness = 0;
     CUdeviceptr gbuffer_normal = 0, gbuffer_depth = 0, gbuffer_albedo = 0, gbuffer_motion = 0;
     CUdeviceptr previous_normal = 0, previous_depth = 0, previous_albedo = 0, temporal_validity = 0;
-    CUdeviceptr reservoirs = 0, previous_reservoirs = 0, device_lights = 0;
+    CUdeviceptr reservoirs = 0, previous_reservoirs = 0, spatial_reservoirs = 0, device_lights = 0;
     CUdeviceptr device_vertices = 0, device_indices = 0;
 
     try {
@@ -203,6 +204,11 @@ int main(int argc, char** argv) {
         raygen_desc.raygen.module = module;
         raygen_desc.raygen.entryFunctionName = "__raygen__triangle";
         create_group(raygen_desc, raygen, "raygen program");
+        OptixProgramGroupDesc spatial_raygen_desc{};
+        spatial_raygen_desc.kind = OPTIX_PROGRAM_GROUP_KIND_RAYGEN;
+        spatial_raygen_desc.raygen.module = module;
+        spatial_raygen_desc.raygen.entryFunctionName = "__raygen__spatial_reuse";
+        create_group(spatial_raygen_desc, spatial_raygen, "spatial raygen program");
         OptixProgramGroupDesc miss_desc{};
         miss_desc.kind = OPTIX_PROGRAM_GROUP_KIND_MISS;
         miss_desc.miss.module = module;
@@ -224,8 +230,8 @@ int main(int argc, char** argv) {
         shadow_hit_desc.hitgroup.entryFunctionNameCH = "__closesthit__shadow";
         create_group(shadow_hit_desc, shadow_hit, "shadow closest-hit program");
 
-        const std::array<OptixProgramGroup, 5> groups{
-            raygen, radiance_miss, shadow_miss, radiance_hit, shadow_hit};
+        const std::array<OptixProgramGroup, 6> groups{
+            raygen, spatial_raygen, radiance_miss, shadow_miss, radiance_hit, shadow_hit};
         OptixPipelineLinkOptions link_options{};
         link_options.maxTraceDepth = 4;
         log.fill(0); log_size = log.size();
@@ -254,6 +260,7 @@ int main(int argc, char** argv) {
                                   cudaMemcpyHostToDevice), "cudaMemcpy SBT record");
         };
         upload_records({raygen}, raygen_record);
+        upload_records({spatial_raygen}, spatial_raygen_record);
         upload_records({radiance_miss, shadow_miss}, miss_record);
         upload_records({radiance_hit, shadow_hit}, hit_record);
         OptixShaderBindingTable sbt{};
@@ -293,6 +300,8 @@ int main(int argc, char** argv) {
                               width * height * sizeof(OptixLightReservoir)), "cudaMalloc reservoirs");
         check_cuda(cudaMalloc(reinterpret_cast<void**>(&previous_reservoirs),
                               width * height * sizeof(OptixLightReservoir)), "cudaMalloc previous reservoirs");
+        check_cuda(cudaMalloc(reinterpret_cast<void**>(&spatial_reservoirs),
+                              width * height * sizeof(OptixLightReservoir)), "cudaMalloc spatial reservoirs");
         check_cuda(cudaMemset(reinterpret_cast<void*>(reservoirs), 0,
                               width * height * sizeof(OptixLightReservoir)), "cudaMemset reservoirs");
         check_cuda(cudaMalloc(reinterpret_cast<void**>(&device_colors), mesh.colors.size() * sizeof(float3)),
@@ -352,6 +361,7 @@ int main(int argc, char** argv) {
                                          reinterpret_cast<unsigned int*>(temporal_validity),
                                          reinterpret_cast<OptixLightReservoir*>(reservoirs),
                                          reinterpret_cast<OptixLightReservoir*>(previous_reservoirs),
+                                         reinterpret_cast<OptixLightReservoir*>(spatial_reservoirs),
                                          width, height, 0, 0,
                                          gas_handle,
                                          reinterpret_cast<float3*>(device_vertices),
@@ -390,6 +400,9 @@ int main(int argc, char** argv) {
             check_optix(optixLaunch(pipeline, nullptr, device_params, sizeof(params), &sbt,
                                     width, height, 1), "optixLaunch temporal frame");
         }
+        sbt.raygenRecord = spatial_raygen_record;
+        check_optix(optixLaunch(pipeline, nullptr, device_params, sizeof(params), &sbt,
+                                width, height, 1), "optixLaunch spatial reuse");
         check_cuda(cudaDeviceSynchronize(), "cudaDeviceSynchronize");
         float4 center_accumulation{};
         const std::size_t center_offset = ((height / 2) * width + width / 2) * sizeof(float4);
@@ -416,6 +429,17 @@ int main(int argc, char** argv) {
         if (center_reservoir.candidate_count < samples_per_pixel || center_reservoir.weight_sum <= 0.0f ||
             center_reservoir.selected_weight <= 0.0f || center_reservoir.light_index >= lights.size())
             throw std::runtime_error("ReSTIR temporal reservoir invariant failed");
+        OptixLightReservoir center_spatial_reservoir{};
+        check_cuda(cudaMemcpy(&center_spatial_reservoir,
+                              reinterpret_cast<void*>(spatial_reservoirs +
+                                  ((height / 2) * width + width / 2) * sizeof(OptixLightReservoir)),
+                              sizeof(center_spatial_reservoir), cudaMemcpyDeviceToHost),
+                   "cudaMemcpy center spatial reservoir");
+        if (center_spatial_reservoir.candidate_count <= center_reservoir.candidate_count ||
+            center_spatial_reservoir.weight_sum <= 0.0f ||
+            center_spatial_reservoir.selected_weight <= 0.0f ||
+            center_spatial_reservoir.light_index >= lights.size())
+            throw std::runtime_error("ReSTIR spatial reservoir invariant failed");
         float3 center_normal{};
         float center_depth = 0.0f;
         float3 center_albedo{};
@@ -464,10 +488,12 @@ int main(int argc, char** argv) {
                   << static_cast<int>(center_pixel.x) << ", " << static_cast<int>(center_pixel.y) << ", "
                   << static_cast<int>(center_pixel.z) << ", depth " << center_depth << ", normal "
                   << center_normal.x << ", " << center_normal.y << ", " << center_normal.z
-                  << ", temporal history accepted, reservoir M=" << center_reservoir.candidate_count << ")\n";
+                  << ", temporal history accepted, temporal M=" << center_reservoir.candidate_count
+                  << ", spatial M=" << center_spatial_reservoir.candidate_count << ")\n";
 
         cudaFree(reinterpret_cast<void*>(device_params));
         cudaFree(reinterpret_cast<void*>(device_lights));
+        cudaFree(reinterpret_cast<void*>(spatial_reservoirs));
         cudaFree(reinterpret_cast<void*>(previous_reservoirs));
         cudaFree(reinterpret_cast<void*>(reservoirs));
         cudaFree(reinterpret_cast<void*>(temporal_validity));
@@ -487,6 +513,7 @@ int main(int argc, char** argv) {
         cudaFree(reinterpret_cast<void*>(device_image));
         cudaFree(reinterpret_cast<void*>(hit_record));
         cudaFree(reinterpret_cast<void*>(miss_record));
+        cudaFree(reinterpret_cast<void*>(spatial_raygen_record));
         cudaFree(reinterpret_cast<void*>(raygen_record));
         cudaFree(reinterpret_cast<void*>(gas));
         optixPipelineDestroy(pipeline);
@@ -494,6 +521,7 @@ int main(int argc, char** argv) {
         optixProgramGroupDestroy(radiance_hit);
         optixProgramGroupDestroy(shadow_miss);
         optixProgramGroupDestroy(radiance_miss);
+        optixProgramGroupDestroy(spatial_raygen);
         optixProgramGroupDestroy(raygen);
         optixModuleDestroy(module);
         optixDeviceContextDestroy(context);
