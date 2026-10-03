@@ -9,6 +9,7 @@ LabX/
 ├── animation/    # keyframe and quaternion animation demos
 ├── curves/       # headless and interactive Bézier tools
 ├── gpu/          # optional CUDA/GPU capability and rendering work
+├── pbr/          # GGX, Fresnel, and metallic/roughness material model
 └── raytracing/   # Whitted ray tracing and Monte Carlo path tracing demos
 ```
 

@@ -14,13 +14,14 @@ option(BUILD_CUDA_DEMOS "Build CUDA experiments under LabX/gpu" OFF)
 set(CG_CUDA_ARCHITECTURES "89" CACHE STRING "CUDA architectures for LabX GPU experiments")
 
 add_library(cg_core
+    LabX/pbr/pbr.cpp
     src/animation/animation.cpp
     src/core/draw.cpp
     src/core/image.cpp
     src/curves/bezier.cpp
     src/raytracer/raytracer.cpp
 )
-target_include_directories(cg_core PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/src")
+target_include_directories(cg_core PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/src" "${CMAKE_CURRENT_SOURCE_DIR}/LabX")
 target_compile_features(cg_core PUBLIC cxx_std_17)
 
 if(MSVC)
@@ -41,6 +42,10 @@ if(BUILD_TESTING)
     add_executable(raytracer_tests tests/raytracer_tests.cpp)
     target_link_libraries(raytracer_tests PRIVATE cg_core)
     add_test(NAME raytracer_tests COMMAND raytracer_tests)
+
+    add_executable(pbr_tests LabX/pbr/pbr_tests.cpp)
+    target_link_libraries(pbr_tests PRIVATE cg_core)
+    add_test(NAME pbr_tests COMMAND pbr_tests)
 
     add_executable(animation_tests tests/animation_tests.cpp)
     target_link_libraries(animation_tests PRIVATE cg_core)

@@ -24,6 +24,8 @@ struct Material {
     double shininess{32.0};
     double reflectivity{0.0};
     Color emission{0.0, 0.0, 0.0};
+    double metallic{0.0};
+    double roughness{0.5};
 };
 
 struct Aabb {

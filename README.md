@@ -62,7 +62,8 @@ per area-light sample.
 
 The separate Monte Carlo path tracer adds cosine-weighted hemisphere sampling,
 indirect diffuse illumination, explicit area-light sampling, mirror bounces,
-and Russian roulette termination. The optional second argument controls samples
+Russian roulette termination, and a metallic/roughness GGX BRDF with Schlick
+Fresnel and Smith visibility. The optional second argument controls samples
 per pixel (64 by default):
 
 ```bash

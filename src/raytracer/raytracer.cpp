@@ -1,4 +1,5 @@
 #include "raytracer/raytracer.hpp"
+#include "pbr/pbr.hpp"
 
 #include <algorithm>
 #include <array>
@@ -82,10 +83,10 @@ Color path_radiance(const Scene& scene, const Ray& ray, int depth, int maximum_d
         if (surface_cosine > 0.0 && light_cosine > 0.0 &&
             !scene.intersect({hit.position + hit.normal * kRayBias, direction}, kRayBias,
                              distance - kRayBias, blocker)) {
-            constexpr double inverse_pi = 0.31830988618379067154;
-            result += material.albedo * light.color *
-                      (material.diffuse * inverse_pi * light.intensity * light.area() *
-                       surface_cosine * light_cosine / distance_squared);
+            const Color brdf = pbr::evaluate_ggx(hit.normal, normalized(-ray.direction), direction,
+                                                 material.albedo, material.metallic, material.roughness);
+            result += brdf * light.color * (material.diffuse * light.intensity * light.area() *
+                                            surface_cosine * light_cosine / distance_squared);
         }
     }
 
