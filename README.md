@@ -63,7 +63,9 @@ per area-light sample.
 The separate Monte Carlo path tracer adds cosine-weighted hemisphere sampling,
 indirect diffuse illumination, explicit area-light sampling, mirror bounces,
 Russian roulette termination, and a metallic/roughness GGX BRDF with Schlick
-Fresnel and Smith visibility. Area-light and BSDF importance sampling are
+Fresnel and Smith visibility. Dielectric materials add Snell refraction, exact
+Fresnel sampling, total internal reflection, and GGX rough transmission.
+Area-light and BSDF importance sampling are
 combined with the 1995 Veach–Guibas power heuristic for lower-variance direct
 lighting. The optional second argument controls samples
 per pixel (64 by default):

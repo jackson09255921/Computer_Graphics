@@ -17,7 +17,13 @@ int main(int argc, char** argv) {
         constexpr std::size_t height = 360;
 
         const cg::rt::Material coral{{0.85, 0.12, 0.06}, 0.9, 0.0, 1.0, 0.0};
-        const cg::rt::Material blue{{0.04, 0.16, 0.9}, 0.85, 0.0, 1.0, 0.12};
+        cg::rt::Material blue_glass;
+        blue_glass.albedo = {0.72, 0.88, 1.0};
+        blue_glass.diffuse = 0.03;
+        blue_glass.specular = 1.0;
+        blue_glass.roughness = 0.16;
+        blue_glass.transmission = 0.92;
+        blue_glass.index_of_refraction = 1.5;
         const cg::rt::Material mirror{{0.92, 0.92, 0.92}, 0.0, 0.0, 1.0, 0.92};
         const cg::rt::Material floor{{0.62, 0.64, 0.68}, 0.9, 0.0, 1.0, 0.0};
 
@@ -25,7 +31,7 @@ int main(int argc, char** argv) {
         scene.background = {0.004, 0.006, 0.012};
         scene.add(std::make_shared<cg::rt::Sphere>(cg::Vec3{-1.25, -0.05, -4.3}, 1.0, coral));
         scene.add(std::make_shared<cg::rt::Sphere>(cg::Vec3{1.1, -0.2, -3.7}, 0.85, mirror));
-        scene.add(std::make_shared<cg::rt::Sphere>(cg::Vec3{0.2, 1.25, -5.1}, 0.62, blue));
+        scene.add(std::make_shared<cg::rt::Sphere>(cg::Vec3{0.2, 1.25, -5.1}, 0.62, blue_glass));
         scene.add(std::make_shared<cg::rt::Triangle>(cg::Vec3{-7.0, -1.05, 1.0}, cg::Vec3{7.0, -1.05, 1.0},
                                                     cg::Vec3{7.0, -1.05, -12.0}, floor));
         scene.add(std::make_shared<cg::rt::Triangle>(cg::Vec3{-7.0, -1.05, 1.0}, cg::Vec3{7.0, -1.05, -12.0},

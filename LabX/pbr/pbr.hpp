@@ -5,6 +5,11 @@
 namespace cg::pbr {
 
 [[nodiscard]] Color fresnel_schlick(double cosine, const Color& reflectance_at_normal);
+[[nodiscard]] double fresnel_dielectric(double cosine, double eta_incident, double eta_transmitted);
+[[nodiscard]] bool refract(const Vec3& incident, const Vec3& normal, double eta_ratio,
+                           Vec3& transmitted);
+[[nodiscard]] Vec3 sample_ggx_normal(const Vec3& normal, double roughness,
+                                     double uniform_1, double uniform_2);
 [[nodiscard]] double ggx_distribution(double normal_dot_half, double roughness);
 [[nodiscard]] double smith_geometry(double normal_dot_view, double normal_dot_light, double roughness);
 [[nodiscard]] Color evaluate_ggx(const Vec3& normal, const Vec3& view, const Vec3& light,

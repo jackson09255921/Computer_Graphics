@@ -126,15 +126,32 @@ Color path_radiance(const Scene& scene, const Ray& ray, int depth, int maximum_d
     const double compensation = depth >= 3 ? 1.0 / survival : 1.0;
     Vec3 bounce_direction;
     Color throughput;
-    if (material.reflectivity > 0.0 && sampler.next() < material.reflectivity) {
+    if (material.transmission > 0.0 && sampler.next() < material.transmission) {
+        Vec3 microfacet_normal = pbr::sample_ggx_normal(hit.normal, material.roughness,
+                                                        sampler.next(), sampler.next());
+        if (dot(ray.direction, microfacet_normal) > 0.0) microfacet_normal = -microfacet_normal;
+        const double eta_incident = hit.front_face ? 1.0 : material.index_of_refraction;
+        const double eta_transmitted = hit.front_face ? material.index_of_refraction : 1.0;
+        const double fresnel = pbr::fresnel_dielectric(-dot(normalized(ray.direction), microfacet_normal),
+                                                       eta_incident, eta_transmitted);
+        Vec3 transmitted;
+        if (sampler.next() < fresnel ||
+            !pbr::refract(ray.direction, microfacet_normal, eta_incident / eta_transmitted, transmitted)) {
+            bounce_direction = normalized(reflect(ray.direction, microfacet_normal));
+        } else {
+            bounce_direction = transmitted;
+        }
+        throughput = material.albedo;
+    } else if (material.reflectivity > 0.0 && sampler.next() < material.reflectivity) {
         bounce_direction = normalized(reflect(ray.direction, hit.normal));
         throughput = Color{1.0, 1.0, 1.0};
     } else {
         bounce_direction = cosine_hemisphere(hit.normal, sampler);
         throughput = material.albedo * material.diffuse;
     }
+    const double bias = dot(bounce_direction, hit.normal) >= 0.0 ? kRayBias : -kRayBias;
     return result + throughput * path_radiance(scene,
-        {hit.position + hit.normal * kRayBias, bounce_direction}, depth + 1, maximum_depth, sampler) * compensation;
+        {hit.position + hit.normal * bias, bounce_direction}, depth + 1, maximum_depth, sampler) * compensation;
 }
 
 std::uint64_t mix_seed(std::uint64_t value) {
@@ -204,7 +221,9 @@ bool Sphere::intersect(const Ray& ray, double minimum_distance, double maximum_d
     }
     hit.distance = distance;
     hit.position = ray.at(distance);
-    hit.normal = normalized((hit.position - center_) / radius_);
+    const Vec3 outward_normal = normalized((hit.position - center_) / radius_);
+    hit.front_face = dot(ray.direction, outward_normal) < 0.0;
+    hit.normal = hit.front_face ? outward_normal : -outward_normal;
     hit.material = &material_;
     return true;
 }
@@ -252,7 +271,8 @@ bool Triangle::intersect(const Ray& ray, double minimum_distance, double maximum
     }
     hit.distance = distance;
     hit.position = ray.at(distance);
-    hit.normal = dot(normal_, ray.direction) < 0.0 ? normal_ : -normal_;
+    hit.front_face = dot(normal_, ray.direction) < 0.0;
+    hit.normal = hit.front_face ? normal_ : -normal_;
     hit.material = &material_;
     return true;
 }

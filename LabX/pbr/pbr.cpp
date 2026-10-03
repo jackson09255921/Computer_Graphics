@@ -21,6 +21,43 @@ Color fresnel_schlick(double cosine, const Color& reflectance_at_normal) {
     return reflectance_at_normal + (Color{1.0, 1.0, 1.0} - reflectance_at_normal) * factor;
 }
 
+double fresnel_dielectric(double cosine, double eta_incident, double eta_transmitted) {
+    cosine = clamp(std::abs(cosine));
+    const double sine_transmitted = eta_incident / eta_transmitted *
+                                    std::sqrt(std::max(0.0, 1.0 - cosine * cosine));
+    if (sine_transmitted >= 1.0) return 1.0;
+    const double cosine_transmitted = std::sqrt(std::max(0.0, 1.0 - sine_transmitted * sine_transmitted));
+    const double parallel = (eta_transmitted * cosine - eta_incident * cosine_transmitted) /
+                            (eta_transmitted * cosine + eta_incident * cosine_transmitted);
+    const double perpendicular = (eta_incident * cosine - eta_transmitted * cosine_transmitted) /
+                                 (eta_incident * cosine + eta_transmitted * cosine_transmitted);
+    return 0.5 * (parallel * parallel + perpendicular * perpendicular);
+}
+
+bool refract(const Vec3& incident, const Vec3& normal, double eta_ratio, Vec3& transmitted) {
+    const Vec3 direction = normalized(incident);
+    const double cosine = std::min(1.0, -dot(direction, normal));
+    const double discriminant = 1.0 - eta_ratio * eta_ratio * (1.0 - cosine * cosine);
+    if (discriminant < 0.0) return false;
+    transmitted = normalized(direction * eta_ratio + normal * (eta_ratio * cosine - std::sqrt(discriminant)));
+    return true;
+}
+
+Vec3 sample_ggx_normal(const Vec3& normal, double roughness, double uniform_1, double uniform_2) {
+    constexpr double tau = 2.0 * kPi;
+    const double alpha = std::max(0.001, roughness * roughness);
+    uniform_1 = clamp(uniform_1, 0.0, 1.0 - 1e-12);
+    const double tangent_squared = alpha * alpha * uniform_1 / (1.0 - uniform_1);
+    const double cosine = 1.0 / std::sqrt(1.0 + tangent_squared);
+    const double sine = std::sqrt(std::max(0.0, 1.0 - cosine * cosine));
+    const double azimuth = tau * uniform_2;
+    const Vec3 helper = std::abs(normal.x) > 0.9 ? Vec3{0.0, 1.0, 0.0} : Vec3{1.0, 0.0, 0.0};
+    const Vec3 tangent = normalized(cross(helper, normal));
+    const Vec3 bitangent = cross(normal, tangent);
+    return normalized(tangent * (sine * std::cos(azimuth)) +
+                      bitangent * (sine * std::sin(azimuth)) + normal * cosine);
+}
+
 double ggx_distribution(double normal_dot_half, double roughness) {
     const double alpha = std::max(0.045, roughness * roughness);
     const double alpha_squared = alpha * alpha;

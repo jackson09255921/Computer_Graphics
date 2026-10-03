@@ -26,6 +26,8 @@ struct Material {
     Color emission{0.0, 0.0, 0.0};
     double metallic{0.0};
     double roughness{0.5};
+    double transmission{0.0};
+    double index_of_refraction{1.5};
 };
 
 struct Aabb {
@@ -41,6 +43,7 @@ struct Hit {
     Vec3 position;
     Vec3 normal;
     const Material* material{nullptr};
+    bool front_face{true};
 };
 
 class Primitive {

@@ -6,11 +6,12 @@ implementation of an engineering technique.
 
 | Year | Technique | Project status |
 | --- | --- | --- |
+| 1980 | Whitted recursive reflection and refraction | Implemented |
 | 1982 | Cook–Torrance physically based reflectance | Implemented |
 | 1986 | Kajiya rendering equation and path tracing | Implemented |
 | 1991 | Progressive multi-pass global illumination (representative publication) | Implemented |
 | 1995 | Veach–Guibas multiple importance sampling | Implemented |
-| 2007 | GGX microfacet reflection | Implemented |
+| 2007 | GGX microfacet reflection and rough transmission | Implemented |
 | 2020 | ReSTIR direct illumination | Planned |
 
 Multi-threaded tile scheduling and GPU execution evolved across many systems,
@@ -19,6 +20,7 @@ invention date.
 
 ## References
 
+- Whitted, *An Improved Illumination Model for Shaded Display*, 1980.
 - Cook and Torrance, *A Reflectance Model for Computer Graphics*, 1982.
 - Kajiya, *The Rendering Equation*, SIGGRAPH 1986.
 - Chen et al., *A Progressive Multi-Pass Method for Global Illumination*, SIGGRAPH 1991.

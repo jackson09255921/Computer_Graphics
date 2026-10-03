@@ -26,6 +26,12 @@ int main() {
         cg::rt::Hit sphere_hit;
         require(sphere.intersect(center_ray, 1e-5, 100.0, sphere_hit), "center ray should hit sphere");
         require(near(sphere_hit.distance, 4.0), "sphere should be four units from the ray origin");
+        require(sphere_hit.front_face, "outside ray should hit the sphere's front face");
+        cg::rt::Hit inside_hit;
+        require(sphere.intersect({{0.0, 0.0, -5.0}, {1.0, 0.0, 0.0}}, 1e-5, 100.0, inside_hit),
+                "ray inside a sphere should find the exit surface");
+        require(!inside_hit.front_face && near(inside_hit.normal.x, -1.0),
+                "exit hits must retain inside/outside state and oppose the incident ray");
 
         const cg::rt::Triangle triangle({-1.0, -1.0, -3.0}, {1.0, -1.0, -3.0}, {0.0, 1.0, -3.0}, material);
         cg::rt::Hit triangle_hit;
