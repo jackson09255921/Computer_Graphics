@@ -11,7 +11,7 @@ implementation of an engineering technique.
 | 1982 | Cook–Torrance physically based reflectance | Implemented |
 | 1986 | Kajiya rendering equation and path tracing | Implemented |
 | 1991 | Progressive multi-pass global illumination (representative publication) | Implemented |
-| 1995 | Veach–Guibas multiple importance sampling | Implemented |
+| 1995 | Veach–Guibas multiple importance sampling | Implemented on CPU and CUDA |
 | 1998 | High-dynamic-range image-based lighting | Implemented |
 | 2002 | Ray tracing on programmable GPU hardware | Implemented baseline |
 | 2007 | GGX microfacet reflection and rough transmission | Implemented on CPU; GPU sampling baseline |

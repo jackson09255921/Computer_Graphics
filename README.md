@@ -88,7 +88,9 @@ Its feature baseline renders diffuse, GGX-rough metallic, and dielectric glass
 spheres plus triangle meshes through a CPU-built, flattened GPU BVH, with up
 to six bounces and Russian roulette. Glass paths use Snell refraction, exact
 dielectric Fresnel sampling, total internal reflection, and rough microfacet
-normals. A 16x16 device tile buffer keeps temporary pixel
+normals. Rectangular area lights use next-event estimation, visibility rays,
+solid-angle PDFs, and the 1995 power heuristic to combine light and
+cosine-weighted diffuse sampling. A 16x16 device tile buffer keeps temporary pixel
 storage bounded (about 3 KiB), leaving the RTX 4060 Laptop's 8 GiB budget for
 larger scene and material data:
 
@@ -103,8 +105,8 @@ cmake --build build-wsl --target cuda_pathtracer
 The `--gltf` path converts imported scene triangles and base-color,
 metallic, and roughness factors into compact CUDA buffers and rebuilds the
 flattened GPU BVH. The GPU baseline does not yet have CPU feature parity:
-matched GGX BSDF/PDF weighting, MIS, and HDR environments are the next staged
-migrations.
+matched GGX BSDF/PDF weighting and HDR environments are the next staged
+migrations; the current GPU MIS path covers diffuse surfaces and area lights.
 
 The dependency-free `LabX/assets` loader imports glTF 2.x triangle primitives
 from external binary buffers, including indexed or non-indexed geometry, scene

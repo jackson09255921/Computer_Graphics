@@ -49,6 +49,7 @@ struct Triangle {
     float3 first; float3 second; float3 third; float3 albedo; float metallic; float roughness;
     float transmission; float index_of_refraction;
 };
+struct AreaLight { float3 center; float3 half_u; float3 half_v; float3 emission; };
 struct BvhNode { float3 minimum; float3 maximum; int left; int right; int first; int count; };
 struct Hit {
     float distance; float3 position; float3 normal; float3 albedo; float metallic; float roughness;
@@ -215,13 +216,55 @@ __device__ bool refract3(float3 incident, float3 normal, float eta_ratio, float3
     return true;
 }
 
+__host__ __device__ float power_heuristic(float first_pdf, float second_pdf) {
+    const float first = first_pdf * first_pdf;
+    const float second = second_pdf * second_pdf;
+    return first / (first + second);
+}
+
+__host__ __device__ float light_area(const AreaLight& light) {
+    return 4.0f * sqrtf(dot3(cross3(light.half_u, light.half_v),
+                            cross3(light.half_u, light.half_v)));
+}
+
+__device__ bool intersect_light(const AreaLight& light, const Ray& ray, float& distance) {
+    const float3 normal = normalize3(cross3(light.half_u, light.half_v));
+    const float denominator = dot3(normal, ray.direction);
+    if (fabsf(denominator) < 1.0e-8f) return false;
+    distance = dot3(sub(light.center, ray.origin), normal) / denominator;
+    if (distance <= 1.0e-4f) return false;
+    const float3 relative = sub(add(ray.origin, mul(ray.direction, distance)), light.center);
+    const float u = dot3(relative, light.half_u) / dot3(light.half_u, light.half_u);
+    const float v = dot3(relative, light.half_v) / dot3(light.half_v, light.half_v);
+    return fabsf(u) <= 1.0f && fabsf(v) <= 1.0f;
+}
+
+__device__ float area_light_pdf(const AreaLight& light, const Ray& ray, float distance) {
+    const float3 normal = normalize3(cross3(light.half_u, light.half_v));
+    const float cosine = fabsf(dot3(normal, ray.direction));
+    return cosine > 0.0f ? distance * distance / (cosine * light_area(light)) : 0.0f;
+}
+
 __device__ float3 radiance(Ray ray, const Sphere* spheres, int sphere_count,
-                           const Triangle* triangles, const BvhNode* nodes, int node_count, Rng& rng) {
+                           const Triangle* triangles, const BvhNode* nodes, int node_count,
+                           const AreaLight& light, Rng& rng) {
     float3 result = make_float3(0, 0, 0);
     float3 throughput = make_float3(1, 1, 1);
+    float previous_bsdf_pdf = 0.0f;
+    bool previous_uses_mis = false;
     for (int depth = 0; depth < 6; ++depth) {
         Hit hit{};
-        if (!intersect_scene(ray, spheres, sphere_count, triangles, nodes, node_count, hit)) {
+        const bool hit_scene = intersect_scene(ray, spheres, sphere_count, triangles, nodes, node_count, hit);
+        float light_distance = 0.0f;
+        const bool hit_light = intersect_light(light, ray, light_distance);
+        if (hit_light && (!hit_scene || light_distance < hit.distance)) {
+            float weight = 1.0f;
+            if (previous_uses_mis)
+                weight = power_heuristic(previous_bsdf_pdf, area_light_pdf(light, ray, light_distance));
+            result = add(result, mul(mul(throughput, light.emission), weight));
+            break;
+        }
+        if (!hit_scene) {
             const float blend = 0.5f * (ray.direction.y + 1.0f);
             const float3 sky = add(mul(make_float3(0.02f, 0.03f, 0.06f), 1.0f - blend),
                                    mul(make_float3(0.35f, 0.55f, 0.9f), blend));
@@ -229,6 +272,31 @@ __device__ float3 radiance(Ray ray, const Sphere* spheres, int sphere_count,
             break;
         }
         throughput = mul(throughput, hit.albedo);
+        const bool diffuse_surface = hit.transmission <= 0.0f && hit.metallic <= 0.5f;
+        if (diffuse_surface) {
+            const float3 light_point = add(light.center, add(mul(light.half_u, 2.0f * rng.next() - 1.0f),
+                                                               mul(light.half_v, 2.0f * rng.next() - 1.0f)));
+            const float3 offset = sub(light_point, hit.position);
+            const float distance_squared = dot3(offset, offset);
+            const float distance = sqrtf(distance_squared);
+            const float3 direction_to_light = mul(offset, 1.0f / distance);
+            const float surface_cosine = fmaxf(0.0f, dot3(hit.normal, direction_to_light));
+            const float3 light_normal = normalize3(cross3(light.half_u, light.half_v));
+            const float light_cosine = fmaxf(0.0f, -dot3(light_normal, direction_to_light));
+            if (surface_cosine > 0.0f && light_cosine > 0.0f) {
+                Hit blocker{};
+                const Ray shadow{add(hit.position, mul(hit.normal, 1.0e-4f)), direction_to_light};
+                const bool blocked = intersect_scene(shadow, spheres, sphere_count, triangles, nodes,
+                                                     node_count, blocker) && blocker.distance < distance - 1.0e-4f;
+                if (!blocked) {
+                    const float light_pdf = distance_squared / (light_cosine * light_area(light));
+                    const float bsdf_pdf = surface_cosine / kPi;
+                    const float weight = power_heuristic(light_pdf, bsdf_pdf);
+                    result = add(result, mul(mul(throughput, light.emission),
+                                             surface_cosine * weight / (kPi * light_pdf)));
+                }
+            }
+        }
         float3 direction;
         if (hit.transmission > 0.0f && rng.next() < hit.transmission) {
             float3 microfacet = sample_ggx_normal(hit.normal, hit.roughness, rng);
@@ -243,12 +311,16 @@ __device__ float3 radiance(Ray ray, const Sphere* spheres, int sphere_count,
                 direction = normalize3(reflect3(ray.direction, microfacet));
             else
                 direction = transmitted;
+            previous_uses_mis = false;
         } else if (hit.metallic > 0.5f) {
             const float3 microfacet = sample_ggx_normal(hit.normal, hit.roughness, rng);
             direction = normalize3(reflect3(ray.direction, microfacet));
             if (dot3(direction, hit.normal) <= 0.0f) direction = normalize3(reflect3(ray.direction, hit.normal));
+            previous_uses_mis = false;
         } else {
             direction = cosine_direction(hit.normal, rng);
+            previous_bsdf_pdf = fmaxf(0.0f, dot3(hit.normal, direction)) / kPi;
+            previous_uses_mis = true;
         }
         const float bias = dot3(direction, hit.normal) >= 0.0f ? 1.0e-4f : -1.0e-4f;
         ray = {add(hit.position, mul(hit.normal, bias)), direction};
@@ -264,7 +336,7 @@ __device__ float3 radiance(Ray ray, const Sphere* spheres, int sphere_count,
 __global__ void render_tile(float3* tile, int tile_x, int tile_y, int tile_width, int tile_height,
                             int image_width, int image_height, int samples, std::uint32_t seed,
                             const Sphere* spheres, int sphere_count, const Triangle* triangles,
-                            const BvhNode* nodes, int node_count) {
+                            const BvhNode* nodes, int node_count, AreaLight light) {
     const int local_x = static_cast<int>(blockIdx.x * blockDim.x + threadIdx.x);
     const int local_y = static_cast<int>(blockIdx.y * blockDim.y + threadIdx.y);
     if (local_x >= tile_width || local_y >= tile_height) return;
@@ -286,7 +358,7 @@ __global__ void render_tile(float3* tile, int tile_x, int tile_y, int tile_width
         const float3 direction = normalize3(add(forward, add(mul(right, (u - 0.5f) * viewport * aspect),
                                                                mul(up, (0.5f - v) * viewport))));
         color = add(color, radiance({origin, direction}, spheres, sphere_count,
-                                    triangles, nodes, node_count, rng));
+                                    triangles, nodes, node_count, light, rng));
     }
     tile[local_y * tile_width + local_x] = mul(color, 1.0f / static_cast<float>(samples));
 }
@@ -309,6 +381,17 @@ __global__ void probe_dielectric(int* passed) {
                                                       make_float3(0, 1, 0), 1.5f, total_internal);
     *passed = fabsf(fresnel_dielectric(1.0f, 1.0f, 1.5f) - 0.04f) < 1.0e-5f &&
               normal_refraction && fabsf(straight.y + 1.0f) < 1.0e-5f && total_internal_reflection;
+}
+
+__global__ void probe_mis(int* passed) {
+    const AreaLight light{make_float3(0, 2, 0), make_float3(1, 0, 0),
+                          make_float3(0, 0, 1), make_float3(1, 1, 1)};
+    const Ray ray{make_float3(0, 0, 0), make_float3(0, 1, 0)};
+    float distance = 0.0f;
+    const bool intersects = intersect_light(light, ray, distance);
+    *passed = fabsf(power_heuristic(0.25f, 0.25f) - 0.5f) < 1.0e-6f && intersects &&
+              fabsf(distance - 2.0f) < 1.0e-6f &&
+              fabsf(area_light_pdf(light, ray, distance) - 1.0f) < 1.0e-6f;
 }
 
 float component(float3 value, int axis) { return axis == 0 ? value.x : axis == 1 ? value.y : value.z; }
@@ -414,6 +497,23 @@ void validate_dielectric_on_gpu() {
     }
 }
 
+void validate_mis_on_gpu() {
+    int* device_passed = nullptr;
+    try {
+        check(cudaMalloc(&device_passed, sizeof(int)), "cudaMalloc MIS probe result");
+        probe_mis<<<1, 1>>>(device_passed);
+        check(cudaGetLastError(), "MIS probe launch");
+        int passed = 0;
+        check(cudaMemcpy(&passed, device_passed, sizeof(int), cudaMemcpyDeviceToHost), "copy MIS probe result");
+        check(cudaFree(device_passed), "cudaFree MIS probe result");
+        device_passed = nullptr;
+        if (!passed) throw std::runtime_error("GPU area-light PDF or MIS power heuristic probe failed");
+    } catch (...) {
+        if (device_passed) cudaFree(device_passed);
+        throw;
+    }
+}
+
 std::vector<Triangle> load_gltf_triangles(const std::filesystem::path& path) {
     const cg::assets::GltfAsset asset = cg::assets::GltfAsset::load(path);
     std::vector<Triangle> result;
@@ -433,6 +533,8 @@ std::vector<Triangle> load_gltf_triangles(const std::filesystem::path& path) {
 
 std::vector<float3> render(int width, int height, int samples, std::uint32_t seed,
                            const std::vector<Triangle>& imported = {}, bool show_demo_spheres = true) {
+    const AreaLight light{make_float3(-0.8f, 4.5f, -3.5f), make_float3(1.5f, 0, 0),
+                          make_float3(0, 0, 1.0f), make_float3(10.0f, 8.0f, 5.5f)};
     std::vector<Sphere> spheres;
     if (show_demo_spheres) {
         spheres = {
@@ -480,7 +582,7 @@ std::vector<float3> render(int width, int height, int samples, std::uint32_t see
                 render_tile<<<blocks, threads>>>(device_tile, tile_x, tile_y, tile_width, tile_height,
                                                   width, height, samples, seed, device_spheres,
                                                   static_cast<int>(spheres.size()), device_triangles,
-                                                  device_nodes, static_cast<int>(nodes.size()));
+                                                  device_nodes, static_cast<int>(nodes.size()), light);
                 check(cudaGetLastError(), "render tile launch");
                 check(cudaMemcpy(tile.data(), device_tile, tile_width * tile_height * sizeof(float3),
                                  cudaMemcpyDeviceToHost), "copy rendered tile");
@@ -567,6 +669,7 @@ void write_image(const std::string& path, int width, int height, const std::vect
 void self_test() {
     validate_bvh_on_gpu();
     validate_dielectric_on_gpu();
+    validate_mis_on_gpu();
     const std::filesystem::path gltf_path = "cuda_gltf_test.gltf";
     const std::filesystem::path bin_path = "cuda_gltf_test.bin";
     {
