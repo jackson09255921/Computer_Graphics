@@ -107,11 +107,12 @@ cmake --build build-wsl --target cuda_pathtracer
 The `--gltf` path converts imported scene triangles and base-color,
 metallic, and roughness factors into compact CUDA buffers and rebuilds the
 flattened GPU BVH. Radiance RGBE environments retain linear HDR energy during
-upload and use device-side latitude-longitude bilinear filtering for miss rays.
-The GPU baseline does not yet have CPU feature parity: matched GGX BSDF/PDF
-weighting and luminance-weighted environment importance sampling are the next
-staged migrations; the current GPU MIS path covers diffuse surfaces and area
-lights.
+upload and use device-side latitude-longitude bilinear filtering. A CPU-built
+`luminance * sin(theta)` PMF/CDF concentrates CUDA samples on bright texels;
+solid-angle environment PDFs and the power heuristic combine environment NEE
+with cosine-weighted BSDF paths. The remaining major GPU parity item is matched
+GGX BSDF/PDF weighting; the current non-delta MIS path covers diffuse surfaces,
+area lights, and HDR environments.
 
 The dependency-free `LabX/assets` loader imports glTF 2.x triangle primitives
 from external binary buffers, including indexed or non-indexed geometry, scene

@@ -52,7 +52,13 @@ struct Triangle {
     float transmission; float index_of_refraction;
 };
 struct AreaLight { float3 center; float3 half_u; float3 half_v; float3 emission; };
-struct GpuEnvironment { const float3* pixels; int width; int height; };
+struct GpuEnvironment {
+    const float3* pixels;
+    const float* pmf;
+    const float* cdf;
+    int width;
+    int height;
+};
 struct BvhNode { float3 minimum; float3 maximum; int left; int right; int first; int count; };
 struct Hit {
     float distance; float3 position; float3 normal; float3 albedo; float metallic; float roughness;
@@ -254,6 +260,56 @@ __device__ float3 environment_texel(const GpuEnvironment& environment, int x, in
     return environment.pixels[y * environment.width + x];
 }
 
+__device__ float3 sample_environment(const GpuEnvironment& environment, float3 direction);
+
+__device__ int environment_index(const GpuEnvironment& environment, float3 direction) {
+    direction = normalize3(direction);
+    const float u = atan2f(direction.z, direction.x) / (2.0f * kPi) + 0.5f;
+    const float v = acosf(fminf(1.0f, fmaxf(-1.0f, direction.y))) / kPi;
+    const int x = min(environment.width - 1, max(0, static_cast<int>(u * environment.width)));
+    const int y = min(environment.height - 1, max(0, static_cast<int>(v * environment.height)));
+    return y * environment.width + x;
+}
+
+__device__ float environment_texel_solid_angle(const GpuEnvironment& environment, int index) {
+    const int y = index / environment.width;
+    const float theta0 = kPi * static_cast<float>(y) / static_cast<float>(environment.height);
+    const float theta1 = kPi * static_cast<float>(y + 1) / static_cast<float>(environment.height);
+    return 2.0f * kPi / static_cast<float>(environment.width) * (cosf(theta0) - cosf(theta1));
+}
+
+__device__ float environment_pdf(const GpuEnvironment& environment, float3 direction) {
+    if (!environment.pmf) return 0.0f;
+    const int index = environment_index(environment, direction);
+    return environment.pmf[index] / environment_texel_solid_angle(environment, index);
+}
+
+__device__ bool sample_environment_direction(const GpuEnvironment& environment, Rng& rng,
+                                             float3& direction, float3& value, float& pdf) {
+    if (!environment.cdf || !environment.pmf) return false;
+    const int count = environment.width * environment.height;
+    const float target = rng.next();
+    int low = 0;
+    int high = count - 1;
+    while (low < high) {
+        const int middle = low + (high - low) / 2;
+        if (target <= environment.cdf[middle]) high = middle;
+        else low = middle + 1;
+    }
+    const int index = low;
+    const int x = index % environment.width;
+    const int y = index / environment.width;
+    const float u = (static_cast<float>(x) + rng.next()) / static_cast<float>(environment.width);
+    const float v = (static_cast<float>(y) + rng.next()) / static_cast<float>(environment.height);
+    const float theta = kPi * v;
+    const float phi = 2.0f * kPi * (u - 0.5f);
+    const float sine = sinf(theta);
+    direction = make_float3(sine * cosf(phi), cosf(theta), sine * sinf(phi));
+    pdf = environment.pmf[index] / environment_texel_solid_angle(environment, index);
+    value = sample_environment(environment, direction);
+    return pdf > 0.0f;
+}
+
 __device__ float3 sample_environment(const GpuEnvironment& environment, float3 direction) {
     if (!environment.pixels || environment.width <= 0 || environment.height <= 0) {
         const float blend = 0.5f * (direction.y + 1.0f);
@@ -296,7 +352,10 @@ __device__ float3 radiance(Ray ray, const Sphere* spheres, int sphere_count,
             break;
         }
         if (!hit_scene) {
-            result = add(result, mul(throughput, sample_environment(environment, ray.direction)));
+            float weight = 1.0f;
+            if (previous_uses_mis && environment.pmf)
+                weight = power_heuristic(previous_bsdf_pdf, environment_pdf(environment, ray.direction));
+            result = add(result, mul(mul(throughput, sample_environment(environment, ray.direction)), weight));
             break;
         }
         throughput = mul(throughput, hit.albedo);
@@ -322,6 +381,26 @@ __device__ float3 radiance(Ray ray, const Sphere* spheres, int sphere_count,
                     const float weight = power_heuristic(light_pdf, bsdf_pdf);
                     result = add(result, mul(mul(throughput, light.emission),
                                              surface_cosine * weight / (kPi * light_pdf)));
+                }
+            }
+            float3 environment_direction{};
+            float3 environment_value{};
+            float environment_sample_pdf = 0.0f;
+            if (sample_environment_direction(environment, rng, environment_direction,
+                                             environment_value, environment_sample_pdf)) {
+                const float environment_cosine = fmaxf(0.0f, dot3(hit.normal, environment_direction));
+                if (environment_cosine > 0.0f) {
+                    Hit blocker{};
+                    const Ray shadow{add(hit.position, mul(hit.normal, 1.0e-4f)), environment_direction};
+                    const bool blocked = intersect_scene(shadow, spheres, sphere_count, triangles, nodes,
+                                                         node_count, blocker);
+                    if (!blocked) {
+                        const float bsdf_pdf = environment_cosine / kPi;
+                        const float weight = power_heuristic(environment_sample_pdf, bsdf_pdf);
+                        result = add(result, mul(mul(throughput, environment_value),
+                                                 environment_cosine * weight /
+                                                 (kPi * environment_sample_pdf)));
+                    }
                 }
             }
         }
@@ -425,8 +504,15 @@ __global__ void probe_mis(int* passed) {
 
 __global__ void probe_environment(GpuEnvironment environment, int* passed) {
     const float3 color = sample_environment(environment, make_float3(1, 0, 0));
+    Rng rng(42u);
+    float3 direction{};
+    float3 sampled{};
+    float pdf = 0.0f;
+    const bool sampled_direction = sample_environment_direction(environment, rng, direction, sampled, pdf);
     *passed = fabsf(color.x - 2.0f) < 1.0e-6f && fabsf(color.y - 1.0f) < 1.0e-6f &&
-              fabsf(color.z - 0.5f) < 1.0e-6f;
+              fabsf(color.z - 0.5f) < 1.0e-6f && sampled_direction &&
+              fabsf(dot3(direction, direction) - 1.0f) < 1.0e-5f &&
+              fabsf(pdf - 1.0f / (4.0f * kPi)) < 1.0e-5f;
 }
 
 float component(float3 value, int axis) { return axis == 0 ? value.x : axis == 1 ? value.y : value.z; }
@@ -551,14 +637,24 @@ void validate_mis_on_gpu() {
 
 void validate_environment_on_gpu() {
     const std::vector<float3> pixels(4, make_float3(2.0f, 1.0f, 0.5f));
+    const std::vector<float> pmf(4, 0.25f);
+    const std::vector<float> cdf{0.25f, 0.5f, 0.75f, 1.0f};
     float3* device_pixels = nullptr;
+    float* device_pmf = nullptr;
+    float* device_cdf = nullptr;
     int* device_passed = nullptr;
     try {
         check(cudaMalloc(&device_pixels, pixels.size() * sizeof(float3)), "cudaMalloc environment probe pixels");
+        check(cudaMalloc(&device_pmf, pmf.size() * sizeof(float)), "cudaMalloc environment probe PMF");
+        check(cudaMalloc(&device_cdf, cdf.size() * sizeof(float)), "cudaMalloc environment probe CDF");
         check(cudaMalloc(&device_passed, sizeof(int)), "cudaMalloc environment probe result");
         check(cudaMemcpy(device_pixels, pixels.data(), pixels.size() * sizeof(float3), cudaMemcpyHostToDevice),
               "copy environment probe pixels");
-        probe_environment<<<1, 1>>>({device_pixels, 2, 2}, device_passed);
+        check(cudaMemcpy(device_pmf, pmf.data(), pmf.size() * sizeof(float), cudaMemcpyHostToDevice),
+              "copy environment probe PMF");
+        check(cudaMemcpy(device_cdf, cdf.data(), cdf.size() * sizeof(float), cudaMemcpyHostToDevice),
+              "copy environment probe CDF");
+        probe_environment<<<1, 1>>>({device_pixels, device_pmf, device_cdf, 2, 2}, device_passed);
         check(cudaGetLastError(), "environment probe launch");
         int passed = 0;
         check(cudaMemcpy(&passed, device_passed, sizeof(int), cudaMemcpyDeviceToHost),
@@ -567,9 +663,15 @@ void validate_environment_on_gpu() {
         device_passed = nullptr;
         check(cudaFree(device_pixels), "cudaFree environment probe pixels");
         device_pixels = nullptr;
+        check(cudaFree(device_cdf), "cudaFree environment probe CDF");
+        device_cdf = nullptr;
+        check(cudaFree(device_pmf), "cudaFree environment probe PMF");
+        device_pmf = nullptr;
         if (!passed) throw std::runtime_error("GPU HDR environment filtering clipped or changed linear values");
     } catch (...) {
         if (device_passed) cudaFree(device_passed);
+        if (device_cdf) cudaFree(device_cdf);
+        if (device_pmf) cudaFree(device_pmf);
         if (device_pixels) cudaFree(device_pixels);
         throw;
     }
@@ -589,6 +691,47 @@ std::vector<Triangle> load_gltf_triangles(const std::filesystem::path& path) {
                           static_cast<float>(triangle.material.transmission),
                           static_cast<float>(triangle.material.index_of_refraction)});
     }
+    return result;
+}
+
+struct EnvironmentData {
+    std::vector<float3> pixels;
+    std::vector<float> pmf;
+    std::vector<float> cdf;
+};
+
+EnvironmentData build_environment_data(const cg::environment::EnvironmentMap* environment) {
+    EnvironmentData result;
+    if (!environment) return result;
+    const std::size_t count = environment->pixels().size();
+    result.pixels.reserve(count);
+    result.pmf.resize(count);
+    result.cdf.resize(count);
+    double total = 0.0;
+    for (std::size_t y = 0; y < environment->height(); ++y) {
+        const double theta = kPi * (static_cast<double>(y) + 0.5) / static_cast<double>(environment->height());
+        const double sine = std::sin(theta);
+        for (std::size_t x = 0; x < environment->width(); ++x) {
+            const std::size_t index = y * environment->width() + x;
+            const cg::Color color = environment->pixels()[index] * environment->intensity();
+            result.pixels.push_back(make_float3(static_cast<float>(color.x), static_cast<float>(color.y),
+                                                static_cast<float>(color.z)));
+            const double luminance = 0.2126 * color.x + 0.7152 * color.y + 0.0722 * color.z;
+            result.pmf[index] = static_cast<float>(std::max(0.0, luminance) * sine);
+            total += result.pmf[index];
+        }
+    }
+    if (total <= 0.0) {
+        std::fill(result.pmf.begin(), result.pmf.end(), 1.0f / static_cast<float>(count));
+    } else {
+        for (float& probability : result.pmf) probability = static_cast<float>(probability / total);
+    }
+    float cumulative = 0.0f;
+    for (std::size_t index = 0; index < count; ++index) {
+        cumulative += result.pmf[index];
+        result.cdf[index] = cumulative;
+    }
+    result.cdf.back() = 1.0f;
     return result;
 }
 
@@ -617,28 +760,26 @@ std::vector<float3> render(int width, int height, int samples, std::uint32_t see
     };
     triangles.insert(triangles.end(), imported.begin(), imported.end());
     const std::vector<BvhNode> nodes = build_bvh(triangles);
-    std::vector<float3> environment_pixels;
-    if (environment_map) {
-        environment_pixels.reserve(environment_map->pixels().size());
-        for (const cg::Color& color : environment_map->pixels()) {
-            const double intensity = environment_map->intensity();
-            environment_pixels.push_back(make_float3(static_cast<float>(color.x * intensity),
-                                                       static_cast<float>(color.y * intensity),
-                                                       static_cast<float>(color.z * intensity)));
-        }
-    }
+    const EnvironmentData environment_data = build_environment_data(environment_map);
     Sphere* device_spheres = nullptr;
     Triangle* device_triangles = nullptr;
     BvhNode* device_nodes = nullptr;
     float3* device_environment_pixels = nullptr;
+    float* device_environment_pmf = nullptr;
+    float* device_environment_cdf = nullptr;
     float3* device_tile = nullptr;
     try {
         if (!spheres.empty()) check(cudaMalloc(&device_spheres, spheres.size() * sizeof(Sphere)), "cudaMalloc spheres");
         check(cudaMalloc(&device_triangles, triangles.size() * sizeof(Triangle)), "cudaMalloc triangles");
         check(cudaMalloc(&device_nodes, nodes.size() * sizeof(BvhNode)), "cudaMalloc BVH nodes");
-        if (!environment_pixels.empty())
-            check(cudaMalloc(&device_environment_pixels, environment_pixels.size() * sizeof(float3)),
+        if (!environment_data.pixels.empty()) {
+            check(cudaMalloc(&device_environment_pixels, environment_data.pixels.size() * sizeof(float3)),
                   "cudaMalloc HDR environment");
+            check(cudaMalloc(&device_environment_pmf, environment_data.pmf.size() * sizeof(float)),
+                  "cudaMalloc HDR PMF");
+            check(cudaMalloc(&device_environment_cdf, environment_data.cdf.size() * sizeof(float)),
+                  "cudaMalloc HDR CDF");
+        }
         check(cudaMalloc(&device_tile, kTileWidth * kTileHeight * sizeof(float3)), "cudaMalloc tile");
         if (!spheres.empty())
             check(cudaMemcpy(device_spheres, spheres.data(), spheres.size() * sizeof(Sphere), cudaMemcpyHostToDevice),
@@ -647,11 +788,19 @@ std::vector<float3> render(int width, int height, int samples, std::uint32_t see
               "copy triangles");
         check(cudaMemcpy(device_nodes, nodes.data(), nodes.size() * sizeof(BvhNode), cudaMemcpyHostToDevice),
               "copy BVH nodes");
-        if (!environment_pixels.empty())
-            check(cudaMemcpy(device_environment_pixels, environment_pixels.data(),
-                             environment_pixels.size() * sizeof(float3), cudaMemcpyHostToDevice),
+        if (!environment_data.pixels.empty()) {
+            check(cudaMemcpy(device_environment_pixels, environment_data.pixels.data(),
+                             environment_data.pixels.size() * sizeof(float3), cudaMemcpyHostToDevice),
                   "copy HDR environment");
-        const GpuEnvironment environment{device_environment_pixels,
+            check(cudaMemcpy(device_environment_pmf, environment_data.pmf.data(),
+                             environment_data.pmf.size() * sizeof(float), cudaMemcpyHostToDevice),
+                  "copy HDR PMF");
+            check(cudaMemcpy(device_environment_cdf, environment_data.cdf.data(),
+                             environment_data.cdf.size() * sizeof(float), cudaMemcpyHostToDevice),
+                  "copy HDR CDF");
+        }
+        const GpuEnvironment environment{device_environment_pixels, device_environment_pmf,
+                                         device_environment_cdf,
                                          environment_map ? static_cast<int>(environment_map->width()) : 0,
                                          environment_map ? static_cast<int>(environment_map->height()) : 0};
         std::vector<float3> image(static_cast<std::size_t>(width) * height);
@@ -676,13 +825,24 @@ std::vector<float3> render(int width, int height, int samples, std::uint32_t see
             }
         }
         check(cudaFree(device_tile), "cudaFree tile");
+        device_tile = nullptr;
+        if (device_environment_cdf) check(cudaFree(device_environment_cdf), "cudaFree HDR CDF");
+        device_environment_cdf = nullptr;
+        if (device_environment_pmf) check(cudaFree(device_environment_pmf), "cudaFree HDR PMF");
+        device_environment_pmf = nullptr;
         if (device_environment_pixels) check(cudaFree(device_environment_pixels), "cudaFree HDR environment");
+        device_environment_pixels = nullptr;
         check(cudaFree(device_nodes), "cudaFree BVH nodes");
+        device_nodes = nullptr;
         check(cudaFree(device_triangles), "cudaFree triangles");
+        device_triangles = nullptr;
         if (device_spheres) check(cudaFree(device_spheres), "cudaFree spheres");
+        device_spheres = nullptr;
         return image;
     } catch (...) {
         if (device_tile) cudaFree(device_tile);
+        if (device_environment_cdf) cudaFree(device_environment_cdf);
+        if (device_environment_pmf) cudaFree(device_environment_pmf);
         if (device_environment_pixels) cudaFree(device_environment_pixels);
         if (device_nodes) cudaFree(device_nodes);
         if (device_triangles) cudaFree(device_triangles);
@@ -785,6 +945,11 @@ void self_test() {
     if (imported.size() != 1 || fabsf(imported[0].metallic - 0.7f) > 1.0e-6f ||
         fabsf(imported[0].roughness - 0.35f) > 1.0e-6f)
         throw std::runtime_error("glTF triangles or PBR factors did not reach the CUDA upload format");
+    const cg::environment::EnvironmentMap importance_environment(
+        2, 2, {{40.0, 40.0, 40.0}, {0.1, 0.1, 0.1}, {0.1, 0.1, 0.1}, {0.1, 0.1, 0.1}});
+    const EnvironmentData importance_data = build_environment_data(&importance_environment);
+    if (importance_data.pmf[0] < 0.99f || importance_data.cdf.back() != 1.0f)
+        throw std::runtime_error("HDR luminance distribution did not concentrate probability on the bright texel");
     const cg::environment::EnvironmentMap environment(
         2, 2, std::vector<cg::Color>(4, cg::Color{0.4, 0.6, 1.2}), 1.5);
     const std::vector<float3> first = render(64, 36, 4, 0xC0FFEEu, imported, false, &environment);
