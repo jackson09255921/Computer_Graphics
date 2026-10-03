@@ -1,0 +1,66 @@
+﻿[
+    {
+        "name":  "Avocado",
+        "file":  "Avocado/Avocado.glb",
+        "source":  "https://github.com/KhronosGroup/glTF-Sample-Assets/tree/main/Models/Avocado",
+        "license":  "Avocado/README.md",
+        "bytes":  8110040,
+        "sha256":  "ccc9c3ce56423720b09399c2351537207cd5a65f859f9e6e2f30922762f3abd4"
+    },
+    {
+        "name":  "BoomBox",
+        "file":  "BoomBox/BoomBox.glb",
+        "source":  "https://github.com/KhronosGroup/glTF-Sample-Assets/tree/main/Models/BoomBox",
+        "license":  "BoomBox/README.md",
+        "bytes":  10614184,
+        "sha256":  "f8b918445ebdd006768232205a62f5182d2208ca57f84c6ccc084943c0bc8f15"
+    },
+    {
+        "name":  "BoxTextured",
+        "file":  "BoxTextured/BoxTextured.glb",
+        "source":  "https://github.com/KhronosGroup/glTF-Sample-Assets/tree/main/Models/BoxTextured",
+        "license":  "BoxTextured/README.md",
+        "bytes":  5956,
+        "sha256":  "b510eca2e2ef33f62f9ed57d6e7ce2d10ebb2bdebc4a8e59d347719ba81abdf4"
+    },
+    {
+        "name":  "DamagedHelmet",
+        "file":  "DamagedHelmet/DamagedHelmet.glb",
+        "source":  "https://github.com/KhronosGroup/glTF-Sample-Assets/tree/main/Models/DamagedHelmet",
+        "license":  "DamagedHelmet/README.md",
+        "bytes":  3773916,
+        "sha256":  "a1e3b04de97b11de564ce6e53b95f02954a297f0008183ac63a4f5974f6b32d8"
+    },
+    {
+        "name":  "Duck",
+        "file":  "Duck/Duck.glb",
+        "source":  "https://github.com/KhronosGroup/glTF-Sample-Assets/tree/main/Models/Duck",
+        "license":  "Duck/README.md",
+        "bytes":  120484,
+        "sha256":  "65bf938f54d6073e619e76e007820bbf980cdc3dc0daec0d94830ffc4ae54ab5"
+    },
+    {
+        "name":  "Lantern",
+        "file":  "Lantern/Lantern.glb",
+        "source":  "https://github.com/KhronosGroup/glTF-Sample-Assets/tree/main/Models/Lantern",
+        "license":  "Lantern/README.md",
+        "bytes":  9564264,
+        "sha256":  "a79458c4b02d695187a952f23a63b8bf278e7bc3d316a3c2a314f2d6974181f1"
+    },
+    {
+        "name":  "ToyCar",
+        "file":  "ToyCar/ToyCar.glb",
+        "source":  "https://github.com/KhronosGroup/glTF-Sample-Assets/tree/main/Models/ToyCar",
+        "license":  "ToyCar/README.md",
+        "bytes":  5422412,
+        "sha256":  "01a60862de55cd4b9f3acfab0b0def86451800f9c42467fcd61052c16cb9838c"
+    },
+    {
+        "name":  "WaterBottle",
+        "file":  "WaterBottle/WaterBottle.glb",
+        "source":  "https://github.com/KhronosGroup/glTF-Sample-Assets/tree/main/Models/WaterBottle",
+        "license":  "WaterBottle/README.md",
+        "bytes":  8966700,
+        "sha256":  "b337e526fd6a162013c2984aeec163f5fbb4f717252724dfc3f3458bd51df94b"
+    }
+]

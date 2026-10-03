@@ -1192,6 +1192,8 @@ int main(int argc, char** argv) {
         std::unique_ptr<cg::environment::EnvironmentMap> environment;
         std::string output;
         int samples = 64;
+        int width = 640;
+        int height = 360;
         const bool gltf_mode = argc > 1 && std::string(argv[1]) == "--gltf";
         const bool scene_mode = argc > 1 && std::string(argv[1]) == "--scene";
         const bool hdr_mode = argc > 1 && std::string(argv[1]) == "--hdr";
@@ -1200,6 +1202,8 @@ int main(int argc, char** argv) {
                 "usage: cuda_pathtracer --scene output.bmp spp model1.gltf model2.gltf [model3.gltf ...]");
             output = argv[2];
             samples = std::stoi(argv[3]);
+            width = 1280;
+            height = 720;
             const int model_count = argc - 4;
             for (int model = 0; model < model_count; ++model) {
                 std::vector<Triangle> mesh = load_gltf_triangles(argv[model + 4]);
@@ -1228,8 +1232,6 @@ int main(int argc, char** argv) {
             output = argc > 1 ? argv[1] : "cuda_pathtracer.bmp";
             samples = argc > 2 ? std::stoi(argv[2]) : 64;
         }
-        const int width = 640;
-        const int height = 360;
         write_image(output, width, height,
                     render(width, height, samples, 0xC0FFEEu, imported,
                            !gltf_mode && !scene_mode, environment.get()));

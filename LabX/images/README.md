@@ -22,6 +22,7 @@ visually inspected. Tests never overwrite a reviewed image automatically.
 | Scene | Reviewed output | Coverage |
 | --- | --- | --- |
 | Multi-asset material showcase | [`cuda_multi_asset_material_showcase.png`](cuda_multi_asset_material_showcase.png) | Bunny, skull, Suzanne, and teapot in one 96 spp render; distinct glTF base colors, metallic factors, roughness factors, shadows, and inter-object occlusion |
+| HD multi-asset material showcase | [`cuda_multi_asset_material_showcase_hd.png`](cuda_multi_asset_material_showcase_hd.png) | 1280x720 at 192 spp; reviewed at native resolution for edge definition, noise, and specular highlights |
 
 The converted assets deliberately use different PBR factors so material import
 errors are visible in the rendered result. Legacy meshes do not contain usable
