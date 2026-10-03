@@ -1,0 +1,337 @@
+#include "assets/gltf_loader.hpp"
+
+#include <array>
+#include <cctype>
+#include <cstdint>
+#include <cstdlib>
+#include <cstring>
+#include <fstream>
+#include <map>
+#include <memory>
+#include <stdexcept>
+#include <string>
+#include <utility>
+#include <variant>
+
+namespace cg::assets {
+namespace {
+
+struct Json {
+    using Array = std::vector<Json>;
+    using Object = std::map<std::string, Json>;
+    std::variant<std::nullptr_t, bool, double, std::string, Array, Object> value;
+
+    [[nodiscard]] const Object& object() const { return std::get<Object>(value); }
+    [[nodiscard]] const Array& array() const { return std::get<Array>(value); }
+    [[nodiscard]] const std::string& string() const { return std::get<std::string>(value); }
+    [[nodiscard]] double number() const { return std::get<double>(value); }
+    [[nodiscard]] const Json* find(const std::string& key) const {
+        const auto& values = object();
+        const auto found = values.find(key);
+        return found == values.end() ? nullptr : &found->second;
+    }
+};
+
+class JsonParser {
+public:
+    explicit JsonParser(std::string source) : source_(std::move(source)) {}
+    Json parse() {
+        Json result = value();
+        whitespace();
+        if (position_ != source_.size()) fail("trailing JSON content");
+        return result;
+    }
+
+private:
+    [[noreturn]] void fail(const char* message) const {
+        throw std::runtime_error(std::string("invalid glTF JSON at byte ") + std::to_string(position_) + ": " + message);
+    }
+    void whitespace() {
+        while (position_ < source_.size() && std::isspace(static_cast<unsigned char>(source_[position_]))) ++position_;
+    }
+    bool consume(char expected) {
+        whitespace();
+        if (position_ < source_.size() && source_[position_] == expected) { ++position_; return true; }
+        return false;
+    }
+    Json value() {
+        whitespace();
+        if (position_ >= source_.size()) fail("expected value");
+        const char token = source_[position_];
+        if (token == '{') return Json{object()};
+        if (token == '[') return Json{array()};
+        if (token == '"') return Json{string()};
+        if (token == '-' || std::isdigit(static_cast<unsigned char>(token))) return Json{number()};
+        if (source_.compare(position_, 4, "true") == 0) { position_ += 4; return Json{true}; }
+        if (source_.compare(position_, 5, "false") == 0) { position_ += 5; return Json{false}; }
+        if (source_.compare(position_, 4, "null") == 0) { position_ += 4; return Json{nullptr}; }
+        fail("unknown value");
+    }
+    Json::Object object() {
+        consume('{');
+        Json::Object result;
+        if (consume('}')) return result;
+        do {
+            whitespace();
+            if (position_ >= source_.size() || source_[position_] != '"') fail("expected object key");
+            std::string key = string();
+            if (!consume(':')) fail("expected colon");
+            result.emplace(std::move(key), value());
+        } while (consume(','));
+        if (!consume('}')) fail("expected closing brace");
+        return result;
+    }
+    Json::Array array() {
+        consume('[');
+        Json::Array result;
+        if (consume(']')) return result;
+        do { result.push_back(value()); } while (consume(','));
+        if (!consume(']')) fail("expected closing bracket");
+        return result;
+    }
+    std::string string() {
+        if (!consume('"')) fail("expected string");
+        std::string result;
+        while (position_ < source_.size()) {
+            char character = source_[position_++];
+            if (character == '"') return result;
+            if (character == '\\') {
+                if (position_ >= source_.size()) fail("unfinished escape");
+                character = source_[position_++];
+                if (character == 'n') character = '\n';
+                else if (character == 'r') character = '\r';
+                else if (character == 't') character = '\t';
+                else if (character == 'u') fail("unicode escapes are not supported in asset URIs");
+            }
+            result.push_back(character);
+        }
+        fail("unterminated string");
+    }
+    double number() {
+        const char* begin = source_.c_str() + position_;
+        char* end = nullptr;
+        const double result = std::strtod(begin, &end);
+        if (end == begin) fail("invalid number");
+        position_ = static_cast<std::size_t>(end - source_.c_str());
+        return result;
+    }
+
+    std::string source_;
+    std::size_t position_{0};
+};
+
+std::size_t integer(const Json& value) {
+    const double number = value.number();
+    if (number < 0.0 || number != static_cast<double>(static_cast<std::size_t>(number))) {
+        throw std::runtime_error("glTF index must be a non-negative integer");
+    }
+    return static_cast<std::size_t>(number);
+}
+
+std::size_t member_integer(const Json& object, const std::string& key, std::size_t fallback = 0) {
+    const Json* value = object.find(key);
+    return value ? integer(*value) : fallback;
+}
+
+std::string read_text(const std::filesystem::path& path) {
+    std::ifstream input(path, std::ios::binary);
+    if (!input) throw std::runtime_error("failed to open glTF file: " + path.string());
+    return {std::istreambuf_iterator<char>(input), std::istreambuf_iterator<char>()};
+}
+
+std::vector<std::uint8_t> read_binary(const std::filesystem::path& path) {
+    std::ifstream input(path, std::ios::binary);
+    if (!input) throw std::runtime_error("failed to open glTF buffer: " + path.string());
+    return {std::istreambuf_iterator<char>(input), std::istreambuf_iterator<char>()};
+}
+
+struct Matrix {
+    std::array<double, 16> m{1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1};
+};
+
+Matrix multiply(const Matrix& lhs, const Matrix& rhs) {
+    Matrix result{{}};
+    for (std::size_t column = 0; column < 4; ++column)
+        for (std::size_t row = 0; row < 4; ++row)
+            for (std::size_t k = 0; k < 4; ++k)
+                result.m[column * 4 + row] += lhs.m[k * 4 + row] * rhs.m[column * 4 + k];
+    return result;
+}
+
+Vec3 transform(const Matrix& matrix, const Vec3& value) {
+    return {matrix.m[0] * value.x + matrix.m[4] * value.y + matrix.m[8] * value.z + matrix.m[12],
+            matrix.m[1] * value.x + matrix.m[5] * value.y + matrix.m[9] * value.z + matrix.m[13],
+            matrix.m[2] * value.x + matrix.m[6] * value.y + matrix.m[10] * value.z + matrix.m[14]};
+}
+
+Matrix node_matrix(const Json& node) {
+    if (const Json* matrix = node.find("matrix")) {
+        if (matrix->array().size() != 16) throw std::runtime_error("glTF node matrix must contain 16 values");
+        Matrix result;
+        for (std::size_t i = 0; i < 16; ++i) result.m[i] = matrix->array()[i].number();
+        return result;
+    }
+    Vec3 translation{};
+    Vec3 scale{1, 1, 1};
+    std::array<double, 4> rotation{0, 0, 0, 1};
+    if (const Json* values = node.find("translation"))
+        translation = {values->array()[0].number(), values->array()[1].number(), values->array()[2].number()};
+    if (const Json* values = node.find("scale"))
+        scale = {values->array()[0].number(), values->array()[1].number(), values->array()[2].number()};
+    if (const Json* values = node.find("rotation"))
+        for (std::size_t i = 0; i < 4; ++i) rotation[i] = values->array()[i].number();
+    const double x = rotation[0], y = rotation[1], z = rotation[2], w = rotation[3];
+    Matrix result;
+    result.m = {
+        (1 - 2*y*y - 2*z*z) * scale.x, (2*x*y + 2*z*w) * scale.x, (2*x*z - 2*y*w) * scale.x, 0,
+        (2*x*y - 2*z*w) * scale.y, (1 - 2*x*x - 2*z*z) * scale.y, (2*y*z + 2*x*w) * scale.y, 0,
+        (2*x*z + 2*y*w) * scale.z, (2*y*z - 2*x*w) * scale.z, (1 - 2*x*x - 2*y*y) * scale.z, 0,
+        translation.x, translation.y, translation.z, 1};
+    return result;
+}
+
+struct View { std::size_t offset{}, length{}, stride{}; };
+struct Accessor { std::size_t view{}, offset{}, count{}, component{}; std::string type; };
+
+template <typename T>
+T scalar_at(const std::vector<std::uint8_t>& buffer, std::size_t offset) {
+    if (offset + sizeof(T) > buffer.size()) throw std::runtime_error("glTF accessor exceeds buffer bounds");
+    T value{};
+    std::memcpy(&value, buffer.data() + offset, sizeof(T));
+    return value;
+}
+
+std::vector<Vec3> positions(const Accessor& accessor, const View& view,
+                            const std::vector<std::uint8_t>& buffer) {
+    if (accessor.component != 5126 || accessor.type != "VEC3")
+        throw std::runtime_error("POSITION accessor must use FLOAT VEC3");
+    const std::size_t stride = view.stride ? view.stride : sizeof(float) * 3;
+    std::vector<Vec3> result(accessor.count);
+    for (std::size_t i = 0; i < accessor.count; ++i) {
+        const std::size_t offset = view.offset + accessor.offset + i * stride;
+        result[i] = {scalar_at<float>(buffer, offset), scalar_at<float>(buffer, offset + 4),
+                     scalar_at<float>(buffer, offset + 8)};
+    }
+    return result;
+}
+
+std::vector<std::uint32_t> indices(const Accessor& accessor, const View& view,
+                                   const std::vector<std::uint8_t>& buffer) {
+    std::size_t size = 0;
+    if (accessor.component == 5121) size = 1;
+    else if (accessor.component == 5123) size = 2;
+    else if (accessor.component == 5125) size = 4;
+    else throw std::runtime_error("indices must use UNSIGNED_BYTE, UNSIGNED_SHORT, or UNSIGNED_INT");
+    const std::size_t stride = view.stride ? view.stride : size;
+    std::vector<std::uint32_t> result(accessor.count);
+    for (std::size_t i = 0; i < accessor.count; ++i) {
+        const std::size_t offset = view.offset + accessor.offset + i * stride;
+        result[i] = size == 1 ? scalar_at<std::uint8_t>(buffer, offset) :
+                    size == 2 ? scalar_at<std::uint16_t>(buffer, offset) : scalar_at<std::uint32_t>(buffer, offset);
+    }
+    return result;
+}
+
+rt::Material material_at(const Json& root, std::size_t index) {
+    rt::Material result;
+    const Json* materials = root.find("materials");
+    if (!materials || index >= materials->array().size()) return result;
+    const Json* pbr = materials->array()[index].find("pbrMetallicRoughness");
+    if (!pbr) return result;
+    if (const Json* color = pbr->find("baseColorFactor"))
+        result.albedo = {color->array()[0].number(), color->array()[1].number(), color->array()[2].number()};
+    if (const Json* metallic = pbr->find("metallicFactor")) result.metallic = metallic->number();
+    if (const Json* roughness = pbr->find("roughnessFactor")) result.roughness = roughness->number();
+    return result;
+}
+
+}  // namespace
+
+GltfAsset GltfAsset::load(const std::filesystem::path& path) {
+    const Json root = JsonParser(read_text(path)).parse();
+    const Json* asset = root.find("asset");
+    if (!asset || !asset->find("version") || asset->find("version")->string().rfind("2.", 0) != 0)
+        throw std::runtime_error("only glTF 2.x assets are supported");
+    const auto& buffers = root.find("buffers")->array();
+    if (buffers.size() != 1 || !buffers[0].find("uri"))
+        throw std::runtime_error("this LabX loader requires one external binary buffer");
+    const std::string uri = buffers[0].find("uri")->string();
+    if (uri.find("..") != std::string::npos || uri.find(':') != std::string::npos)
+        throw std::runtime_error("unsafe or embedded glTF buffer URI");
+    const std::vector<std::uint8_t> buffer = read_binary(path.parent_path() / uri);
+
+    std::vector<View> views;
+    for (const Json& source : root.find("bufferViews")->array())
+        views.push_back({member_integer(source, "byteOffset"), member_integer(source, "byteLength"),
+                         member_integer(source, "byteStride")});
+    std::vector<Accessor> accessors;
+    for (const Json& source : root.find("accessors")->array())
+        accessors.push_back({member_integer(source, "bufferView"), member_integer(source, "byteOffset"),
+                             member_integer(source, "count"), member_integer(source, "componentType"),
+                             source.find("type")->string()});
+
+    GltfAsset result;
+    const auto& meshes = root.find("meshes")->array();
+    const auto emit_mesh = [&](std::size_t mesh_index, const Matrix& world) {
+        for (const Json& primitive : meshes.at(mesh_index).find("primitives")->array()) {
+            if (member_integer(primitive, "mode", 4) != 4) throw std::runtime_error("only TRIANGLES mode is supported");
+            const Json* attributes = primitive.find("attributes");
+            const Json* position = attributes ? attributes->find("POSITION") : nullptr;
+            if (!position) throw std::runtime_error("glTF triangle primitive has no POSITION attribute");
+            const std::size_t position_index = integer(*position);
+            const Accessor& position_accessor = accessors.at(position_index);
+            std::vector<Vec3> vertices = positions(position_accessor, views.at(position_accessor.view), buffer);
+            std::vector<std::uint32_t> element_indices;
+            if (const Json* index = primitive.find("indices")) {
+                const Accessor& index_accessor = accessors.at(integer(*index));
+                element_indices = indices(index_accessor, views.at(index_accessor.view), buffer);
+            } else {
+                for (std::size_t i = 0; i < vertices.size(); ++i) element_indices.push_back(static_cast<std::uint32_t>(i));
+            }
+            if (element_indices.size() % 3 != 0) throw std::runtime_error("triangle index count must be divisible by three");
+            rt::Material material;
+            if (const Json* material_index = primitive.find("material"))
+                material = material_at(root, integer(*material_index));
+            for (std::size_t i = 0; i < element_indices.size(); i += 3) {
+                const Vec3 a = transform(world, vertices.at(element_indices[i]));
+                const Vec3 b = transform(world, vertices.at(element_indices[i + 1]));
+                const Vec3 c = transform(world, vertices.at(element_indices[i + 2]));
+                result.triangles_.push_back({a, b, c, material});
+            }
+        }
+    };
+
+    const auto& nodes = root.find("nodes")->array();
+    std::vector<bool> active(nodes.size(), false);
+    const auto visit = [&](auto&& self, std::size_t node_index, const Matrix& parent) -> void {
+        if (active.at(node_index)) throw std::runtime_error("glTF node hierarchy contains a cycle");
+        active[node_index] = true;
+        const Json& node = nodes.at(node_index);
+        const Matrix world = multiply(parent, node_matrix(node));
+        if (const Json* mesh = node.find("mesh")) emit_mesh(integer(*mesh), world);
+        if (const Json* children = node.find("children"))
+            for (const Json& child : children->array()) self(self, integer(child), world);
+        active[node_index] = false;
+    };
+    if (const Json* scenes = root.find("scenes")) {
+        const std::size_t scene_index = member_integer(root, "scene");
+        const Json& scene = scenes->array().at(scene_index);
+        if (const Json* scene_nodes = scene.find("nodes"))
+            for (const Json& node : scene_nodes->array()) visit(visit, integer(node), Matrix{});
+    } else {
+        std::vector<bool> is_child(nodes.size(), false);
+        for (const Json& node : nodes)
+            if (const Json* children = node.find("children"))
+                for (const Json& child : children->array()) is_child.at(integer(child)) = true;
+        for (std::size_t index = 0; index < nodes.size(); ++index)
+            if (!is_child[index]) visit(visit, index, Matrix{});
+    }
+    return result;
+}
+
+void GltfAsset::add_to(rt::Scene& scene) const {
+    for (const GltfTriangle& triangle : triangles_)
+        scene.add(std::make_shared<rt::Triangle>(triangle.first, triangle.second, triangle.third, triangle.material));
+}
+
+}  // namespace cg::assets

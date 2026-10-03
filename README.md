@@ -81,6 +81,19 @@ Raise the sample count for a cleaner result or lower it for faster previews.
 Rendering is progressive and uses a deterministic multi-threaded tile scheduler;
 changing the thread count or tile execution order does not change the pixels.
 
+The dependency-free `LabX/assets` loader imports glTF 2.x triangle primitives
+from external binary buffers, including indexed or non-indexed geometry, scene
+node transforms, and metallic/roughness material factors:
+
+```bash
+./build/gltf_demo model.gltf
+```
+
+The current focused subset accepts `.gltf` JSON with one external buffer,
+FLOAT `POSITION` accessors, triangle topology, and 8/16/32-bit unsigned indices.
+Textures, animation channels, sparse accessors, Draco compression, and `.glb`
+containers remain explicit future extensions.
+
 ![Path-traced demo scene](images/pathtracer_demo.png)
 
 ## Keyframe animation

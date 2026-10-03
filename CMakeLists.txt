@@ -14,6 +14,7 @@ option(BUILD_CUDA_DEMOS "Build CUDA experiments under LabX/gpu" OFF)
 set(CG_CUDA_ARCHITECTURES "89" CACHE STRING "CUDA architectures for LabX GPU experiments")
 
 add_library(cg_core
+    LabX/assets/gltf_loader.cpp
     LabX/environment/environment_map.cpp
     LabX/pbr/pbr.cpp
     LabX/progressive/progressive_renderer.cpp
@@ -65,6 +66,10 @@ if(BUILD_TESTING)
     add_executable(environment_tests LabX/environment/environment_tests.cpp)
     target_link_libraries(environment_tests PRIVATE cg_core)
     add_test(NAME environment_tests COMMAND environment_tests)
+
+    add_executable(gltf_tests LabX/assets/gltf_tests.cpp)
+    target_link_libraries(gltf_tests PRIVATE cg_core)
+    add_test(NAME gltf_tests COMMAND gltf_tests)
 endif()
 
 add_executable(bezier_demo LabX/curves/bezier_demo.cpp)
@@ -75,6 +80,9 @@ target_link_libraries(raytracer_demo PRIVATE cg_core)
 
 add_executable(pathtracer_demo LabX/raytracing/pathtracer_demo.cpp)
 target_link_libraries(pathtracer_demo PRIVATE cg_core)
+
+add_executable(gltf_demo LabX/assets/gltf_demo.cpp)
+target_link_libraries(gltf_demo PRIVATE cg_core)
 
 add_executable(animation_demo LabX/animation/animation_demo.cpp)
 target_link_libraries(animation_demo PRIVATE cg_core)

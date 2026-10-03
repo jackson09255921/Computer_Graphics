@@ -13,6 +13,7 @@ implementation of an engineering technique.
 | 1995 | Veach–Guibas multiple importance sampling | Implemented |
 | 1998 | High-dynamic-range image-based lighting | Implemented |
 | 2007 | GGX microfacet reflection and rough transmission | Implemented |
+| 2017 | glTF 2.0 scene and physically based material interchange | Implemented |
 | 2020 | ReSTIR direct illumination | Planned |
 
 Multi-threaded tile scheduling and GPU execution evolved across many systems,
@@ -28,3 +29,4 @@ invention date.
 - Veach and Guibas, *Optimally Combining Sampling Techniques for Monte Carlo Rendering*, SIGGRAPH 1995.
 - Debevec, *Rendering Synthetic Objects into Real Scenes*, SIGGRAPH 1998.
 - Walter et al., *Microfacet Models for Refraction through Rough Surfaces*, 2007.
+- Khronos Group, *glTF 2.0 Specification*, 2017.
