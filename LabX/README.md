@@ -53,7 +53,7 @@ ctest --test-dir build-cuda -R cuda_capability --output-on-failure
 2. Progressive, multi-threaded CPU rendering and convergence snapshots.
 3. Importance sampling and multiple importance sampling.
 4. Refraction, dielectric materials, HDR environment lighting, and glTF input (implemented).
-5. CUDA tiled path tracing sized for the 8 GiB GPU budget.
+5. CUDA tiled path tracing sized for the 8 GiB GPU budget (sphere baseline implemented; feature parity next).
 6. OptiX/DXR evaluation, then ReSTIR direct illumination.
 7. Denoising and neural reconstruction only after stable temporal buffers exist.
 

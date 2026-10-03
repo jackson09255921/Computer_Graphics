@@ -95,7 +95,13 @@ if(BUILD_CUDA_DEMOS)
     endif()
     enable_language(CUDA)
     add_executable(cuda_capability LabX/gpu/cuda_capability.cu)
+    add_executable(cuda_pathtracer LabX/gpu/cuda_pathtracer.cu)
     set_target_properties(cuda_capability PROPERTIES
+        CUDA_ARCHITECTURES "${CG_CUDA_ARCHITECTURES}"
+        CUDA_STANDARD 17
+        CUDA_STANDARD_REQUIRED ON
+    )
+    set_target_properties(cuda_pathtracer PROPERTIES
         CUDA_ARCHITECTURES "${CG_CUDA_ARCHITECTURES}"
         CUDA_STANDARD 17
         CUDA_STANDARD_REQUIRED ON
@@ -105,6 +111,7 @@ if(BUILD_CUDA_DEMOS)
     endif()
     if(BUILD_TESTING)
         add_test(NAME cuda_capability COMMAND cuda_capability)
+        add_test(NAME cuda_pathtracer COMMAND cuda_pathtracer --self-test)
     endif()
 endif()
 

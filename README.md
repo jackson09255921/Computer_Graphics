@@ -81,6 +81,24 @@ Raise the sample count for a cleaner result or lower it for faster previews.
 Rendering is progressive and uses a deterministic multi-threaded tile scheduler;
 changing the thread count or tile execution order does not change the pixels.
 
+### CUDA path tracing
+
+The optional WSL2/CUDA build includes a deterministic tiled GPU path tracer.
+Its first feature baseline renders diffuse and metallic spheres with up to six
+bounces and Russian roulette. A 16x16 device tile buffer keeps temporary pixel
+storage bounded (about 3 KiB), leaving the RTX 4060 Laptop's 8 GiB budget for
+future triangle BVH and material data:
+
+```bash
+cmake -S . -B build-wsl -G Ninja -DBUILD_LEGACY_LABS=OFF -DBUILD_CUDA_DEMOS=ON
+cmake --build build-wsl --target cuda_pathtracer
+./build-wsl/cuda_pathtracer cuda_pathtracer.bmp 64
+./build-wsl/cuda_pathtracer --self-test
+```
+
+This GPU baseline does not yet have CPU feature parity: triangle BVH traversal,
+GGX glass, MIS, and HDR environments are the next staged migrations.
+
 The dependency-free `LabX/assets` loader imports glTF 2.x triangle primitives
 from external binary buffers, including indexed or non-indexed geometry, scene
 node transforms, and metallic/roughness material factors:

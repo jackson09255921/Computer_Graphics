@@ -12,6 +12,7 @@ implementation of an engineering technique.
 | 1991 | Progressive multi-pass global illumination (representative publication) | Implemented |
 | 1995 | Veach–Guibas multiple importance sampling | Implemented |
 | 1998 | High-dynamic-range image-based lighting | Implemented |
+| 2002 | Ray tracing on programmable GPU hardware | Implemented baseline |
 | 2007 | GGX microfacet reflection and rough transmission | Implemented |
 | 2017 | glTF 2.0 scene and physically based material interchange | Implemented |
 | 2020 | ReSTIR direct illumination | Planned |
@@ -28,5 +29,6 @@ invention date.
 - Chen et al., *A Progressive Multi-Pass Method for Global Illumination*, SIGGRAPH 1991.
 - Veach and Guibas, *Optimally Combining Sampling Techniques for Monte Carlo Rendering*, SIGGRAPH 1995.
 - Debevec, *Rendering Synthetic Objects into Real Scenes*, SIGGRAPH 1998.
+- Purcell et al., *Ray Tracing on Programmable Graphics Hardware*, 2002.
 - Walter et al., *Microfacet Models for Refraction through Rough Surfaces*, 2007.
 - Khronos Group, *glTF 2.0 Specification*, 2017.
