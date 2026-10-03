@@ -16,3 +16,13 @@ images and produces amplified diff heatmaps when MAE or RMSE exceeds tolerance.
 
 References are updated only after the corresponding PNG has been rendered and
 visually inspected. Tests never overwrite a reviewed image automatically.
+
+## Converted glTF meshes through the CUDA path tracer
+
+| Scene | Reviewed output | Coverage |
+| --- | --- | --- |
+| Multi-asset material showcase | [`cuda_multi_asset_material_showcase.png`](cuda_multi_asset_material_showcase.png) | Bunny, skull, Suzanne, and teapot in one 96 spp render; distinct glTF base colors, metallic factors, roughness factors, shadows, and inter-object occlusion |
+
+The converted assets deliberately use different PBR factors so material import
+errors are visible in the rendered result. Legacy meshes do not contain usable
+UV coordinates, so image textures are not claimed by this validation yet.

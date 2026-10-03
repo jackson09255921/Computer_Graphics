@@ -860,7 +860,8 @@ std::vector<Triangle> load_gltf_triangles(const std::filesystem::path& path) {
     return result;
 }
 
-void frame_imported_triangles(std::vector<Triangle>& triangles) {
+void frame_imported_triangles(std::vector<Triangle>& triangles, float target_extent = 3.2f,
+                              float target_x = 0.0f, float target_z = -4.5f) {
     if (triangles.empty()) return;
     float3 minimum = triangles.front().first;
     float3 maximum = minimum;
@@ -881,14 +882,13 @@ void frame_imported_triangles(std::vector<Triangle>& triangles) {
                                           std::max(maximum.y - minimum.y, maximum.z - minimum.z));
     if (!(largest_extent > 1.0e-6f) || !std::isfinite(largest_extent))
         throw std::runtime_error("glTF mesh has a degenerate bounding box");
-    constexpr float target_extent = 3.2f;
     const float scale = target_extent / largest_extent;
     const float center_x = (minimum.x + maximum.x) * 0.5f;
     const float center_z = (minimum.z + maximum.z) * 0.5f;
     const auto frame = [&](float3& point) {
-        point = make_float3((point.x - center_x) * scale,
+        point = make_float3((point.x - center_x) * scale + target_x,
                             (point.y - minimum.y) * scale - 1.0f,
-                            (point.z - center_z) * scale - 4.5f);
+                            (point.z - center_z) * scale + target_z);
     };
     for (Triangle& triangle : triangles) {
         frame(triangle.first);
@@ -1193,8 +1193,22 @@ int main(int argc, char** argv) {
         std::string output;
         int samples = 64;
         const bool gltf_mode = argc > 1 && std::string(argv[1]) == "--gltf";
+        const bool scene_mode = argc > 1 && std::string(argv[1]) == "--scene";
         const bool hdr_mode = argc > 1 && std::string(argv[1]) == "--hdr";
-        if (gltf_mode) {
+        if (scene_mode) {
+            if (argc < 6) throw std::invalid_argument(
+                "usage: cuda_pathtracer --scene output.bmp spp model1.gltf model2.gltf [model3.gltf ...]");
+            output = argv[2];
+            samples = std::stoi(argv[3]);
+            const int model_count = argc - 4;
+            for (int model = 0; model < model_count; ++model) {
+                std::vector<Triangle> mesh = load_gltf_triangles(argv[model + 4]);
+                const float x = (static_cast<float>(model) - 0.5f * static_cast<float>(model_count - 1)) * 1.35f;
+                const float z = -4.3f - 0.35f * static_cast<float>(model % 2);
+                frame_imported_triangles(mesh, 1.3f, x, z);
+                imported.insert(imported.end(), mesh.begin(), mesh.end());
+            }
+        } else if (gltf_mode) {
             if (argc < 3) throw std::invalid_argument(
                 "usage: cuda_pathtracer --gltf model.gltf [output.bmp] [spp] [environment.hdr]");
             imported = load_gltf_triangles(argv[2]);
@@ -1217,7 +1231,8 @@ int main(int argc, char** argv) {
         const int width = 640;
         const int height = 360;
         write_image(output, width, height,
-                    render(width, height, samples, 0xC0FFEEu, imported, !gltf_mode, environment.get()));
+                    render(width, height, samples, 0xC0FFEEu, imported,
+                           !gltf_mode && !scene_mode, environment.get()));
         std::cout << "CUDA path traced " << width << 'x' << height << " at " << samples
                   << " spp with " << imported.size() << " imported triangles"
                   << (environment ? " and HDR environment" : "") << " to " << output << '\n';

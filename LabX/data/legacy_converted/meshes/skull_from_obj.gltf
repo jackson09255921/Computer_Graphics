@@ -52,15 +52,16 @@
   ],
   "materials": [
     {
+      "name": "skull_showcase_material",
       "pbrMetallicRoughness": {
         "baseColorFactor": [
-          0.18,
-          0.52,
-          0.92,
+          0.72,
+          0.63,
+          0.46,
           1.0
         ],
-        "metallicFactor": 0.05,
-        "roughnessFactor": 0.48
+        "metallicFactor": 0.0,
+        "roughnessFactor": 0.72
       }
     }
   ],

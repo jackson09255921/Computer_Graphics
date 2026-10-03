@@ -11,6 +11,19 @@ ROOT = pathlib.Path(__file__).resolve().parents[1]
 LEGACY = ROOT / "legacy"
 OUTPUT = ROOT / "LabX" / "data" / "legacy_converted"
 
+MATERIALS = {
+    "bench": ([0.42, 0.12, 0.035, 1.0], 0.0, 0.62),
+    "bunny": ([0.12, 0.72, 0.46, 1.0], 0.08, 0.24),
+    "cube": ([0.82, 0.08, 0.045, 1.0], 0.15, 0.28),
+    "drop": ([0.10, 0.38, 0.92, 1.0], 0.65, 0.16),
+    "glass": ([0.55, 0.82, 1.0, 1.0], 0.1, 0.08),
+    "grid4x4": ([0.72, 0.72, 0.76, 1.0], 0.75, 0.32),
+    "quad": ([0.76, 0.56, 0.14, 1.0], 0.25, 0.5),
+    "skull": ([0.72, 0.63, 0.46, 1.0], 0.0, 0.72),
+    "suzanne": ([0.58, 0.16, 0.78, 1.0], 0.45, 0.2),
+    "teapot": ([0.92, 0.52, 0.08, 1.0], 0.82, 0.14),
+}
+
 
 def load_obj(path):
     vertices, triangles = [], []
@@ -65,6 +78,9 @@ def write_gltf(name, vertices, triangles, source):
     (mesh_dir / bin_name).write_bytes(binary)
     minimum = [min(vertex[axis] for vertex in vertices) for axis in range(3)]
     maximum = [max(vertex[axis] for vertex in vertices) for axis in range(3)]
+    stem = name.split("_from_", 1)[0]
+    base_color, metallic, roughness = MATERIALS.get(
+        stem, ([0.18, 0.52, 0.92, 1.0], 0.05, 0.48))
     document = {
         "asset": {"version": "2.0", "generator": "Computer_Graphics legacy converter"},
         "extras": {"source": source.relative_to(ROOT).as_posix()},
@@ -79,8 +95,10 @@ def write_gltf(name, vertices, triangles, source):
              "min": minimum, "max": maximum},
             {"bufferView": 1, "componentType": 5125, "count": len(triangles) * 3, "type": "SCALAR"},
         ],
-        "materials": [{"pbrMetallicRoughness": {"baseColorFactor": [0.18, 0.52, 0.92, 1.0],
-                                                   "metallicFactor": 0.05, "roughnessFactor": 0.48}}],
+        "materials": [{"name": f"{stem}_showcase_material",
+                       "pbrMetallicRoughness": {"baseColorFactor": base_color,
+                                                   "metallicFactor": metallic,
+                                                   "roughnessFactor": roughness}}],
         "meshes": [{"primitives": [{"attributes": {"POSITION": 0}, "indices": 1, "material": 0}]}],
         "nodes": [{"mesh": 0}], "scenes": [{"nodes": [0]}], "scene": 0,
     }

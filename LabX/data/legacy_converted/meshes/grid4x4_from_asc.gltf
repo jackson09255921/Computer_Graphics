@@ -52,15 +52,16 @@
   ],
   "materials": [
     {
+      "name": "grid4x4_showcase_material",
       "pbrMetallicRoughness": {
         "baseColorFactor": [
-          0.18,
-          0.52,
-          0.92,
+          0.72,
+          0.72,
+          0.76,
           1.0
         ],
-        "metallicFactor": 0.05,
-        "roughnessFactor": 0.48
+        "metallicFactor": 0.75,
+        "roughnessFactor": 0.32
       }
     }
   ],

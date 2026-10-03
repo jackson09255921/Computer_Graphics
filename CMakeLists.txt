@@ -227,6 +227,10 @@ if(BUILD_CUDA_DEMOS)
     if(BUILD_TESTING)
         add_test(NAME cuda_capability COMMAND cuda_capability)
         add_test(NAME cuda_pathtracer COMMAND cuda_pathtracer --self-test)
+        add_test(NAME cuda_material_scene COMMAND cuda_pathtracer --scene
+            "${CMAKE_CURRENT_BINARY_DIR}/cuda_material_scene_test.ppm" 4
+            "${CMAKE_CURRENT_SOURCE_DIR}/LabX/data/legacy_converted/meshes/bunny_from_obj.gltf"
+            "${CMAKE_CURRENT_SOURCE_DIR}/LabX/data/legacy_converted/meshes/teapot_from_obj.gltf")
         add_test(NAME restir_di COMMAND restir_di)
     endif()
 endif()
