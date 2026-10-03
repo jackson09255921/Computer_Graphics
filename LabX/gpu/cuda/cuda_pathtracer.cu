@@ -860,6 +860,43 @@ std::vector<Triangle> load_gltf_triangles(const std::filesystem::path& path) {
     return result;
 }
 
+void frame_imported_triangles(std::vector<Triangle>& triangles) {
+    if (triangles.empty()) return;
+    float3 minimum = triangles.front().first;
+    float3 maximum = minimum;
+    const auto include = [&](const float3& point) {
+        minimum.x = std::min(minimum.x, point.x);
+        minimum.y = std::min(minimum.y, point.y);
+        minimum.z = std::min(minimum.z, point.z);
+        maximum.x = std::max(maximum.x, point.x);
+        maximum.y = std::max(maximum.y, point.y);
+        maximum.z = std::max(maximum.z, point.z);
+    };
+    for (const Triangle& triangle : triangles) {
+        include(triangle.first);
+        include(triangle.second);
+        include(triangle.third);
+    }
+    const float largest_extent = std::max(maximum.x - minimum.x,
+                                          std::max(maximum.y - minimum.y, maximum.z - minimum.z));
+    if (!(largest_extent > 1.0e-6f) || !std::isfinite(largest_extent))
+        throw std::runtime_error("glTF mesh has a degenerate bounding box");
+    constexpr float target_extent = 3.2f;
+    const float scale = target_extent / largest_extent;
+    const float center_x = (minimum.x + maximum.x) * 0.5f;
+    const float center_z = (minimum.z + maximum.z) * 0.5f;
+    const auto frame = [&](float3& point) {
+        point = make_float3((point.x - center_x) * scale,
+                            (point.y - minimum.y) * scale - 1.0f,
+                            (point.z - center_z) * scale - 4.5f);
+    };
+    for (Triangle& triangle : triangles) {
+        frame(triangle.first);
+        frame(triangle.second);
+        frame(triangle.third);
+    }
+}
+
 struct EnvironmentData {
     std::vector<float3> pixels;
     std::vector<float> pmf;
@@ -1112,6 +1149,14 @@ void self_test() {
     if (imported.size() != 1 || fabsf(imported[0].metallic - 0.7f) > 1.0e-6f ||
         fabsf(imported[0].roughness - 0.35f) > 1.0e-6f)
         throw std::runtime_error("glTF triangles or PBR factors did not reach the CUDA upload format");
+    frame_imported_triangles(imported);
+    const float framed_minimum_y = std::min(imported[0].first.y,
+                                             std::min(imported[0].second.y, imported[0].third.y));
+    const float framed_maximum_y = std::max(imported[0].first.y,
+                                             std::max(imported[0].second.y, imported[0].third.y));
+    if (fabsf(framed_minimum_y + 1.0f) > 1.0e-5f ||
+        fabsf(framed_maximum_y - framed_minimum_y - 3.2f) > 1.0e-5f)
+        throw std::runtime_error("glTF automatic framing did not scale and place the mesh on the floor");
     const cg::environment::EnvironmentMap importance_environment(
         2, 2, {{40.0, 40.0, 40.0}, {0.1, 0.1, 0.1}, {0.1, 0.1, 0.1}, {0.1, 0.1, 0.1}});
     const EnvironmentData importance_data = build_environment_data(&importance_environment);
@@ -1153,6 +1198,7 @@ int main(int argc, char** argv) {
             if (argc < 3) throw std::invalid_argument(
                 "usage: cuda_pathtracer --gltf model.gltf [output.bmp] [spp] [environment.hdr]");
             imported = load_gltf_triangles(argv[2]);
+            frame_imported_triangles(imported);
             output = argc > 3 ? argv[3] : "cuda_gltf_pathtracer.bmp";
             samples = argc > 4 ? std::stoi(argv[4]) : 64;
             if (argc > 5) environment = std::make_unique<cg::environment::EnvironmentMap>(
