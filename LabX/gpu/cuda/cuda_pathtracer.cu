@@ -51,6 +51,13 @@ struct Triangle {
     float3 first; float3 second; float3 third; float3 albedo; float metallic; float roughness;
     float transmission; float index_of_refraction;
     float3 first_normal; float3 second_normal; float3 third_normal; bool smooth;
+    float2 first_uv; float2 second_uv; float2 third_uv; int texture_index{-1};
+};
+struct TextureDescriptor { int offset; int width; int height; };
+struct ImportedAssets {
+    std::vector<Triangle> triangles;
+    std::vector<float3> texture_pixels;
+    std::vector<TextureDescriptor> textures;
 };
 struct AreaLight { float3 center; float3 half_u; float3 half_v; float3 emission; };
 struct GpuEnvironment {
@@ -60,10 +67,12 @@ struct GpuEnvironment {
     int width;
     int height;
 };
+struct GpuTextures { const float3* pixels; const TextureDescriptor* descriptors; int count; };
 struct BvhNode { float3 minimum; float3 maximum; int left; int right; int first; int count; };
 struct Hit {
     float distance; float3 position; float3 normal; float3 albedo; float metallic; float roughness;
     float transmission; float index_of_refraction; bool front_face; bool found;
+    float2 uv; int texture_index;
 };
 
 struct Rng {
@@ -141,6 +150,11 @@ __device__ void intersect_triangles(const Ray& ray, const Triangle* triangles, c
                 closest.roughness = triangle.roughness;
                 closest.transmission = triangle.transmission;
                 closest.index_of_refraction = triangle.index_of_refraction;
+                closest.uv = make_float2(triangle.first_uv.x * (1.0f - u - v) + triangle.second_uv.x * u +
+                                         triangle.third_uv.x * v,
+                                         triangle.first_uv.y * (1.0f - u - v) + triangle.second_uv.y * u +
+                                         triangle.third_uv.y * v);
+                closest.texture_index = triangle.texture_index;
                 closest.found = true;
             }
         } else {
@@ -177,6 +191,7 @@ __device__ bool intersect_scene(const Ray& ray, const Sphere* spheres, int spher
         closest.roughness = sphere.roughness;
         closest.transmission = sphere.transmission;
         closest.index_of_refraction = sphere.index_of_refraction;
+        closest.texture_index = -1;
         closest.found = true;
     }
     intersect_triangles(ray, triangles, nodes, node_count, closest);
@@ -193,6 +208,22 @@ __device__ float3 cosine_direction(float3 normal, Rng& rng) {
     const float3 tangent = normalize3(cross3(helper, normal));
     const float3 bitangent = cross3(normal, tangent);
     return normalize3(add(add(mul(tangent, x), mul(bitangent, y)), mul(normal, z)));
+}
+
+__device__ float3 sample_texture(const GpuTextures& textures, int index, float2 uv) {
+    if (index < 0 || index >= textures.count) return make_float3(1, 1, 1);
+    const TextureDescriptor texture = textures.descriptors[index];
+    uv.x -= floorf(uv.x); uv.y -= floorf(uv.y);
+    const float x = uv.x * texture.width - 0.5f, y = uv.y * texture.height - 0.5f;
+    const int x0 = static_cast<int>(floorf(x)), y0 = static_cast<int>(floorf(y));
+    const auto texel = [&](int column, int row) {
+        column = (column % texture.width + texture.width) % texture.width;
+        row = (row % texture.height + texture.height) % texture.height;
+        return textures.pixels[texture.offset + row * texture.width + column];
+    };
+    const float tx = x - floorf(x), ty = y - floorf(y);
+    return add(mul(add(mul(texel(x0, y0), 1.0f - tx), mul(texel(x0 + 1, y0), tx)), 1.0f - ty),
+               mul(add(mul(texel(x0, y0 + 1), 1.0f - tx), mul(texel(x0 + 1, y0 + 1), tx)), ty));
 }
 
 __device__ float3 sample_ggx_normal(float3 normal, float roughness, Rng& rng) {
@@ -421,7 +452,8 @@ __device__ float3 sample_environment(const GpuEnvironment& environment, float3 d
 
 __device__ float3 radiance(Ray ray, const Sphere* spheres, int sphere_count,
                            const Triangle* triangles, const BvhNode* nodes, int node_count,
-                           const AreaLight& light, const GpuEnvironment& environment, Rng& rng) {
+                           const AreaLight& light, const GpuEnvironment& environment,
+                           const GpuTextures& textures, Rng& rng) {
     float3 result = make_float3(0, 0, 0);
     float3 throughput = make_float3(1, 1, 1);
     float previous_bsdf_pdf = 0.0f;
@@ -445,6 +477,7 @@ __device__ float3 radiance(Ray ray, const Sphere* spheres, int sphere_count,
             result = add(result, mul(mul(throughput, sample_environment(environment, ray.direction)), weight));
             break;
         }
+        hit.albedo = mul(hit.albedo, sample_texture(textures, hit.texture_index, hit.uv));
         const float3 view_direction = mul(ray.direction, -1.0f);
         const bool non_transmissive_surface = hit.transmission <= 0.0f;
         if (non_transmissive_surface) {
@@ -573,7 +606,7 @@ __global__ void render_tile(float3* tile, int tile_x, int tile_y, int tile_width
                             int image_width, int image_height, int samples, std::uint32_t seed,
                             const Sphere* spheres, int sphere_count, const Triangle* triangles,
                             const BvhNode* nodes, int node_count, AreaLight light,
-                            GpuEnvironment environment) {
+                            GpuEnvironment environment, GpuTextures textures) {
     const int local_x = static_cast<int>(blockIdx.x * blockDim.x + threadIdx.x);
     const int local_y = static_cast<int>(blockIdx.y * blockDim.y + threadIdx.y);
     if (local_x >= tile_width || local_y >= tile_height) return;
@@ -595,7 +628,7 @@ __global__ void render_tile(float3* tile, int tile_x, int tile_y, int tile_width
         const float3 direction = normalize3(add(forward, add(mul(right, (u - 0.5f) * viewport * aspect),
                                                                mul(up, (0.5f - v) * viewport))));
         color = add(color, radiance({origin, direction}, spheres, sphere_count,
-                                    triangles, nodes, node_count, light, environment, rng));
+                                    triangles, nodes, node_count, light, environment, textures, rng));
     }
     tile[local_y * tile_width + local_x] = mul(color, 1.0f / static_cast<float>(samples));
 }
@@ -849,23 +882,56 @@ void validate_ggx_on_gpu() {
     }
 }
 
-std::vector<Triangle> load_gltf_triangles(const std::filesystem::path& path) {
+ImportedAssets load_gltf_triangles(const std::filesystem::path& path) {
     const cg::assets::GltfAsset asset = cg::assets::GltfAsset::load(path);
-    std::vector<Triangle> result;
-    result.reserve(asset.triangles().size());
+    ImportedAssets result;
+    result.triangles.reserve(asset.triangles().size());
+    std::vector<std::shared_ptr<const cg::assets::GltfTexture>> texture_sources;
     const auto convert = [](const cg::Vec3& value) {
         return make_float3(static_cast<float>(value.x), static_cast<float>(value.y), static_cast<float>(value.z));
     };
     for (const cg::assets::GltfTriangle& triangle : asset.triangles()) {
-        result.push_back({convert(triangle.first), convert(triangle.second), convert(triangle.third),
+        int texture_index = -1;
+        if (triangle.base_color_texture) {
+            const auto found = std::find(texture_sources.begin(), texture_sources.end(), triangle.base_color_texture);
+            if (found == texture_sources.end()) {
+                texture_index = static_cast<int>(texture_sources.size());
+                texture_sources.push_back(triangle.base_color_texture);
+                const int offset = static_cast<int>(result.texture_pixels.size());
+                result.textures.push_back({offset, static_cast<int>(triangle.base_color_texture->width),
+                                            static_cast<int>(triangle.base_color_texture->height)});
+                for (const cg::Color& pixel : triangle.base_color_texture->pixels)
+                    result.texture_pixels.push_back(convert(pixel));
+            } else texture_index = static_cast<int>(found - texture_sources.begin());
+        }
+        result.triangles.push_back({convert(triangle.first), convert(triangle.second), convert(triangle.third),
                           convert(triangle.material.albedo), static_cast<float>(triangle.material.metallic),
                           static_cast<float>(triangle.material.roughness),
                           static_cast<float>(triangle.material.transmission),
                           static_cast<float>(triangle.material.index_of_refraction),
                           convert(triangle.first_normal), convert(triangle.second_normal),
-                          convert(triangle.third_normal), triangle.has_normals});
+                          convert(triangle.third_normal), triangle.has_normals,
+                          make_float2(static_cast<float>(triangle.first_uv.x), static_cast<float>(triangle.first_uv.y)),
+                          make_float2(static_cast<float>(triangle.second_uv.x), static_cast<float>(triangle.second_uv.y)),
+                          make_float2(static_cast<float>(triangle.third_uv.x), static_cast<float>(triangle.third_uv.y)),
+                          texture_index});
     }
     return result;
+}
+
+void append_imported(ImportedAssets& destination, ImportedAssets source) {
+    const int texture_base = static_cast<int>(destination.textures.size());
+    const int pixel_base = static_cast<int>(destination.texture_pixels.size());
+    for (TextureDescriptor& texture : source.textures) {
+        texture.offset += pixel_base;
+        destination.textures.push_back(texture);
+    }
+    destination.texture_pixels.insert(destination.texture_pixels.end(),
+                                      source.texture_pixels.begin(), source.texture_pixels.end());
+    for (Triangle& triangle : source.triangles) {
+        if (triangle.texture_index >= 0) triangle.texture_index += texture_base;
+        destination.triangles.push_back(triangle);
+    }
 }
 
 void frame_imported_triangles(std::vector<Triangle>& triangles, float target_extent = 3.2f,
@@ -947,7 +1013,7 @@ EnvironmentData build_environment_data(const cg::environment::EnvironmentMap* en
 }
 
 std::vector<float3> render(int width, int height, int samples, std::uint32_t seed,
-                           const std::vector<Triangle>& imported = {}, bool show_demo_spheres = true,
+                           const ImportedAssets& imported = {}, bool show_demo_spheres = true,
                            const cg::environment::EnvironmentMap* environment_map = nullptr) {
     const AreaLight light{make_float3(-0.8f, 4.5f, -3.5f), make_float3(1.5f, 0, 0),
                           make_float3(0, 0, 1.0f), make_float3(10.0f, 8.0f, 5.5f)};
@@ -969,7 +1035,7 @@ std::vector<float3> render(int width, int height, int samples, std::uint32_t see
         {make_float3(-7, -1, -9), make_float3(7, 6, -9), make_float3(-7, 6, -9),
          make_float3(0.3f, 0.38f, 0.5f), 0.0f, 0.7f, 0.0f, 1.5f},
     };
-    triangles.insert(triangles.end(), imported.begin(), imported.end());
+    triangles.insert(triangles.end(), imported.triangles.begin(), imported.triangles.end());
     const std::vector<BvhNode> nodes = build_bvh(triangles);
     const EnvironmentData environment_data = build_environment_data(environment_map);
     Sphere* device_spheres = nullptr;
@@ -978,6 +1044,8 @@ std::vector<float3> render(int width, int height, int samples, std::uint32_t see
     float3* device_environment_pixels = nullptr;
     float* device_environment_pmf = nullptr;
     float* device_environment_cdf = nullptr;
+    float3* device_texture_pixels = nullptr;
+    TextureDescriptor* device_texture_descriptors = nullptr;
     float3* device_tile = nullptr;
     try {
         if (!spheres.empty()) check(cudaMalloc(&device_spheres, spheres.size() * sizeof(Sphere)), "cudaMalloc spheres");
@@ -990,6 +1058,18 @@ std::vector<float3> render(int width, int height, int samples, std::uint32_t see
                   "cudaMalloc HDR PMF");
             check(cudaMalloc(&device_environment_cdf, environment_data.cdf.size() * sizeof(float)),
                   "cudaMalloc HDR CDF");
+        }
+        if (!imported.texture_pixels.empty()) {
+            check(cudaMalloc(&device_texture_pixels, imported.texture_pixels.size() * sizeof(float3)),
+                  "cudaMalloc texture pixels");
+            check(cudaMalloc(&device_texture_descriptors, imported.textures.size() * sizeof(TextureDescriptor)),
+                  "cudaMalloc texture descriptors");
+            check(cudaMemcpy(device_texture_pixels, imported.texture_pixels.data(),
+                             imported.texture_pixels.size() * sizeof(float3), cudaMemcpyHostToDevice),
+                  "copy texture pixels");
+            check(cudaMemcpy(device_texture_descriptors, imported.textures.data(),
+                             imported.textures.size() * sizeof(TextureDescriptor), cudaMemcpyHostToDevice),
+                  "copy texture descriptors");
         }
         check(cudaMalloc(&device_tile, kTileWidth * kTileHeight * sizeof(float3)), "cudaMalloc tile");
         if (!spheres.empty())
@@ -1014,6 +1094,8 @@ std::vector<float3> render(int width, int height, int samples, std::uint32_t see
                                          device_environment_cdf,
                                          environment_map ? static_cast<int>(environment_map->width()) : 0,
                                          environment_map ? static_cast<int>(environment_map->height()) : 0};
+        const GpuTextures textures{device_texture_pixels, device_texture_descriptors,
+                                   static_cast<int>(imported.textures.size())};
         std::vector<float3> image(static_cast<std::size_t>(width) * height);
         std::vector<float3> tile(kTileWidth * kTileHeight);
         for (int tile_y = 0; tile_y < height; tile_y += kTileHeight) {
@@ -1025,7 +1107,8 @@ std::vector<float3> render(int width, int height, int samples, std::uint32_t see
                 render_tile<<<blocks, threads>>>(device_tile, tile_x, tile_y, tile_width, tile_height,
                                                   width, height, samples, seed, device_spheres,
                                                   static_cast<int>(spheres.size()), device_triangles,
-                                                  device_nodes, static_cast<int>(nodes.size()), light, environment);
+                                                  device_nodes, static_cast<int>(nodes.size()), light, environment,
+                                                  textures);
                 check(cudaGetLastError(), "render tile launch");
                 check(cudaMemcpy(tile.data(), device_tile, tile_width * tile_height * sizeof(float3),
                                  cudaMemcpyDeviceToHost), "copy rendered tile");
@@ -1043,6 +1126,10 @@ std::vector<float3> render(int width, int height, int samples, std::uint32_t see
         device_environment_pmf = nullptr;
         if (device_environment_pixels) check(cudaFree(device_environment_pixels), "cudaFree HDR environment");
         device_environment_pixels = nullptr;
+        if (device_texture_descriptors) check(cudaFree(device_texture_descriptors), "cudaFree texture descriptors");
+        device_texture_descriptors = nullptr;
+        if (device_texture_pixels) check(cudaFree(device_texture_pixels), "cudaFree texture pixels");
+        device_texture_pixels = nullptr;
         check(cudaFree(device_nodes), "cudaFree BVH nodes");
         device_nodes = nullptr;
         check(cudaFree(device_triangles), "cudaFree triangles");
@@ -1055,6 +1142,8 @@ std::vector<float3> render(int width, int height, int samples, std::uint32_t see
         if (device_environment_cdf) cudaFree(device_environment_cdf);
         if (device_environment_pmf) cudaFree(device_environment_pmf);
         if (device_environment_pixels) cudaFree(device_environment_pixels);
+        if (device_texture_descriptors) cudaFree(device_texture_descriptors);
+        if (device_texture_pixels) cudaFree(device_texture_pixels);
         if (device_nodes) cudaFree(device_nodes);
         if (device_triangles) cudaFree(device_triangles);
         if (device_spheres) cudaFree(device_spheres);
@@ -1144,7 +1233,7 @@ void self_test() {
 "meshes":[{"primitives":[{"attributes":{"POSITION":0},"material":0}]}],
 "nodes":[{"mesh":0}],"scenes":[{"nodes":[0]}],"scene":0})";
     }
-    std::vector<Triangle> imported;
+    ImportedAssets imported;
     try {
         imported = load_gltf_triangles(gltf_path);
         std::filesystem::remove(gltf_path);
@@ -1154,14 +1243,14 @@ void self_test() {
         std::filesystem::remove(bin_path);
         throw;
     }
-    if (imported.size() != 1 || fabsf(imported[0].metallic - 0.7f) > 1.0e-6f ||
-        fabsf(imported[0].roughness - 0.35f) > 1.0e-6f)
+    if (imported.triangles.size() != 1 || fabsf(imported.triangles[0].metallic - 0.7f) > 1.0e-6f ||
+        fabsf(imported.triangles[0].roughness - 0.35f) > 1.0e-6f)
         throw std::runtime_error("glTF triangles or PBR factors did not reach the CUDA upload format");
-    frame_imported_triangles(imported);
-    const float framed_minimum_y = std::min(imported[0].first.y,
-                                             std::min(imported[0].second.y, imported[0].third.y));
-    const float framed_maximum_y = std::max(imported[0].first.y,
-                                             std::max(imported[0].second.y, imported[0].third.y));
+    frame_imported_triangles(imported.triangles);
+    const float framed_minimum_y = std::min(imported.triangles[0].first.y,
+                                             std::min(imported.triangles[0].second.y, imported.triangles[0].third.y));
+    const float framed_maximum_y = std::max(imported.triangles[0].first.y,
+                                             std::max(imported.triangles[0].second.y, imported.triangles[0].third.y));
     if (fabsf(framed_minimum_y + 1.0f) > 1.0e-5f ||
         fabsf(framed_maximum_y - framed_minimum_y - 3.2f) > 1.0e-5f)
         throw std::runtime_error("glTF automatic framing did not scale and place the mesh on the floor");
@@ -1196,7 +1285,7 @@ int main(int argc, char** argv) {
             self_test();
             return 0;
         }
-        std::vector<Triangle> imported;
+        ImportedAssets imported;
         std::unique_ptr<cg::environment::EnvironmentMap> environment;
         std::string output;
         int samples = 64;
@@ -1214,17 +1303,17 @@ int main(int argc, char** argv) {
             height = 720;
             const int model_count = argc - 4;
             for (int model = 0; model < model_count; ++model) {
-                std::vector<Triangle> mesh = load_gltf_triangles(argv[model + 4]);
+                ImportedAssets mesh = load_gltf_triangles(argv[model + 4]);
                 const float x = (static_cast<float>(model) - 0.5f * static_cast<float>(model_count - 1)) * 1.35f;
                 const float z = -4.3f - 0.35f * static_cast<float>(model % 2);
-                frame_imported_triangles(mesh, 1.3f, x, z);
-                imported.insert(imported.end(), mesh.begin(), mesh.end());
+                frame_imported_triangles(mesh.triangles, 1.3f, x, z);
+                append_imported(imported, std::move(mesh));
             }
         } else if (gltf_mode) {
             if (argc < 3) throw std::invalid_argument(
                 "usage: cuda_pathtracer --gltf model.gltf [output.bmp] [spp] [environment.hdr]");
             imported = load_gltf_triangles(argv[2]);
-            frame_imported_triangles(imported);
+            frame_imported_triangles(imported.triangles);
             output = argc > 3 ? argv[3] : "cuda_gltf_pathtracer.bmp";
             samples = argc > 4 ? std::stoi(argv[4]) : 64;
             if (argc > 5) environment = std::make_unique<cg::environment::EnvironmentMap>(
@@ -1244,7 +1333,7 @@ int main(int argc, char** argv) {
                     render(width, height, samples, 0xC0FFEEu, imported,
                            !gltf_mode && !scene_mode, environment.get()));
         std::cout << "CUDA path traced " << width << 'x' << height << " at " << samples
-                  << " spp with " << imported.size() << " imported triangles"
+                  << " spp with " << imported.triangles.size() << " imported triangles"
                   << (environment ? " and HDR environment" : "") << " to " << output << '\n';
         return 0;
     } catch (const std::exception& error) {

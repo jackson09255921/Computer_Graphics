@@ -25,6 +25,8 @@ visually inspected. Tests never overwrite a reviewed image automatically.
 | HD multi-asset material showcase | [`cuda_multi_asset_material_showcase_hd.png`](cuda_multi_asset_material_showcase_hd.png) | 1280x720 at 192 spp; reviewed at native resolution for edge definition, noise, and specular highlights |
 | BoxTextured GLB baseline | [`gltf_boxtextured_glb_cuda.png`](gltf_boxtextured_glb_cuda.png) | GLB v2 JSON/BIN container, indexed mesh, node transforms, and material factors; intentionally textureless until UV/image sampling is implemented |
 | Duck smooth normals | [`gltf_duck_smooth_normals_cuda.png`](gltf_duck_smooth_normals_cuda.png) | 4,212 triangles at 256 spp; glTF vertex normals transformed by the inverse-transpose normal matrix and barycentrically interpolated by CUDA |
+| BoxTextured base color | [`gltf_boxtextured_base_color_cuda.png`](gltf_boxtextured_base_color_cuda.png) | GLB embedded PNG, `TEXCOORD_0`, repeat wrapping, bilinear sampling, and sRGB-to-linear conversion |
+| Duck base color | [`gltf_duck_base_color_cuda.png`](gltf_duck_base_color_cuda.png) | 4,212 smooth triangles with the official yellow/orange/black base-color texture at 256 spp |
 
 The converted assets deliberately use different PBR factors so material import
 errors are visible in the rendered result. Legacy meshes do not contain usable

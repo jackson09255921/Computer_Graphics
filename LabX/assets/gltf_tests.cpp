@@ -124,6 +124,14 @@ int main() {
         const cg::assets::GltfAsset glb_asset = cg::assets::GltfAsset::load(glb_path);
         require(glb_asset.triangles().size() == 1, "GLB v2 JSON and BIN chunks must load");
 
+        const cg::assets::GltfTexture texture{2, 2,
+            {{1, 0, 0}, {0, 1, 0}, {0, 0, 1}, {1, 1, 1}}};
+        const cg::Color first_texel = texture.sample({0.25, 0.25});
+        const cg::Color repeated_texel = texture.sample({1.25, 0.25});
+        require(near(first_texel.x, 1.0) && near(first_texel.y, 0.0) &&
+                    near(repeated_texel.x, first_texel.x),
+                "base-color texture sampling must be bilinear and repeat UV coordinates");
+
         std::filesystem::remove(gltf_path);
         std::filesystem::remove(bin_path);
         std::filesystem::remove(glb_path);

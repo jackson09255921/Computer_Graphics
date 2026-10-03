@@ -1,11 +1,19 @@
 #pragma once
 
 #include <filesystem>
+#include <memory>
 #include <vector>
 
 #include "raytracer/raytracer.hpp"
 
 namespace cg::assets {
+
+struct GltfTexture {
+    std::size_t width{};
+    std::size_t height{};
+    std::vector<Color> pixels;
+    [[nodiscard]] Color sample(Vec2 uv) const;
+};
 
 struct GltfTriangle {
     Vec3 first;
@@ -15,6 +23,10 @@ struct GltfTriangle {
     Vec3 second_normal;
     Vec3 third_normal;
     bool has_normals{false};
+    Vec2 first_uv;
+    Vec2 second_uv;
+    Vec2 third_uv;
+    std::shared_ptr<const GltfTexture> base_color_texture;
     rt::Material material;
 };
 

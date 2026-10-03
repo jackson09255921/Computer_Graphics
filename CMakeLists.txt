@@ -34,6 +34,7 @@ add_library(cg_visual
 target_include_directories(cg_visual PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/LabX")
 target_compile_features(cg_visual PUBLIC cxx_std_17)
 target_include_directories(cg_core PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/src" "${CMAKE_CURRENT_SOURCE_DIR}/LabX")
+target_include_directories(cg_core PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/third_party/stb")
 target_compile_features(cg_core PUBLIC cxx_std_17)
 
 if(MSVC)

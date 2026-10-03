@@ -1,5 +1,10 @@
 #include "assets/gltf_loader.hpp"
 
+#define STB_IMAGE_IMPLEMENTATION
+#define STBI_ONLY_JPEG
+#define STBI_ONLY_PNG
+#include "stb_image.h"
+
 #include <array>
 #include <cctype>
 #include <cstdint>
@@ -268,6 +273,19 @@ std::vector<Vec3> positions(const Accessor& accessor, const View& view,
     return result;
 }
 
+std::vector<Vec2> texcoords(const Accessor& accessor, const View& view,
+                            const std::vector<std::uint8_t>& buffer) {
+    if (accessor.component != 5126 || accessor.type != "VEC2")
+        throw std::runtime_error("TEXCOORD_0 accessor must use FLOAT VEC2");
+    const std::size_t stride = view.stride ? view.stride : sizeof(float) * 2;
+    std::vector<Vec2> result(accessor.count);
+    for (std::size_t i = 0; i < accessor.count; ++i) {
+        const std::size_t offset = view.offset + accessor.offset + i * stride;
+        result[i] = {scalar_at<float>(buffer, offset), scalar_at<float>(buffer, offset + 4)};
+    }
+    return result;
+}
+
 std::vector<std::uint32_t> indices(const Accessor& accessor, const View& view,
                                    const std::vector<std::uint8_t>& buffer) {
     std::size_t size = 0;
@@ -299,6 +317,26 @@ rt::Material material_at(const Json& root, std::size_t index) {
 }
 
 }  // namespace
+
+Color GltfTexture::sample(Vec2 uv) const {
+    if (pixels.empty() || width == 0 || height == 0) return {1.0, 1.0, 1.0};
+    uv.x -= std::floor(uv.x);
+    uv.y -= std::floor(uv.y);
+    const double x = uv.x * static_cast<double>(width) - 0.5;
+    const double y = uv.y * static_cast<double>(height) - 0.5;
+    const auto texel = [&](long long column, long long row) {
+        const auto wrap = [](long long value, std::size_t size) {
+            const long long length = static_cast<long long>(size);
+            return static_cast<std::size_t>((value % length + length) % length);
+        };
+        return pixels[wrap(row, height) * width + wrap(column, width)];
+    };
+    const long long x0 = static_cast<long long>(std::floor(x));
+    const long long y0 = static_cast<long long>(std::floor(y));
+    const double tx = x - std::floor(x), ty = y - std::floor(y);
+    return lerp(lerp(texel(x0, y0), texel(x0 + 1, y0), tx),
+                lerp(texel(x0, y0 + 1), texel(x0 + 1, y0 + 1), tx), ty);
+}
 
 GltfAsset GltfAsset::load(const std::filesystem::path& path) {
     const Document document = read_document(path);
@@ -334,6 +372,33 @@ GltfAsset GltfAsset::load(const std::filesystem::path& path) {
                              member_integer(source, "count"), member_integer(source, "componentType"),
                              source.find("type")->string()});
 
+    std::vector<std::shared_ptr<const GltfTexture>> textures;
+    if (const Json* texture_sources = root.find("textures")) {
+        const Json* images = root.find("images");
+        if (!images) throw std::runtime_error("glTF textures require images");
+        for (const Json& texture_source : texture_sources->array()) {
+            const Json& image = images->array().at(member_integer(texture_source, "source"));
+            const Json* image_view = image.find("bufferView");
+            if (!image_view) throw std::runtime_error("only bufferView-backed glTF images are supported");
+            const View& view = views.at(integer(*image_view));
+            if (view.offset + view.length > buffer.size()) throw std::runtime_error("glTF image exceeds buffer bounds");
+            int width = 0, height = 0, channels = 0;
+            stbi_uc* decoded = stbi_load_from_memory(buffer.data() + view.offset, static_cast<int>(view.length),
+                                                     &width, &height, &channels, 4);
+            if (!decoded) throw std::runtime_error(std::string("failed to decode glTF image: ") + stbi_failure_reason());
+            auto texture = std::make_shared<GltfTexture>();
+            texture->width = static_cast<std::size_t>(width);
+            texture->height = static_cast<std::size_t>(height);
+            texture->pixels.reserve(texture->width * texture->height);
+            for (std::size_t pixel = 0; pixel < texture->width * texture->height; ++pixel) {
+                const auto linear = [&](int channel) { return std::pow(decoded[pixel * 4 + channel] / 255.0, 2.2); };
+                texture->pixels.push_back({linear(0), linear(1), linear(2)});
+            }
+            stbi_image_free(decoded);
+            textures.push_back(std::move(texture));
+        }
+    }
+
     GltfAsset result;
     const auto& meshes = root.find("meshes")->array();
     const auto emit_mesh = [&](std::size_t mesh_index, const Matrix& world) {
@@ -352,6 +417,13 @@ GltfAsset GltfAsset::load(const std::filesystem::path& path) {
                 if (vertex_normals.size() != vertices.size())
                     throw std::runtime_error("NORMAL and POSITION accessor counts must match");
             }
+            std::vector<Vec2> vertex_uvs;
+            if (const Json* uv = attributes->find("TEXCOORD_0")) {
+                const Accessor& uv_accessor = accessors.at(integer(*uv));
+                vertex_uvs = texcoords(uv_accessor, views.at(uv_accessor.view), buffer);
+                if (vertex_uvs.size() != vertices.size())
+                    throw std::runtime_error("TEXCOORD_0 and POSITION accessor counts must match");
+            }
             std::vector<std::uint32_t> element_indices;
             if (const Json* index = primitive.find("indices")) {
                 const Accessor& index_accessor = accessors.at(integer(*index));
@@ -361,19 +433,34 @@ GltfAsset GltfAsset::load(const std::filesystem::path& path) {
             }
             if (element_indices.size() % 3 != 0) throw std::runtime_error("triangle index count must be divisible by three");
             rt::Material material;
-            if (const Json* material_index = primitive.find("material"))
-                material = material_at(root, integer(*material_index));
+            std::shared_ptr<const GltfTexture> base_color_texture;
+            if (const Json* material_index = primitive.find("material")) {
+                const std::size_t index = integer(*material_index);
+                material = material_at(root, index);
+                const Json* pbr = root.find("materials")->array().at(index).find("pbrMetallicRoughness");
+                if (pbr)
+                    if (const Json* texture = pbr->find("baseColorTexture"))
+                        base_color_texture = textures.at(member_integer(*texture, "index"));
+            }
             for (std::size_t i = 0; i < element_indices.size(); i += 3) {
                 const Vec3 a = transform(world, vertices.at(element_indices[i]));
                 const Vec3 b = transform(world, vertices.at(element_indices[i + 1]));
                 const Vec3 c = transform(world, vertices.at(element_indices[i + 2]));
                 if (vertex_normals.empty()) {
-                    result.triangles_.push_back({a, b, c, {}, {}, {}, false, material});
+                    result.triangles_.push_back({a, b, c, {}, {}, {}, false,
+                        vertex_uvs.empty() ? Vec2{} : vertex_uvs.at(element_indices[i]),
+                        vertex_uvs.empty() ? Vec2{} : vertex_uvs.at(element_indices[i + 1]),
+                        vertex_uvs.empty() ? Vec2{} : vertex_uvs.at(element_indices[i + 2]),
+                        base_color_texture, material});
                 } else {
                     result.triangles_.push_back({a, b, c,
                         transform_normal(world, vertex_normals.at(element_indices[i])),
                         transform_normal(world, vertex_normals.at(element_indices[i + 1])),
-                        transform_normal(world, vertex_normals.at(element_indices[i + 2])), true, material});
+                        transform_normal(world, vertex_normals.at(element_indices[i + 2])), true,
+                        vertex_uvs.empty() ? Vec2{} : vertex_uvs.at(element_indices[i]),
+                        vertex_uvs.empty() ? Vec2{} : vertex_uvs.at(element_indices[i + 1]),
+                        vertex_uvs.empty() ? Vec2{} : vertex_uvs.at(element_indices[i + 2]),
+                        base_color_texture, material});
                 }
             }
         }
