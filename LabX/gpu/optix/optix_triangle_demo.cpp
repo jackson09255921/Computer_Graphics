@@ -48,10 +48,13 @@ struct MeshData {
 };
 
 MeshData default_mesh() {
-    return {{{-0.85f, -0.65f, 0.0f}, {0.85f, -0.65f, 0.0f},
-             {0.85f, 0.65f, 0.0f}, {-0.85f, 0.65f, 0.0f}},
-            {{0, 1, 2}, {0, 2, 3}},
-            {{0.95f, 0.25f, 0.15f}, {0.15f, 0.45f, 0.95f}}};
+    return {{{-1.0f, -0.8f, 0.0f}, {1.0f, -0.8f, 0.0f},
+             {1.0f, 0.8f, 0.0f}, {-1.0f, 0.8f, 0.0f},
+             {-0.30f, -0.25f, 0.45f}, {0.35f, -0.20f, 0.45f},
+             {0.05f, 0.38f, 0.45f}},
+            {{0, 1, 2}, {0, 2, 3}, {4, 5, 6}},
+            {{0.72f, 0.72f, 0.72f}, {0.72f, 0.72f, 0.72f},
+             {0.95f, 0.22f, 0.12f}}};
 }
 
 MeshData load_gltf_mesh(const std::string& path) {
@@ -105,9 +108,11 @@ int main(int argc, char** argv) {
     OptixDeviceContext context = nullptr;
     OptixModule module = nullptr;
     OptixPipeline pipeline = nullptr;
-    OptixProgramGroup raygen = nullptr, miss = nullptr, hitgroup = nullptr;
+    OptixProgramGroup raygen = nullptr, radiance_miss = nullptr, shadow_miss = nullptr;
+    OptixProgramGroup radiance_hit = nullptr, shadow_hit = nullptr;
     CUdeviceptr gas = 0, raygen_record = 0, miss_record = 0, hit_record = 0;
     CUdeviceptr device_image = 0, device_params = 0, device_colors = 0;
+    CUdeviceptr device_vertices = 0, device_indices = 0;
 
     try {
         mesh = argc > 2 ? load_gltf_mesh(argv[2]) : default_mesh();
@@ -117,8 +122,6 @@ int main(int argc, char** argv) {
         check_optix(optixDeviceContextCreate(nullptr, &context_options, &context),
                     "optixDeviceContextCreate");
 
-        CUdeviceptr device_vertices = 0;
-        CUdeviceptr device_indices = 0;
         const std::size_t vertices_size = mesh.vertices.size() * sizeof(float3);
         const std::size_t indices_size = mesh.indices.size() * sizeof(uint3);
         check_cuda(cudaMalloc(reinterpret_cast<void**>(&device_vertices), vertices_size), "cudaMalloc vertices");
@@ -152,8 +155,6 @@ int main(int argc, char** argv) {
                                     scratch, sizes.tempSizeInBytes, gas, sizes.outputSizeInBytes,
                                     &gas_handle, nullptr, 0), "optixAccelBuild");
         check_cuda(cudaFree(reinterpret_cast<void*>(scratch)), "cudaFree GAS scratch");
-        check_cuda(cudaFree(reinterpret_cast<void*>(device_vertices)), "cudaFree vertices");
-        check_cuda(cudaFree(reinterpret_cast<void*>(device_indices)), "cudaFree indices");
 
         OptixPipelineCompileOptions compile_options{};
         compile_options.traversableGraphFlags = OPTIX_TRAVERSABLE_GRAPH_FLAG_ALLOW_SINGLE_GAS;
@@ -189,16 +190,27 @@ int main(int argc, char** argv) {
         miss_desc.kind = OPTIX_PROGRAM_GROUP_KIND_MISS;
         miss_desc.miss.module = module;
         miss_desc.miss.entryFunctionName = "__miss__background";
-        create_group(miss_desc, miss, "miss program");
+        create_group(miss_desc, radiance_miss, "radiance miss program");
+        OptixProgramGroupDesc shadow_miss_desc{};
+        shadow_miss_desc.kind = OPTIX_PROGRAM_GROUP_KIND_MISS;
+        shadow_miss_desc.miss.module = module;
+        shadow_miss_desc.miss.entryFunctionName = "__miss__shadow";
+        create_group(shadow_miss_desc, shadow_miss, "shadow miss program");
         OptixProgramGroupDesc hit_desc{};
         hit_desc.kind = OPTIX_PROGRAM_GROUP_KIND_HITGROUP;
         hit_desc.hitgroup.moduleCH = module;
-        hit_desc.hitgroup.entryFunctionNameCH = "__closesthit__barycentric";
-        create_group(hit_desc, hitgroup, "closest-hit program");
+        hit_desc.hitgroup.entryFunctionNameCH = "__closesthit__lit";
+        create_group(hit_desc, radiance_hit, "radiance closest-hit program");
+        OptixProgramGroupDesc shadow_hit_desc{};
+        shadow_hit_desc.kind = OPTIX_PROGRAM_GROUP_KIND_HITGROUP;
+        shadow_hit_desc.hitgroup.moduleCH = module;
+        shadow_hit_desc.hitgroup.entryFunctionNameCH = "__closesthit__shadow";
+        create_group(shadow_hit_desc, shadow_hit, "shadow closest-hit program");
 
-        const std::array<OptixProgramGroup, 3> groups{raygen, miss, hitgroup};
+        const std::array<OptixProgramGroup, 5> groups{
+            raygen, radiance_miss, shadow_miss, radiance_hit, shadow_hit};
         OptixPipelineLinkOptions link_options{};
-        link_options.maxTraceDepth = 1;
+        link_options.maxTraceDepth = 2;
         log.fill(0); log_size = log.size();
         check_optix(optixPipelineCreate(context, &compile_options, &link_options, groups.data(),
                                         static_cast<unsigned int>(groups.size()), log.data(), &log_size, &pipeline),
@@ -208,29 +220,33 @@ int main(int argc, char** argv) {
             check_optix(optixUtilAccumulateStackSizes(group, &stack_sizes, pipeline),
                         "optixUtilAccumulateStackSizes");
         unsigned int direct_traversal = 0, direct_state = 0, continuation = 0;
-        check_optix(optixUtilComputeStackSizes(&stack_sizes, 1, 0, 0, &direct_traversal,
+        check_optix(optixUtilComputeStackSizes(&stack_sizes, 2, 0, 0, &direct_traversal,
                                                &direct_state, &continuation), "optixUtilComputeStackSizes");
         check_optix(optixPipelineSetStackSize(pipeline, direct_traversal, direct_state, continuation, 1),
                     "optixPipelineSetStackSize");
 
-        auto upload_record = [](OptixProgramGroup group, CUdeviceptr& destination) {
-            EmptyRecord record{};
-            check_optix(optixSbtRecordPackHeader(group, &record), "optixSbtRecordPackHeader");
-            check_cuda(cudaMalloc(reinterpret_cast<void**>(&destination), sizeof(record)), "cudaMalloc SBT record");
-            check_cuda(cudaMemcpy(reinterpret_cast<void*>(destination), &record, sizeof(record),
+        auto upload_records = [](const std::vector<OptixProgramGroup>& groups_to_upload,
+                                 CUdeviceptr& destination) {
+            std::vector<EmptyRecord> records(groups_to_upload.size());
+            for (std::size_t i = 0; i < groups_to_upload.size(); ++i)
+                check_optix(optixSbtRecordPackHeader(groups_to_upload[i], &records[i]),
+                            "optixSbtRecordPackHeader");
+            const std::size_t bytes = records.size() * sizeof(EmptyRecord);
+            check_cuda(cudaMalloc(reinterpret_cast<void**>(&destination), bytes), "cudaMalloc SBT records");
+            check_cuda(cudaMemcpy(reinterpret_cast<void*>(destination), records.data(), bytes,
                                   cudaMemcpyHostToDevice), "cudaMemcpy SBT record");
         };
-        upload_record(raygen, raygen_record);
-        upload_record(miss, miss_record);
-        upload_record(hitgroup, hit_record);
+        upload_records({raygen}, raygen_record);
+        upload_records({radiance_miss, shadow_miss}, miss_record);
+        upload_records({radiance_hit, shadow_hit}, hit_record);
         OptixShaderBindingTable sbt{};
         sbt.raygenRecord = raygen_record;
         sbt.missRecordBase = miss_record;
         sbt.missRecordStrideInBytes = sizeof(EmptyRecord);
-        sbt.missRecordCount = 1;
+        sbt.missRecordCount = OPTIX_RAY_TYPE_COUNT;
         sbt.hitgroupRecordBase = hit_record;
         sbt.hitgroupRecordStrideInBytes = sizeof(EmptyRecord);
-        sbt.hitgroupRecordCount = 1;
+        sbt.hitgroupRecordCount = OPTIX_RAY_TYPE_COUNT;
 
         check_cuda(cudaMalloc(reinterpret_cast<void**>(&device_image), width * height * sizeof(uchar4)),
                    "cudaMalloc image");
@@ -255,8 +271,14 @@ int main(int argc, char** argv) {
                                                           maximum.y - minimum.y) * 0.65f);
         const float3 camera_origin = make_float3(scene_center.x, scene_center.y,
                                                  maximum.z + 2.5f * view_scale);
+        const float3 light_position = make_float3(scene_center.x - 1.25f * view_scale,
+                                                  scene_center.y + 1.75f * view_scale,
+                                                  maximum.z + 2.0f * view_scale);
         const OptixTriangleParams params{reinterpret_cast<uchar4*>(device_image), width, height, gas_handle,
-                                         reinterpret_cast<float3*>(device_colors), camera_origin, view_scale};
+                                         reinterpret_cast<float3*>(device_vertices),
+                                         reinterpret_cast<uint3*>(device_indices),
+                                         reinterpret_cast<float3*>(device_colors), camera_origin, view_scale,
+                                         light_position};
         check_cuda(cudaMalloc(reinterpret_cast<void**>(&device_params), sizeof(params)), "cudaMalloc params");
         check_cuda(cudaMemcpy(reinterpret_cast<void*>(device_params), &params, sizeof(params),
                               cudaMemcpyHostToDevice), "cudaMemcpy params");
@@ -272,22 +294,33 @@ int main(int argc, char** argv) {
                 return pixel.x != 7 || pixel.y != 12 || pixel.z != 25;
             }));
         if (hit_pixels == 0) throw std::runtime_error("rendered mesh produced no visible pixels");
+        const std::size_t shadow_pixels = static_cast<std::size_t>(std::count_if(
+            image.begin(), image.end(), [](uchar4 pixel) {
+                return pixel.x == 18 && pixel.y == 18 && pixel.z == 18;
+            }));
+        if (argc <= 2 && shadow_pixels == 0)
+            throw std::runtime_error("default scene produced no verified shadow pixels");
         write_ppm(output_path, image, width, height);
         std::cout << "OptiX indexed mesh rendered " << mesh.indices.size() << " triangles to "
-                  << output_path << " (" << hit_pixels << " hit pixels, center RGB "
+                  << output_path << " (" << hit_pixels << " hit pixels, " << shadow_pixels
+                  << " verified shadow pixels, center RGB "
                   << static_cast<int>(center_pixel.x) << ", " << static_cast<int>(center_pixel.y) << ", "
                   << static_cast<int>(center_pixel.z) << ")\n";
 
         cudaFree(reinterpret_cast<void*>(device_params));
         cudaFree(reinterpret_cast<void*>(device_colors));
+        cudaFree(reinterpret_cast<void*>(device_indices));
+        cudaFree(reinterpret_cast<void*>(device_vertices));
         cudaFree(reinterpret_cast<void*>(device_image));
         cudaFree(reinterpret_cast<void*>(hit_record));
         cudaFree(reinterpret_cast<void*>(miss_record));
         cudaFree(reinterpret_cast<void*>(raygen_record));
         cudaFree(reinterpret_cast<void*>(gas));
         optixPipelineDestroy(pipeline);
-        optixProgramGroupDestroy(hitgroup);
-        optixProgramGroupDestroy(miss);
+        optixProgramGroupDestroy(shadow_hit);
+        optixProgramGroupDestroy(radiance_hit);
+        optixProgramGroupDestroy(shadow_miss);
+        optixProgramGroupDestroy(radiance_miss);
         optixProgramGroupDestroy(raygen);
         optixModuleDestroy(module);
         optixDeviceContextDestroy(context);

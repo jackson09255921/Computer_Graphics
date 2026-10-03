@@ -6,7 +6,7 @@ implementation of an engineering technique.
 
 | Year | Technique | Project status |
 | --- | --- | --- |
-| 1980 | Whitted recursive reflection and refraction | Implemented on CPU and CUDA |
+| 1980 | Whitted recursive reflection, refraction, and shadow rays | Implemented on CPU/CUDA; OptiX radiance and hard-shadow ray types implemented |
 | 1980 | Hierarchical bounding volumes for complex scenes | Implemented on CPU and CUDA |
 | 1982 | Cook–Torrance physically based reflectance | Implemented |
 | 1986 | Kajiya rendering equation and path tracing | Implemented |
@@ -15,7 +15,7 @@ implementation of an engineering technique.
 | 1998 | High-dynamic-range image-based lighting | Implemented on CPU and CUDA |
 | 2002 | Ray tracing on programmable GPU hardware | Implemented baseline |
 | 2007 | GGX microfacet reflection and rough transmission | Matched reflection on CPU/CUDA and matched rough BTDF on CUDA |
-| 2010 | NVIDIA OptiX programmable ray tracing engine | Native Windows context, indexed/glTF triangle GAS, SBT, raygen/miss/closest-hit pipeline, and RTX launch implemented |
+| 2010 | NVIDIA OptiX programmable ray tracing engine | Native Windows indexed/glTF GAS, multi-ray-type SBT, Lambert lighting, hard shadows, and RTX launch implemented |
 | 2017 | glTF 2.0 scene and physically based material interchange | Implemented |
 | 2020 | ReSTIR direct illumination | CUDA reservoir core implemented; renderer integration planned |
 
