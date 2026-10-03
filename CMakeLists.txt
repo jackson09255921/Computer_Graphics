@@ -51,6 +51,9 @@ target_link_libraries(bezier_demo PRIVATE cg_core)
 add_executable(raytracer_demo LabX/raytracer_demo.cpp)
 target_link_libraries(raytracer_demo PRIVATE cg_core)
 
+add_executable(pathtracer_demo LabX/pathtracer_demo.cpp)
+target_link_libraries(pathtracer_demo PRIVATE cg_core)
+
 add_executable(animation_demo LabX/animation_demo.cpp)
 target_link_libraries(animation_demo PRIVATE cg_core)
 

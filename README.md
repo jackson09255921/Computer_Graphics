@@ -43,18 +43,36 @@ same API-agnostic `BezierCurve` implementation.
 
 ## Ray tracer
 
-The offline CPU ray tracer includes sphere and triangle intersections, a
-perspective camera, Blinn–Phong direct lighting, hard shadows, recursive
-reflections, and a median-split bounding volume hierarchy (BVH).
+The offline CPU renderer includes sphere and triangle intersections, a
+perspective camera, Blinn–Phong direct lighting, recursive reflections, and a
+median-split bounding volume hierarchy (BVH). Rectangular area lights use
+multi-sampled visibility rays for soft shadows, while jittered primary rays
+provide anti-aliasing.
 
 ```bash
 ./build/Release/raytracer_demo raytracer_demo.bmp
 ```
 
-The deterministic 800×450 demo scene renders in well under a second in a
-Release build on the development machine.
+The deterministic 800×450 demo uses four samples per pixel and 24 shadow rays
+per area-light sample.
 
 ![Ray-traced demo scene](images/raytracer_demo.png)
+
+### Path tracing
+
+The separate Monte Carlo path tracer adds cosine-weighted hemisphere sampling,
+indirect diffuse illumination, explicit area-light sampling, mirror bounces,
+and Russian roulette termination. The optional second argument controls samples
+per pixel (64 by default):
+
+```bash
+./build/Release/pathtracer_demo pathtracer_demo.bmp 64
+```
+
+The random seed is fixed, so identical settings produce reproducible images.
+Raise the sample count for a cleaner result or lower it for faster previews.
+
+![Path-traced demo scene](images/pathtracer_demo.png)
 
 ## Keyframe animation
 
@@ -168,7 +186,7 @@ the selected input file. Some inherited drawing controls are also available:
 ├── src/animation/     # keyframes, SLERP, and Bézier easing
 ├── src/core/          # API-agnostic math and image primitives
 ├── src/curves/        # De Casteljau Bézier implementation
-├── src/raytracer/     # rays, primitives, BVH, lighting, and rendering
+├── src/raytracer/     # BVH ray tracing, soft shadows, and path tracing
 ├── tests/             # portable core tests
 └── CMakeLists.txt      # reproducible build configuration
 ```

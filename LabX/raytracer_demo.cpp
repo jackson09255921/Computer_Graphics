@@ -25,13 +25,14 @@ int main(int argc, char** argv) {
                                                     cg::Vec3{7.0, -1.05, -12.0}, floor));
         scene.add(std::make_shared<cg::rt::Triangle>(cg::Vec3{-7.0, -1.05, 1.0}, cg::Vec3{7.0, -1.05, -12.0},
                                                     cg::Vec3{-7.0, -1.05, -12.0}, floor));
-        scene.add_light({{-3.5, 5.0, 1.0}, {1.0, 0.88, 0.72}, 65.0});
-        scene.add_light({{4.0, 2.5, -1.0}, {0.35, 0.55, 1.0}, 28.0});
+        scene.add_light(cg::rt::AreaLight{{-3.5, 5.0, 1.0}, {1.25, 0.0, 0.0}, {0.0, 0.0, 1.25},
+                                          {1.0, 0.88, 0.72}, 65.0});
+        scene.add_light(cg::rt::PointLight{{4.0, 2.5, -1.0}, {0.35, 0.55, 1.0}, 28.0});
         scene.build();
 
         const cg::rt::Camera camera({0.0, 1.0, 2.8}, {0.0, 0.1, -4.0}, {0.0, 1.0, 0.0}, 48.0,
                                     static_cast<double>(width) / static_cast<double>(height));
-        const cg::rt::Renderer renderer(width, height, 4);
+        const cg::rt::Renderer renderer(width, height, 4, 4, 24);
         const auto start = std::chrono::steady_clock::now();
         const cg::Image image = renderer.render(scene, camera);
         const auto elapsed = std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count();

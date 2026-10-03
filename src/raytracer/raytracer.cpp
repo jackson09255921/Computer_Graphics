@@ -4,6 +4,7 @@
 #include <array>
 #include <cmath>
 #include <limits>
+#include <random>
 #include <stdexcept>
 #include <utility>
 
@@ -27,6 +28,88 @@ Aabb surrounding(const Aabb& lhs, const Aabb& rhs) {
 }
 
 Vec3 reflect(const Vec3& incident, const Vec3& normal) { return incident - normal * (2.0 * dot(incident, normal)); }
+
+class Sampler {
+public:
+    explicit Sampler(std::uint64_t seed) : engine_(seed), distribution_(0.0, 1.0) {}
+    double next() { return distribution_(engine_); }
+
+private:
+    std::mt19937_64 engine_;
+    std::uniform_real_distribution<double> distribution_;
+};
+
+Vec3 sample_light(const AreaLight& light, Sampler& sampler) {
+    return light.center + light.half_u * (2.0 * sampler.next() - 1.0) +
+           light.half_v * (2.0 * sampler.next() - 1.0);
+}
+
+Vec3 cosine_hemisphere(const Vec3& normal, Sampler& sampler) {
+    constexpr double tau = 6.28318530717958647692;
+    const double radius = std::sqrt(sampler.next());
+    const double angle = tau * sampler.next();
+    const double x = radius * std::cos(angle);
+    const double y = radius * std::sin(angle);
+    const double z = std::sqrt(std::max(0.0, 1.0 - radius * radius));
+    const Vec3 helper = std::abs(normal.x) > 0.9 ? Vec3{0.0, 1.0, 0.0} : Vec3{1.0, 0.0, 0.0};
+    const Vec3 tangent = normalized(cross(helper, normal));
+    const Vec3 bitangent = cross(normal, tangent);
+    return normalized(tangent * x + bitangent * y + normal * z);
+}
+
+Color sky(const Scene& scene, const Vec3& direction) {
+    const double blend = 0.5 * (normalized(direction).y + 1.0);
+    return lerp(scene.background, Color{0.12, 0.20, 0.35}, blend);
+}
+
+Color path_radiance(const Scene& scene, const Ray& ray, int depth, int maximum_depth, Sampler& sampler) {
+    Hit hit;
+    if (!scene.intersect(ray, kRayBias, kInfinity, hit)) {
+        return sky(scene, ray.direction);
+    }
+    const Material& material = *hit.material;
+    Color result = material.emission;
+
+    for (const AreaLight& light : scene.area_lights()) {
+        const Vec3 light_point = sample_light(light, sampler);
+        const Vec3 offset = light_point - hit.position;
+        const double distance_squared = dot(offset, offset);
+        const double distance = std::sqrt(distance_squared);
+        const Vec3 direction = offset / distance;
+        const double surface_cosine = std::max(0.0, dot(hit.normal, direction));
+        const double light_cosine = std::max(0.0, dot(light.normal(), -direction));
+        Hit blocker;
+        if (surface_cosine > 0.0 && light_cosine > 0.0 &&
+            !scene.intersect({hit.position + hit.normal * kRayBias, direction}, kRayBias,
+                             distance - kRayBias, blocker)) {
+            constexpr double inverse_pi = 0.31830988618379067154;
+            result += material.albedo * light.color *
+                      (material.diffuse * inverse_pi * light.intensity * light.area() *
+                       surface_cosine * light_cosine / distance_squared);
+        }
+    }
+
+    if (depth >= maximum_depth) {
+        return result;
+    }
+    double survival = std::max({material.albedo.x, material.albedo.y, material.albedo.z});
+    survival = clamp(survival, 0.1, 0.95);
+    if (depth >= 3 && sampler.next() > survival) {
+        return result;
+    }
+    const double compensation = depth >= 3 ? 1.0 / survival : 1.0;
+    Vec3 bounce_direction;
+    Color throughput;
+    if (material.reflectivity > 0.0 && sampler.next() < material.reflectivity) {
+        bounce_direction = normalized(reflect(ray.direction, hit.normal));
+        throughput = Color{1.0, 1.0, 1.0};
+    } else {
+        bounce_direction = cosine_hemisphere(hit.normal, sampler);
+        throughput = material.albedo * material.diffuse;
+    }
+    return result + throughput * path_radiance(scene,
+        {hit.position + hit.normal * kRayBias, bounce_direction}, depth + 1, maximum_depth, sampler) * compensation;
+}
 
 }  // namespace
 
@@ -221,6 +304,17 @@ void Scene::add(std::shared_ptr<Primitive> primitive) {
 
 void Scene::add_light(PointLight light) { lights_.push_back(light); }
 
+Vec3 AreaLight::normal() const { return normalized(cross(half_u, half_v)); }
+
+double AreaLight::area() const { return 4.0 * length(cross(half_u, half_v)); }
+
+void Scene::add_light(AreaLight light) {
+    if (light.area() <= kEpsilon || light.intensity < 0.0) {
+        throw std::invalid_argument("invalid area light");
+    }
+    area_lights_.push_back(light);
+}
+
 void Scene::build() { bvh_ = std::make_unique<Bvh>(primitives_); }
 
 bool Scene::intersect(const Ray& ray, double minimum_distance, double maximum_distance, Hit& hit) const {
@@ -253,20 +347,29 @@ Ray Camera::ray(double horizontal, double vertical) const {
     return {position_, normalized(forward_ + right_ * x + up_ * y)};
 }
 
-Renderer::Renderer(std::size_t width, std::size_t height, int maximum_depth)
-    : width_(width), height_(height), maximum_depth_(maximum_depth) {
-    if (width == 0 || height == 0 || maximum_depth < 0) {
+Renderer::Renderer(std::size_t width, std::size_t height, int maximum_depth,
+                   std::size_t samples_per_pixel, std::size_t shadow_samples, std::uint64_t seed)
+    : width_(width), height_(height), maximum_depth_(maximum_depth), samples_per_pixel_(samples_per_pixel),
+      shadow_samples_(shadow_samples), seed_(seed) {
+    if (width == 0 || height == 0 || maximum_depth < 0 || samples_per_pixel == 0 || shadow_samples == 0) {
         throw std::invalid_argument("invalid renderer configuration");
     }
 }
 
 Image Renderer::render(const Scene& scene, const Camera& camera) const {
     Image image(width_, height_);
+    Sampler sampler(seed_);
     for (std::size_t y = 0; y < height_; ++y) {
         for (std::size_t x = 0; x < width_; ++x) {
-            const double horizontal = (static_cast<double>(x) + 0.5) / static_cast<double>(width_);
-            const double vertical = (static_cast<double>(y) + 0.5) / static_cast<double>(height_);
-            image.set(x, y, trace(scene, camera.ray(horizontal, vertical)));
+            Color color{};
+            for (std::size_t sample = 0; sample < samples_per_pixel_; ++sample) {
+                const double jitter_x = samples_per_pixel_ == 1 ? 0.5 : sampler.next();
+                const double jitter_y = samples_per_pixel_ == 1 ? 0.5 : sampler.next();
+                const double horizontal = (static_cast<double>(x) + jitter_x) / static_cast<double>(width_);
+                const double vertical = (static_cast<double>(y) + jitter_y) / static_cast<double>(height_);
+                color += trace(scene, camera.ray(horizontal, vertical));
+            }
+            image.set(x, y, color / static_cast<double>(samples_per_pixel_));
         }
     }
     return image;
@@ -298,6 +401,28 @@ Color Renderer::trace(const Scene& scene, const Ray& ray, int depth) const {
         result += (material.albedo * (material.diffuse * diffuse) + light.color * (material.specular * specular)) *
                   attenuation * light.color;
     }
+    Sampler sampler(seed_ + static_cast<std::uint64_t>(depth));
+    for (const AreaLight& light : scene.area_lights()) {
+        Color contribution{};
+        for (std::size_t sample = 0; sample < shadow_samples_; ++sample) {
+            const Vec3 light_position = sample_light(light, sampler);
+            const Vec3 to_light = light_position - hit.position;
+            const double light_distance = length(to_light);
+            const Vec3 light_direction = to_light / light_distance;
+            Hit blocker;
+            if (scene.intersect({hit.position + hit.normal * kRayBias, light_direction}, kRayBias,
+                                light_distance - kRayBias, blocker)) {
+                continue;
+            }
+            const double attenuation = light.intensity / std::max(1.0, light_distance * light_distance);
+            const double diffuse = std::max(0.0, dot(hit.normal, light_direction));
+            const Vec3 half_vector = normalized(light_direction + view_direction);
+            const double specular = std::pow(std::max(0.0, dot(hit.normal, half_vector)), material.shininess);
+            contribution += (material.albedo * (material.diffuse * diffuse) +
+                             light.color * (material.specular * specular)) * attenuation * light.color;
+        }
+        result += contribution / static_cast<double>(shadow_samples_);
+    }
 
     if (material.reflectivity > 0.0 && depth < maximum_depth_) {
         const Vec3 reflection_direction = normalized(reflect(ray.direction, hit.normal));
@@ -305,6 +430,32 @@ Color Renderer::trace(const Scene& scene, const Ray& ray, int depth) const {
         result = lerp(result, reflection, clamp(material.reflectivity));
     }
     return result;
+}
+
+PathTracer::PathTracer(std::size_t width, std::size_t height, std::size_t samples_per_pixel,
+                       int maximum_depth, std::uint64_t seed)
+    : width_(width), height_(height), samples_per_pixel_(samples_per_pixel),
+      maximum_depth_(maximum_depth), seed_(seed) {
+    if (width == 0 || height == 0 || samples_per_pixel == 0 || maximum_depth < 1) {
+        throw std::invalid_argument("invalid path tracer configuration");
+    }
+}
+
+Image PathTracer::render(const Scene& scene, const Camera& camera) const {
+    Image image(width_, height_);
+    Sampler sampler(seed_);
+    for (std::size_t y = 0; y < height_; ++y) {
+        for (std::size_t x = 0; x < width_; ++x) {
+            Color color{};
+            for (std::size_t sample = 0; sample < samples_per_pixel_; ++sample) {
+                const double horizontal = (static_cast<double>(x) + sampler.next()) / static_cast<double>(width_);
+                const double vertical = (static_cast<double>(y) + sampler.next()) / static_cast<double>(height_);
+                color += path_radiance(scene, camera.ray(horizontal, vertical), 0, maximum_depth_, sampler);
+            }
+            image.set(x, y, color / static_cast<double>(samples_per_pixel_));
+        }
+    }
+    return image;
 }
 
 }  // namespace cg::rt

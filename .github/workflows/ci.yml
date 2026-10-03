@@ -23,6 +23,7 @@ jobs:
         run: |
           ./build/bezier_demo bezier_demo.bmp
           ./build/raytracer_demo raytracer_demo.bmp
+          ./build/pathtracer_demo pathtracer_demo.bmp 8
           ./build/animation_demo animation_frames
       - uses: actions/upload-artifact@v4
         with:
@@ -30,6 +31,7 @@ jobs:
           path: |
             bezier_demo.bmp
             raytracer_demo.bmp
+            pathtracer_demo.bmp
             animation_frames/contact_sheet.bmp
 
   windows:

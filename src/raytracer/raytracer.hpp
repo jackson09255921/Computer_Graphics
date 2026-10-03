@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstddef>
+#include <cstdint>
 #include <memory>
 #include <vector>
 
@@ -22,6 +23,7 @@ struct Material {
     double specular{0.2};
     double shininess{32.0};
     double reflectivity{0.0};
+    Color emission{0.0, 0.0, 0.0};
 };
 
 struct Aabb {
@@ -81,6 +83,17 @@ struct PointLight {
     double intensity{1.0};
 };
 
+struct AreaLight {
+    Vec3 center;
+    Vec3 half_u{1.0, 0.0, 0.0};
+    Vec3 half_v{0.0, 0.0, 1.0};
+    Color color{1.0, 1.0, 1.0};
+    double intensity{1.0};
+
+    [[nodiscard]] Vec3 normal() const;
+    [[nodiscard]] double area() const;
+};
+
 class Bvh {
 public:
     struct Node;
@@ -102,16 +115,19 @@ class Scene {
 public:
     void add(std::shared_ptr<Primitive> primitive);
     void add_light(PointLight light);
+    void add_light(AreaLight light);
     void build();
 
     [[nodiscard]] bool intersect(const Ray& ray, double minimum_distance, double maximum_distance, Hit& hit) const;
     [[nodiscard]] const std::vector<PointLight>& lights() const noexcept { return lights_; }
+    [[nodiscard]] const std::vector<AreaLight>& area_lights() const noexcept { return area_lights_; }
 
     Color background{0.015, 0.025, 0.06};
 
 private:
     std::vector<std::shared_ptr<Primitive>> primitives_;
     std::vector<PointLight> lights_;
+    std::vector<AreaLight> area_lights_;
     std::unique_ptr<Bvh> bvh_;
 };
 
@@ -131,7 +147,9 @@ private:
 
 class Renderer {
 public:
-    Renderer(std::size_t width, std::size_t height, int maximum_depth = 3);
+    Renderer(std::size_t width, std::size_t height, int maximum_depth = 3,
+             std::size_t samples_per_pixel = 1, std::size_t shadow_samples = 16,
+             std::uint64_t seed = 0xC0FFEEu);
     [[nodiscard]] Image render(const Scene& scene, const Camera& camera) const;
     [[nodiscard]] Color trace(const Scene& scene, const Ray& ray, int depth = 0) const;
 
@@ -139,6 +157,23 @@ private:
     std::size_t width_;
     std::size_t height_;
     int maximum_depth_;
+    std::size_t samples_per_pixel_;
+    std::size_t shadow_samples_;
+    std::uint64_t seed_;
+};
+
+class PathTracer {
+public:
+    PathTracer(std::size_t width, std::size_t height, std::size_t samples_per_pixel = 64,
+               int maximum_depth = 8, std::uint64_t seed = 0x5EEDu);
+    [[nodiscard]] Image render(const Scene& scene, const Camera& camera) const;
+
+private:
+    std::size_t width_;
+    std::size_t height_;
+    std::size_t samples_per_pixel_;
+    int maximum_depth_;
+    std::uint64_t seed_;
 };
 
 }  // namespace cg::rt
