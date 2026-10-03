@@ -112,6 +112,7 @@ void write_ppm(const std::string& path, const std::vector<uchar4>& image,
 int main(int argc, char** argv) {
     constexpr unsigned int width = 256;
     constexpr unsigned int height = 192;
+    constexpr unsigned int samples_per_pixel = 32;
     const std::string output_path = argc > 1 ? argv[1] : "optix_triangle.ppm";
     MeshData mesh;
 
@@ -121,7 +122,8 @@ int main(int argc, char** argv) {
     OptixProgramGroup raygen = nullptr, radiance_miss = nullptr, shadow_miss = nullptr;
     OptixProgramGroup radiance_hit = nullptr, shadow_hit = nullptr;
     CUdeviceptr gas = 0, raygen_record = 0, miss_record = 0, hit_record = 0;
-    CUdeviceptr device_image = 0, device_params = 0, device_colors = 0, device_reflectivity = 0;
+    CUdeviceptr device_image = 0, device_accumulation = 0, device_params = 0;
+    CUdeviceptr device_colors = 0, device_reflectivity = 0;
     CUdeviceptr device_roughness = 0;
     CUdeviceptr device_vertices = 0, device_indices = 0;
 
@@ -261,6 +263,10 @@ int main(int argc, char** argv) {
 
         check_cuda(cudaMalloc(reinterpret_cast<void**>(&device_image), width * height * sizeof(uchar4)),
                    "cudaMalloc image");
+        check_cuda(cudaMalloc(reinterpret_cast<void**>(&device_accumulation), width * height * sizeof(float4)),
+                   "cudaMalloc accumulation");
+        check_cuda(cudaMemset(reinterpret_cast<void*>(device_accumulation), 0,
+                              width * height * sizeof(float4)), "cudaMemset accumulation");
         check_cuda(cudaMalloc(reinterpret_cast<void**>(&device_colors), mesh.colors.size() * sizeof(float3)),
                    "cudaMalloc primitive colors");
         check_cuda(cudaMemcpy(reinterpret_cast<void*>(device_colors), mesh.colors.data(),
@@ -297,7 +303,9 @@ int main(int argc, char** argv) {
         const float3 light_position = make_float3(scene_center.x - 1.25f * view_scale,
                                                   scene_center.y + 1.75f * view_scale,
                                                   maximum.z + 2.0f * view_scale);
-        const OptixTriangleParams params{reinterpret_cast<uchar4*>(device_image), width, height, gas_handle,
+        OptixTriangleParams params{reinterpret_cast<uchar4*>(device_image),
+                                         reinterpret_cast<float4*>(device_accumulation), width, height, 0,
+                                         gas_handle,
                                          reinterpret_cast<float3*>(device_vertices),
                                          reinterpret_cast<uint3*>(device_indices),
                                          reinterpret_cast<float3*>(device_colors),
@@ -305,11 +313,22 @@ int main(int argc, char** argv) {
                                          reinterpret_cast<float*>(device_roughness), camera_origin, view_scale,
                                          light_position};
         check_cuda(cudaMalloc(reinterpret_cast<void**>(&device_params), sizeof(params)), "cudaMalloc params");
-        check_cuda(cudaMemcpy(reinterpret_cast<void*>(device_params), &params, sizeof(params),
-                              cudaMemcpyHostToDevice), "cudaMemcpy params");
-        check_optix(optixLaunch(pipeline, nullptr, device_params, sizeof(params), &sbt, width, height, 1),
-                    "optixLaunch");
+        for (unsigned int sample = 0; sample < samples_per_pixel; ++sample) {
+            params.sample_index = sample;
+            check_cuda(cudaMemcpy(reinterpret_cast<void*>(device_params), &params, sizeof(params),
+                                  cudaMemcpyHostToDevice), "cudaMemcpy params");
+            check_optix(optixLaunch(pipeline, nullptr, device_params, sizeof(params), &sbt,
+                                    width, height, 1), "optixLaunch");
+        }
         check_cuda(cudaDeviceSynchronize(), "cudaDeviceSynchronize");
+        float4 center_accumulation{};
+        const std::size_t center_offset = ((height / 2) * width + width / 2) * sizeof(float4);
+        check_cuda(cudaMemcpy(&center_accumulation,
+                              reinterpret_cast<void*>(device_accumulation + center_offset),
+                              sizeof(center_accumulation), cudaMemcpyDeviceToHost),
+                   "cudaMemcpy center accumulation");
+        if (center_accumulation.w != static_cast<float>(samples_per_pixel))
+            throw std::runtime_error("progressive accumulation sample count mismatch");
         std::vector<uchar4> image(width * height);
         check_cuda(cudaMemcpy(image.data(), reinterpret_cast<void*>(device_image), image.size() * sizeof(uchar4),
                               cudaMemcpyDeviceToHost), "cudaMemcpy image");
@@ -329,13 +348,15 @@ int main(int argc, char** argv) {
             throw std::runtime_error("default scene produced no verified shadow pixels");
         write_ppm(output_path, image, width, height);
         std::cout << "OptiX indexed mesh rendered " << mesh.indices.size() << " triangles to "
-                  << output_path << " (" << hit_pixels << " hit pixels, " << shadow_pixels
+                  << output_path << " at " << samples_per_pixel << " spp (" << hit_pixels
+                  << " hit pixels, " << shadow_pixels
                   << " verified shadow pixels, center RGB "
                   << static_cast<int>(center_pixel.x) << ", " << static_cast<int>(center_pixel.y) << ", "
                   << static_cast<int>(center_pixel.z) << ")\n";
 
         cudaFree(reinterpret_cast<void*>(device_params));
         cudaFree(reinterpret_cast<void*>(device_roughness));
+        cudaFree(reinterpret_cast<void*>(device_accumulation));
         cudaFree(reinterpret_cast<void*>(device_reflectivity));
         cudaFree(reinterpret_cast<void*>(device_colors));
         cudaFree(reinterpret_cast<void*>(device_indices));

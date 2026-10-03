@@ -134,6 +134,8 @@ hardware-traversed hard shadows. Recursive radiance rays add Whitted-style
 reflections, with glTF metallic and roughness factors controlling their weight.
 Rough reflections sample deterministic GGX microfacet half-vectors per pixel
 and bounce, widening the reflected ray lobe as material roughness increases.
+The native OptiX demo performs 32 progressive launches into a persistent GPU
+floating-point accumulation buffer before converting the running average to PPM.
 
 The dependency-free `LabX/assets` loader imports glTF 2.x triangle primitives
 from external binary buffers, including indexed or non-indexed geometry, scene

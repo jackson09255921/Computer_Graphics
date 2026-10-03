@@ -5,8 +5,10 @@
 
 struct OptixTriangleParams {
     uchar4* image;
+    float4* accumulation;
     unsigned int width;
     unsigned int height;
+    unsigned int sample_index;
     OptixTraversableHandle handle;
     const float3* vertices;
     const uint3* indices;

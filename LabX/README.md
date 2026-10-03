@@ -58,7 +58,7 @@ ctest --test-dir build-cuda -R cuda_capability --output-on-failure
 3. Importance sampling and multiple importance sampling.
 4. Refraction, dielectric materials, HDR environment lighting, and glTF input (implemented).
 5. CUDA tiled path tracing sized for the 8 GiB GPU budget (geometry, glTF, matched GGX reflection/BTDF, MIS, and HDR implemented).
-6. OptiX context plus a hardware-traversed indexed-mesh/glTF pipeline with Lambert lighting, shadow rays, recursive reflections, and GGX rough reflection sampling, and the ReSTIR DI reservoir core (implemented); full renderer integration follows.
+6. OptiX context plus a hardware-traversed indexed-mesh/glTF pipeline with Lambert lighting, shadow rays, recursive GGX reflections, and progressive GPU accumulation, and the ReSTIR DI reservoir core (implemented); full renderer integration follows.
 7. Denoising and neural reconstruction only after stable temporal buffers exist.
 
 Every milestone must retain a CPU build, deterministic tests, and a small demo
@@ -93,7 +93,9 @@ output path and then a `.gltf` path to upload a scene through the shared loader:
 Radiance hits can recursively trace up to two reflection bounces. Imported
 metallic factors determine the Fresnel reflection weight, while roughness sets
 the width of deterministic GGX half-vector samples. Each pixel and bounce uses
-a reproducible hash seed so tests remain stable.
+a reproducible hash seed so tests remain stable. The demo launches 32 samples
+per pixel into a persistent `float4` GPU accumulation buffer and verifies the
+sample count before writing the running average.
 
 Without the SDK, configuration stops immediately with an actionable message;
 normal CPU and CUDA builds remain unaffected.

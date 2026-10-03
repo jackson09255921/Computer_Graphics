@@ -86,10 +86,18 @@ extern "C" __global__ void __raygen__triangle() {
     const float r = __uint_as_float(red);
     const float g = __uint_as_float(green);
     const float b = __uint_as_float(blue);
-    params.image[index.y * params.width + index.x] = make_uchar4(
-        static_cast<unsigned char>(fminf(fmaxf(r, 0.0f), 1.0f) * 255.0f),
-        static_cast<unsigned char>(fminf(fmaxf(g, 0.0f), 1.0f) * 255.0f),
-        static_cast<unsigned char>(fminf(fmaxf(b, 0.0f), 1.0f) * 255.0f), 255);
+    const unsigned int pixel = index.y * params.width + index.x;
+    float4 accumulated = params.accumulation[pixel];
+    accumulated.x += r;
+    accumulated.y += g;
+    accumulated.z += b;
+    accumulated.w += 1.0f;
+    params.accumulation[pixel] = accumulated;
+    const float inverse_samples = 1.0f / accumulated.w;
+    params.image[pixel] = make_uchar4(
+        static_cast<unsigned char>(fminf(fmaxf(accumulated.x * inverse_samples, 0.0f), 1.0f) * 255.0f),
+        static_cast<unsigned char>(fminf(fmaxf(accumulated.y * inverse_samples, 0.0f), 1.0f) * 255.0f),
+        static_cast<unsigned char>(fminf(fmaxf(accumulated.z * inverse_samples, 0.0f), 1.0f) * 255.0f), 255);
 }
 
 extern "C" __global__ void __miss__background() {
@@ -151,7 +159,8 @@ extern "C" __global__ void __closesthit__lit() {
     if (reflectivity > 0.001f && depth < 2) {
         const uint3 launch_index = optixGetLaunchIndex();
         unsigned int random_state = hash(launch_index.x + params.width * launch_index.y +
-                                         0x9e3779b9u * (depth + 1u));
+                                         0x9e3779b9u * (depth + 1u) +
+                                         0x85ebca6bu * (params.sample_index + 1u));
         float3 half_vector = sample_ggx_half_vector(normal, roughness, random_state);
         if (incoming.x * half_vector.x + incoming.y * half_vector.y + incoming.z * half_vector.z > 0.0f)
             half_vector = make_float3(-half_vector.x, -half_vector.y, -half_vector.z);
