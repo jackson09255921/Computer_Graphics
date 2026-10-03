@@ -19,6 +19,8 @@ public:
 
     void set(std::size_t x, std::size_t y, Color color);
     [[nodiscard]] const Color& get(std::size_t x, std::size_t y) const;
+    void write(const std::filesystem::path& path) const;
+    void write_bmp(const std::filesystem::path& path) const;
     void write_ppm(const std::filesystem::path& path) const;
 
 private:

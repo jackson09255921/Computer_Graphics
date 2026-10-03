@@ -9,7 +9,7 @@
 
 int main(int argc, char** argv) {
     try {
-        const std::filesystem::path output = argc > 1 ? argv[1] : "bezier_demo.ppm";
+        const std::filesystem::path output = argc > 1 ? argv[1] : "bezier_demo.bmp";
         cg::Image image(960, 540, {0.015, 0.022, 0.04});
         const cg::BezierCurve curve({{80.0, 440.0}, {250.0, 40.0}, {650.0, 500.0}, {880.0, 100.0}});
         const auto& controls = curve.control_points();
@@ -31,7 +31,7 @@ int main(int argc, char** argv) {
         cg::draw_line(image, midpoint - tangent * 55.0, midpoint + tangent * 55.0, {0.4, 1.0, 0.35});
         cg::draw_disc(image, midpoint, 5.0, {1.0, 1.0, 1.0});
 
-        image.write_ppm(output);
+        image.write(output);
         std::cout << "wrote " << output.string() << '\n';
         return 0;
     } catch (const std::exception& error) {

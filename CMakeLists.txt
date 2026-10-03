@@ -15,6 +15,7 @@ add_library(cg_core
     src/core/draw.cpp
     src/core/image.cpp
     src/curves/bezier.cpp
+    src/raytracer/raytracer.cpp
 )
 target_include_directories(cg_core PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/src")
 target_compile_features(cg_core PUBLIC cxx_std_17)
@@ -33,10 +34,17 @@ if(BUILD_TESTING)
     add_executable(bezier_tests tests/bezier_tests.cpp)
     target_link_libraries(bezier_tests PRIVATE cg_core)
     add_test(NAME bezier_tests COMMAND bezier_tests)
+
+    add_executable(raytracer_tests tests/raytracer_tests.cpp)
+    target_link_libraries(raytracer_tests PRIVATE cg_core)
+    add_test(NAME raytracer_tests COMMAND raytracer_tests)
 endif()
 
 add_executable(bezier_demo apps/bezier_demo.cpp)
 target_link_libraries(bezier_demo PRIVATE cg_core)
+
+add_executable(raytracer_demo apps/raytracer_demo.cpp)
+target_link_libraries(raytracer_demo PRIVATE cg_core)
 
 if(BUILD_LEGACY_LABS)
 find_package(OpenGL REQUIRED)
