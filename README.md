@@ -18,6 +18,24 @@ transformations, clipping, visibility, and shading are implemented on the CPU.
 - Back-face culling and Z-buffer visibility
 - Blinn–Phong lighting
 - Flat, Gouraud, and Phong shading
+- Arbitrary-degree Bézier curves via De Casteljau subdivision
+
+## Bézier curves
+
+The modern curve module supports evaluation, derivatives, splitting, and
+sampling for arbitrary-degree Bézier curves. It is available in two forms:
+
+```bash
+# Headless CPU rendering to a PPM image
+./build/Release/bezier_demo bezier_demo.ppm
+
+# Interactive OpenGL presentation layer
+./build/Release/bezier_interactive
+```
+
+Drag the orange control points to reshape the interactive curve. Press `r` to
+reset the curve and `q` or <kbd>Esc</kbd> to quit. Both applications use the
+same API-agnostic `BezierCurve` implementation.
 
 ## Labs
 
@@ -115,7 +133,9 @@ the selected input file. Some inherited drawing controls are also available:
 ├── 2022CG_Lab3/       # 3D rendering pipeline and OBJ meshes
 ├── 2022CG_Lab4/       # lighting, shading, and Z-buffering
 ├── images/            # diagrams and rendered results
+├── apps/              # headless and interactive demos
 ├── src/core/          # API-agnostic math and image primitives
+├── src/curves/        # De Casteljau Bézier implementation
 ├── tests/             # portable core tests
 └── CMakeLists.txt      # reproducible build configuration
 ```

@@ -12,7 +12,9 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 option(BUILD_LEGACY_LABS "Build the original OpenGL/GLUT lab applications" ON)
 
 add_library(cg_core
+    src/core/draw.cpp
     src/core/image.cpp
+    src/curves/bezier.cpp
 )
 target_include_directories(cg_core PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/src")
 target_compile_features(cg_core PUBLIC cxx_std_17)
@@ -27,7 +29,14 @@ if(BUILD_TESTING)
     add_executable(core_tests tests/core_tests.cpp)
     target_link_libraries(core_tests PRIVATE cg_core)
     add_test(NAME core_tests COMMAND core_tests)
+
+    add_executable(bezier_tests tests/bezier_tests.cpp)
+    target_link_libraries(bezier_tests PRIVATE cg_core)
+    add_test(NAME bezier_tests COMMAND bezier_tests)
 endif()
+
+add_executable(bezier_demo apps/bezier_demo.cpp)
+target_link_libraries(bezier_demo PRIVATE cg_core)
 
 if(BUILD_LEGACY_LABS)
 find_package(OpenGL REQUIRED)
@@ -67,6 +76,8 @@ endfunction()
 add_graphics_lab(lab2 2022CG_Lab2/2022CG_Lab2.cpp)
 add_graphics_lab(lab3 2022CG_Lab3/2022CG_Lab3.cpp)
 add_graphics_lab(lab4 2022CG_Lab4/2022CG_Lab4.cpp)
+add_graphics_lab(bezier_interactive apps/bezier_interactive.cpp)
+target_link_libraries(bezier_interactive PRIVATE cg_core)
 
 set_target_properties(lab2 PROPERTIES
     VS_DEBUGGER_WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}/2022CG_Lab2")
