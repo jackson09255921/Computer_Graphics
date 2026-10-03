@@ -55,6 +55,18 @@ pipeline {
             }
         }
 
+        stage('Visual regression') {
+            steps {
+                script {
+                    if (isUnix()) {
+                        sh 'ctest --test-dir build-jenkins -R "visual_regression_tests|bezier_visual" --output-on-failure'
+                    } else {
+                        bat 'ctest --test-dir build-jenkins -C Release -R "visual_regression_tests|bezier_visual" --output-on-failure'
+                    }
+                }
+            }
+        }
+
         stage('CUDA capability') {
             when {
                 expression { return params.RUN_GPU_TESTS }
@@ -78,7 +90,7 @@ pipeline {
 
     post {
         always {
-            archiveArtifacts artifacts: '*.bmp', allowEmptyArchive: true
+            archiveArtifacts artifacts: '*.bmp,build-jenkins/*visual*.ppm,build-jenkins/*diff*.ppm', allowEmptyArchive: true
             junit testResults: 'build-jenkins/**/Test.xml', allowEmptyResults: true
         }
     }

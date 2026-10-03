@@ -176,6 +176,13 @@ node transforms, and metallic/roughness material factors:
 ./build/gltf_demo model.gltf
 ```
 
+Visual regressions are separate from ordinary render smoke tests. The
+`visual_compare` tool reads 24-bit BMP or binary PPM images, checks dimensions,
+reports MAE/RMSE/maximum error, and writes an amplified PPM diff heatmap. The
+first reviewed golden image covers the deterministic Bézier demo; Jenkins runs
+the render and comparison as CTest cases and archives actual/diff artifacts.
+Golden references are never updated automatically.
+
 The current focused subset accepts `.gltf` JSON with one external buffer,
 FLOAT `POSITION` accessors, triangle topology, and 8/16/32-bit unsigned indices.
 Textures, animation channels, sparse accessors, Draco compression, and `.glb`

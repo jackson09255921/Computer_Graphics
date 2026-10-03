@@ -26,6 +26,12 @@ add_library(cg_core
     src/curves/bezier.cpp
     src/raytracer/raytracer.cpp
 )
+
+add_library(cg_visual
+    LabX/visual/visual_regression.cpp
+)
+target_include_directories(cg_visual PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/LabX")
+target_compile_features(cg_visual PUBLIC cxx_std_17)
 target_include_directories(cg_core PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/src" "${CMAKE_CURRENT_SOURCE_DIR}/LabX")
 target_compile_features(cg_core PUBLIC cxx_std_17)
 
@@ -85,6 +91,10 @@ if(BUILD_OPTIX_DEMOS)
 endif()
 
 if(BUILD_TESTING)
+    add_executable(visual_regression_tests LabX/visual/visual_regression_tests.cpp)
+    target_link_libraries(visual_regression_tests PRIVATE cg_core cg_visual)
+    add_test(NAME visual_regression_tests COMMAND visual_regression_tests)
+
     add_executable(core_tests tests/core_tests.cpp)
     target_link_libraries(core_tests PRIVATE cg_core)
     add_test(NAME core_tests COMMAND core_tests)
@@ -120,6 +130,21 @@ if(BUILD_TESTING)
     add_executable(gltf_tests LabX/assets/gltf_tests.cpp)
     target_link_libraries(gltf_tests PRIVATE cg_core)
     add_test(NAME gltf_tests COMMAND gltf_tests)
+endif()
+
+add_executable(visual_compare LabX/visual/visual_compare.cpp)
+target_link_libraries(visual_compare PRIVATE cg_visual)
+
+if(BUILD_TESTING)
+    add_test(NAME bezier_visual_render
+        COMMAND bezier_demo "${CMAKE_CURRENT_BINARY_DIR}/bezier_visual_actual.ppm")
+    add_test(NAME bezier_visual_compare
+        COMMAND visual_compare
+            "${CMAKE_CURRENT_SOURCE_DIR}/tests/visual/references/bezier.ppm"
+            "${CMAKE_CURRENT_BINARY_DIR}/bezier_visual_actual.ppm"
+            "${CMAKE_CURRENT_BINARY_DIR}/bezier_visual_diff.ppm"
+            0.10 1.00)
+    set_tests_properties(bezier_visual_compare PROPERTIES DEPENDS bezier_visual_render)
 endif()
 
 add_executable(bezier_demo LabX/curves/bezier_demo.cpp)
