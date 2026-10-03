@@ -60,18 +60,18 @@ ctest --test-dir build-cuda -R cuda_capability --output-on-failure
 Every milestone must retain a CPU build, deterministic tests, and a small demo
 scene before the next one begins.
 
-## Optional OptiX probe
+## Optional OptiX probe (native Windows)
 
-The WSL driver exposes the OptiX runtime, but the separately distributed NVIDIA
-OptiX SDK headers are not installed automatically. After downloading the SDK,
-point `OPTIX_ROOT` at its extracted root and enable the opt-in probe:
+OptiX on WSL2 still requires an experimental driver-library workaround. Keep
+the CPU/CUDA labs in WSL2, but run OptiX on native Windows. After downloading
+the separate NVIDIA SDK, point `OPTIX_ROOT` at its extracted root:
 
-```bash
-export OPTIX_ROOT=/opt/optix
-cmake -S . -B build-optix -G Ninja \
-  -DBUILD_LEGACY_LABS=OFF -DBUILD_CUDA_DEMOS=ON -DBUILD_OPTIX_DEMOS=ON
-cmake --build build-optix --target optix_context_probe
-ctest --test-dir build-optix -R optix_context_probe --output-on-failure
+```powershell
+$env:OPTIX_ROOT = 'D:\github\.deps\optix-sdk-9.1.0'
+cmake -S . -B build-optix-windows `
+  -DBUILD_LEGACY_LABS=OFF -DBUILD_CUDA_DEMOS=OFF -DBUILD_OPTIX_DEMOS=ON
+cmake --build build-optix-windows --config Release --target optix_context_probe
+ctest --test-dir build-optix-windows -C Release -R optix_context_probe --output-on-failure
 ```
 
 Without the SDK, configuration stops immediately with an actionable message;
