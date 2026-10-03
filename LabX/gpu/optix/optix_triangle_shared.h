@@ -43,6 +43,7 @@ struct OptixTriangleParams {
     const OptixPointLight* lights;
     unsigned int light_count;
     float3 camera_origin;
+    float3 previous_camera_origin;
     float view_scale;
 };
 

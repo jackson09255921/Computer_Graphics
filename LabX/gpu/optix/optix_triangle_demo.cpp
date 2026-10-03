@@ -345,6 +345,8 @@ int main(int argc, char** argv) {
                                                           maximum.y - minimum.y) * 0.65f);
         const float3 camera_origin = make_float3(scene_center.x, scene_center.y,
                                                  maximum.z + 2.5f * view_scale);
+        const float3 first_frame_camera_origin = make_float3(camera_origin.x - 0.03f * view_scale,
+                                                             camera_origin.y, camera_origin.z);
         const std::array<OptixPointLight, 4> lights{{
             {make_float3(scene_center.x - 1.25f * view_scale, scene_center.y + 1.75f * view_scale,
                          maximum.z + 2.0f * view_scale), make_float3(5.0f, 4.2f, 3.5f)},
@@ -378,7 +380,8 @@ int main(int argc, char** argv) {
                                          reinterpret_cast<float*>(device_reflectivity),
                                          reinterpret_cast<float*>(device_roughness),
                                          reinterpret_cast<OptixPointLight*>(device_lights),
-                                         static_cast<unsigned int>(lights.size()), camera_origin, view_scale};
+                                         static_cast<unsigned int>(lights.size()), first_frame_camera_origin,
+                                         first_frame_camera_origin, view_scale};
         check_cuda(cudaMalloc(reinterpret_cast<void**>(&device_params), sizeof(params)), "cudaMalloc params");
         for (unsigned int sample = 0; sample < samples_per_frame; ++sample) {
             params.sample_index = sample;
@@ -401,6 +404,8 @@ int main(int argc, char** argv) {
                               width * height * sizeof(OptixLightReservoir), cudaMemcpyDeviceToDevice),
                    "cudaMemcpy previous reservoirs");
         params.frame_index = 1;
+        params.previous_camera_origin = params.camera_origin;
+        params.camera_origin = camera_origin;
         for (unsigned int sample = samples_per_frame; sample < samples_per_pixel; ++sample) {
             params.sample_index = sample;
             check_cuda(cudaMemcpy(reinterpret_cast<void*>(device_params), &params, sizeof(params),
@@ -475,7 +480,7 @@ int main(int argc, char** argv) {
                                             center_normal.y * center_normal.y +
                                             center_normal.z * center_normal.z;
         if (center_depth <= 0.0f || normal_length_squared < 0.9f || normal_length_squared > 1.1f ||
-            center_albedo.x <= 0.0f || center_motion.x != 0.0f || center_motion.y != 0.0f)
+            center_albedo.x <= 0.0f || fabsf(center_motion.x) < 0.5f || fabsf(center_motion.y) > 0.01f)
             throw std::runtime_error("primary-hit G-buffer invariant failed");
         std::vector<uchar4> image(width * height);
         check_cuda(cudaMemcpy(image.data(), reinterpret_cast<void*>(device_image), image.size() * sizeof(uchar4),
@@ -502,6 +507,7 @@ int main(int argc, char** argv) {
                   << static_cast<int>(center_pixel.x) << ", " << static_cast<int>(center_pixel.y) << ", "
                   << static_cast<int>(center_pixel.z) << ", depth " << center_depth << ", normal "
                   << center_normal.x << ", " << center_normal.y << ", " << center_normal.z
+                  << ", motion " << center_motion.x << ", " << center_motion.y
                   << ", temporal history accepted, temporal M=" << center_reservoir.candidate_count
                   << ", spatial M=" << center_spatial_reservoir.candidate_count << ")\n";
 

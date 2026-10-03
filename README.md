@@ -138,8 +138,11 @@ The native OptiX demo performs 32 progressive launches into a persistent GPU
 floating-point accumulation buffer before converting the running average to PPM.
 Primary rays also populate world-normal, linear-depth, albedo, and motion-vector
 G-buffer attachments; secondary reflection and shadow rays cannot overwrite them.
-Two simulated frames exercise motion-vector reprojection and reject history on
-depth, normal, or albedo discontinuities before carrying accumulation forward.
+Two frames use different camera positions and derive non-zero motion vectors by
+projecting each world-space primary hit into the previous view. Reprojection
+rejects history on depth, normal, or albedo discontinuities before carrying
+accumulation forward; depth validation compares against the hit's expected ray
+distance from the previous camera rather than mixing depths from two views.
 The same validated reprojection now merges compact ReSTIR DI reservoirs across
 frames. Four point lights provide candidates, while only the selected sample
 receives an RTX shadow ray and reservoir-normalized direct-light contribution.

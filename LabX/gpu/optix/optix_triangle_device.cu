@@ -36,6 +36,15 @@ static __forceinline__ __device__ float3 cross_vector(float3 lhs, float3 rhs) {
                        lhs.x * rhs.y - lhs.y * rhs.x);
 }
 
+static __forceinline__ __device__ float2 project_to_pixel(float3 point, float3 camera_origin) {
+    const float inverse_z = 1.0f / (point.z - camera_origin.z);
+    const float screen_x = -2.5f * (point.x - camera_origin.x) * inverse_z;
+    const float screen_y = -2.5f * (point.y - camera_origin.y) * inverse_z;
+    const float aspect = static_cast<float>(params.width) / static_cast<float>(params.height);
+    return make_float2((screen_x / aspect + 1.0f) * 0.5f * static_cast<float>(params.width) - 0.5f,
+                       (screen_y + 1.0f) * 0.5f * static_cast<float>(params.height) - 0.5f);
+}
+
 static __forceinline__ __device__ float3 sample_ggx_half_vector(float3 normal, float roughness,
                                                                 unsigned int& random_state) {
     const float alpha = fmaxf(roughness * roughness, 0.001f);
@@ -118,6 +127,15 @@ extern "C" __global__ void __raygen__triangle() {
                                                 static_cast<unsigned int>(previous_x);
             const float current_depth = params.gbuffer_depth[pixel];
             const float previous_depth = params.previous_depth[previous_pixel];
+            const float3 current_hit = make_float3(origin.x + direction.x * current_depth,
+                                                   origin.y + direction.y * current_depth,
+                                                   origin.z + direction.z * current_depth);
+            const float3 previous_delta = make_float3(current_hit.x - params.previous_camera_origin.x,
+                                                      current_hit.y - params.previous_camera_origin.y,
+                                                      current_hit.z - params.previous_camera_origin.z);
+            const float expected_previous_depth = sqrtf(previous_delta.x * previous_delta.x +
+                                                        previous_delta.y * previous_delta.y +
+                                                        previous_delta.z * previous_delta.z);
             const float3 current_normal = params.gbuffer_normal[pixel];
             const float3 previous_normal = params.previous_normal[previous_pixel];
             const float3 current_albedo = params.gbuffer_albedo[pixel];
@@ -125,12 +143,12 @@ extern "C" __global__ void __raygen__triangle() {
             const float normal_similarity = current_normal.x * previous_normal.x +
                                             current_normal.y * previous_normal.y +
                                             current_normal.z * previous_normal.z;
-            const float depth_threshold = fmaxf(1.0e-3f, current_depth * 0.01f);
+            const float depth_threshold = fmaxf(1.0e-3f, expected_previous_depth * 0.01f);
             const float albedo_difference = fabsf(current_albedo.x - previous_albedo.x) +
                                             fabsf(current_albedo.y - previous_albedo.y) +
                                             fabsf(current_albedo.z - previous_albedo.z);
             valid = current_depth > 0.0f && previous_depth > 0.0f &&
-                    fabsf(current_depth - previous_depth) <= depth_threshold &&
+                    fabsf(expected_previous_depth - previous_depth) <= depth_threshold &&
                     normal_similarity >= 0.95f && albedo_difference <= 0.05f;
         }
         params.temporal_validity[pixel] = valid ? 1u : 0u;
@@ -257,6 +275,9 @@ extern "C" __global__ void __closesthit__lit() {
         params.gbuffer_normal[pixel] = normal;
         params.gbuffer_depth[pixel] = distance;
         params.gbuffer_albedo[pixel] = base_color;
+        const float2 previous_pixel_position = project_to_pixel(hit, params.previous_camera_origin);
+        params.gbuffer_motion[pixel] = make_float2(static_cast<float>(launch_index.x) - previous_pixel_position.x,
+                                                   static_cast<float>(launch_index.y) - previous_pixel_position.y);
         if (params.frame_index > 0u && params.sample_index == 16u) {
             const float2 motion = params.gbuffer_motion[pixel];
             const int previous_x = static_cast<int>(static_cast<float>(launch_index.x) - motion.x + 0.5f);
@@ -266,6 +287,12 @@ extern "C" __global__ void __closesthit__lit() {
                 temporal_pixel = static_cast<unsigned int>(previous_y) * params.width +
                                  static_cast<unsigned int>(previous_x);
                 const float previous_depth = params.previous_depth[temporal_pixel];
+                const float3 previous_delta = make_float3(hit.x - params.previous_camera_origin.x,
+                                                          hit.y - params.previous_camera_origin.y,
+                                                          hit.z - params.previous_camera_origin.z);
+                const float expected_previous_depth = sqrtf(previous_delta.x * previous_delta.x +
+                                                            previous_delta.y * previous_delta.y +
+                                                            previous_delta.z * previous_delta.z);
                 const float3 previous_normal = params.previous_normal[temporal_pixel];
                 const float3 previous_albedo = params.previous_albedo[temporal_pixel];
                 const float normal_similarity = normal.x * previous_normal.x + normal.y * previous_normal.y +
@@ -274,7 +301,8 @@ extern "C" __global__ void __closesthit__lit() {
                                                 fabsf(base_color.y - previous_albedo.y) +
                                                 fabsf(base_color.z - previous_albedo.z);
                 temporal_valid = previous_depth > 0.0f &&
-                                 fabsf(distance - previous_depth) <= fmaxf(1.0e-3f, distance * 0.01f) &&
+                                 fabsf(expected_previous_depth - previous_depth) <=
+                                     fmaxf(1.0e-3f, expected_previous_depth * 0.01f) &&
                                  normal_similarity >= 0.95f && albedo_difference <= 0.05f;
             }
         }
