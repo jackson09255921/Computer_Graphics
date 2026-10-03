@@ -18,7 +18,7 @@ implementation of an engineering technique.
 | 2007 | GGX microfacet reflection and rough transmission | Matched reflection on CPU/CUDA, matched rough BTDF on CUDA, and recursive GGX reflection-direction sampling on OptiX |
 | 2010 | NVIDIA OptiX programmable ray tracing engine | Native Windows indexed/glTF GAS, multi-ray-type SBT, Lambert lighting, recursive reflections, hard shadows, and RTX launch implemented |
 | 2017 | glTF 2.0 scene and physically based material interchange | Implemented |
-| 2020 | ReSTIR direct illumination | CUDA temporal/spatial core plus OptiX reprojection, GAS updates, disocclusion rejection, temporal merge, normalization, visibility rays, spatial reuse/resolve, and validity/reservoir debug views implemented |
+| 2020 | ReSTIR direct illumination | CUDA temporal/spatial core plus OptiX reprojection, receiver-target reservoir merging, GAS updates, disocclusion rejection, visibility rays, 64-sample spatial resolve, four-light reference/MAE validation, and debug views implemented |
 
 Multi-threaded tile scheduling and GPU execution evolved across many systems,
 so they are tracked as engineering capabilities rather than assigned a single

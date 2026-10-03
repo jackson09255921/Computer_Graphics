@@ -161,6 +161,12 @@ Every OptiX render also writes `_normal`, `_depth`, `_motion`, `_validity`, and
 `_reservoir` PPM companions beside the beauty image. These views expose
 G-buffer orientation and range, screen-space velocity, accepted versus rejected
 history, and spatial reservoir candidate density without requiring a GUI.
+Spatial and temporal reservoir merging reevaluates reused light samples at the
+receiving surface and converts each source reservoir through its normalization
+weight. The preview averages 64 independently resampled spatial resolves. A
+separate four-light RTX reference pass is written as the main image, while the
+ReSTIR approximation is written with a `_restir` suffix and checked against the
+reference over visible pixels.
 
 The dependency-free `LabX/assets` loader imports glTF 2.x triangle primitives
 from external binary buffers, including indexed or non-indexed geometry, scene

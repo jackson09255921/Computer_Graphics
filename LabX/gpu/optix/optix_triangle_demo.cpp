@@ -124,6 +124,7 @@ int main(int argc, char** argv) {
     constexpr unsigned int height = 192;
     constexpr unsigned int samples_per_pixel = 32;
     constexpr unsigned int samples_per_frame = samples_per_pixel / 2;
+    constexpr unsigned int spatial_resolve_samples = 64;
     const std::string output_path = argc > 1 ? argv[1] : "optix_triangle.ppm";
     MeshData mesh;
 
@@ -131,15 +132,18 @@ int main(int argc, char** argv) {
     OptixModule module = nullptr;
     OptixPipeline pipeline = nullptr;
     OptixProgramGroup raygen = nullptr, spatial_raygen = nullptr, spatial_resolve_raygen = nullptr;
+    OptixProgramGroup reference_raygen = nullptr;
     OptixProgramGroup radiance_miss = nullptr, shadow_miss = nullptr;
     OptixProgramGroup radiance_hit = nullptr, shadow_hit = nullptr;
     CUdeviceptr gas = 0, raygen_record = 0, spatial_raygen_record = 0;
-    CUdeviceptr spatial_resolve_raygen_record = 0, miss_record = 0, hit_record = 0;
-    CUdeviceptr device_image = 0, device_accumulation = 0, device_params = 0;
+    CUdeviceptr spatial_resolve_raygen_record = 0, reference_raygen_record = 0;
+    CUdeviceptr miss_record = 0, hit_record = 0;
+    CUdeviceptr device_image = 0, device_accumulation = 0, spatial_accumulation = 0, device_params = 0;
     CUdeviceptr device_colors = 0, device_reflectivity = 0;
     CUdeviceptr device_roughness = 0;
     CUdeviceptr gbuffer_normal = 0, gbuffer_depth = 0, gbuffer_albedo = 0, gbuffer_motion = 0;
     CUdeviceptr previous_normal = 0, previous_depth = 0, previous_albedo = 0, temporal_validity = 0;
+    CUdeviceptr shadow_occlusion_count = 0;
     CUdeviceptr reservoirs = 0, previous_reservoirs = 0, spatial_reservoirs = 0, device_lights = 0;
     CUdeviceptr device_vertices = 0, device_indices = 0;
 
@@ -227,6 +231,11 @@ int main(int argc, char** argv) {
         spatial_resolve_raygen_desc.raygen.module = module;
         spatial_resolve_raygen_desc.raygen.entryFunctionName = "__raygen__spatial_resolve";
         create_group(spatial_resolve_raygen_desc, spatial_resolve_raygen, "spatial resolve raygen program");
+        OptixProgramGroupDesc reference_raygen_desc{};
+        reference_raygen_desc.kind = OPTIX_PROGRAM_GROUP_KIND_RAYGEN;
+        reference_raygen_desc.raygen.module = module;
+        reference_raygen_desc.raygen.entryFunctionName = "__raygen__reference";
+        create_group(reference_raygen_desc, reference_raygen, "reference raygen program");
         OptixProgramGroupDesc miss_desc{};
         miss_desc.kind = OPTIX_PROGRAM_GROUP_KIND_MISS;
         miss_desc.miss.module = module;
@@ -248,8 +257,8 @@ int main(int argc, char** argv) {
         shadow_hit_desc.hitgroup.entryFunctionNameCH = "__closesthit__shadow";
         create_group(shadow_hit_desc, shadow_hit, "shadow closest-hit program");
 
-        const std::array<OptixProgramGroup, 7> groups{
-            raygen, spatial_raygen, spatial_resolve_raygen,
+        const std::array<OptixProgramGroup, 8> groups{
+            raygen, spatial_raygen, spatial_resolve_raygen, reference_raygen,
             radiance_miss, shadow_miss, radiance_hit, shadow_hit};
         OptixPipelineLinkOptions link_options{};
         link_options.maxTraceDepth = 4;
@@ -281,6 +290,7 @@ int main(int argc, char** argv) {
         upload_records({raygen}, raygen_record);
         upload_records({spatial_raygen}, spatial_raygen_record);
         upload_records({spatial_resolve_raygen}, spatial_resolve_raygen_record);
+        upload_records({reference_raygen}, reference_raygen_record);
         upload_records({radiance_miss, shadow_miss}, miss_record);
         upload_records({radiance_hit, shadow_hit}, hit_record);
         OptixShaderBindingTable sbt{};
@@ -298,6 +308,10 @@ int main(int argc, char** argv) {
                    "cudaMalloc accumulation");
         check_cuda(cudaMemset(reinterpret_cast<void*>(device_accumulation), 0,
                               width * height * sizeof(float4)), "cudaMemset accumulation");
+        check_cuda(cudaMalloc(reinterpret_cast<void**>(&spatial_accumulation), width * height * sizeof(float4)),
+                   "cudaMalloc spatial accumulation");
+        check_cuda(cudaMemset(reinterpret_cast<void*>(spatial_accumulation), 0,
+                              width * height * sizeof(float4)), "cudaMemset spatial accumulation");
         check_cuda(cudaMalloc(reinterpret_cast<void**>(&gbuffer_normal), width * height * sizeof(float3)),
                    "cudaMalloc G-buffer normal");
         check_cuda(cudaMalloc(reinterpret_cast<void**>(&gbuffer_depth), width * height * sizeof(float)),
@@ -316,6 +330,10 @@ int main(int argc, char** argv) {
                    "cudaMalloc temporal validity");
         check_cuda(cudaMemset(reinterpret_cast<void*>(temporal_validity), 0,
                               width * height * sizeof(unsigned int)), "cudaMemset temporal validity");
+        check_cuda(cudaMalloc(reinterpret_cast<void**>(&shadow_occlusion_count), sizeof(unsigned int)),
+                   "cudaMalloc shadow occlusion count");
+        check_cuda(cudaMemset(reinterpret_cast<void*>(shadow_occlusion_count), 0, sizeof(unsigned int)),
+                   "cudaMemset shadow occlusion count");
         check_cuda(cudaMalloc(reinterpret_cast<void**>(&reservoirs),
                               width * height * sizeof(OptixLightReservoir)), "cudaMalloc reservoirs");
         check_cuda(cudaMalloc(reinterpret_cast<void**>(&previous_reservoirs),
@@ -373,6 +391,7 @@ int main(int argc, char** argv) {
                               cudaMemcpyHostToDevice), "cudaMemcpy lights");
         OptixTriangleParams params{reinterpret_cast<uchar4*>(device_image),
                                          reinterpret_cast<float4*>(device_accumulation),
+                                         reinterpret_cast<float4*>(spatial_accumulation),
                                          reinterpret_cast<float3*>(gbuffer_normal),
                                          reinterpret_cast<float*>(gbuffer_depth),
                                          reinterpret_cast<float3*>(gbuffer_albedo),
@@ -381,10 +400,11 @@ int main(int argc, char** argv) {
                                          reinterpret_cast<float*>(previous_depth),
                                          reinterpret_cast<float3*>(previous_albedo),
                                          reinterpret_cast<unsigned int*>(temporal_validity),
+                                         reinterpret_cast<unsigned int*>(shadow_occlusion_count),
                                          reinterpret_cast<OptixLightReservoir*>(reservoirs),
                                          reinterpret_cast<OptixLightReservoir*>(previous_reservoirs),
                                          reinterpret_cast<OptixLightReservoir*>(spatial_reservoirs),
-                                         width, height, 0, 0, 0,
+                                         width, height, 0, 0, 0, 0,
                                          gas_handle,
                                          reinterpret_cast<float3*>(device_vertices),
                                          reinterpret_cast<uint3*>(device_indices),
@@ -440,15 +460,31 @@ int main(int argc, char** argv) {
             check_optix(optixLaunch(pipeline, nullptr, device_params, sizeof(params), &sbt,
                                     width, height, 1), "optixLaunch temporal frame");
         }
-        sbt.raygenRecord = spatial_raygen_record;
-        check_optix(optixLaunch(pipeline, nullptr, device_params, sizeof(params), &sbt,
-                                width, height, 1), "optixLaunch spatial reuse");
-        params.spatial_resolve = 1u;
+        for (unsigned int spatial_sample = 0; spatial_sample < spatial_resolve_samples; ++spatial_sample) {
+            params.sample_index = samples_per_pixel + spatial_sample;
+            params.spatial_resolve = 0u;
+            check_cuda(cudaMemcpy(reinterpret_cast<void*>(device_params), &params, sizeof(params),
+                                  cudaMemcpyHostToDevice), "cudaMemcpy spatial reuse params");
+            sbt.raygenRecord = spatial_raygen_record;
+            check_optix(optixLaunch(pipeline, nullptr, device_params, sizeof(params), &sbt,
+                                    width, height, 1), "optixLaunch spatial reuse");
+            params.spatial_resolve = 1u;
+            check_cuda(cudaMemcpy(reinterpret_cast<void*>(device_params), &params, sizeof(params),
+                                  cudaMemcpyHostToDevice), "cudaMemcpy spatial resolve params");
+            sbt.raygenRecord = spatial_resolve_raygen_record;
+            check_optix(optixLaunch(pipeline, nullptr, device_params, sizeof(params), &sbt,
+                                    width, height, 1), "optixLaunch spatial resolve");
+        }
+        std::vector<uchar4> restir_image(width * height);
+        check_cuda(cudaMemcpy(restir_image.data(), reinterpret_cast<void*>(device_image),
+                              restir_image.size() * sizeof(uchar4), cudaMemcpyDeviceToHost),
+                   "cudaMemcpy ReSTIR image");
+        params.reference_resolve = 1u;
         check_cuda(cudaMemcpy(reinterpret_cast<void*>(device_params), &params, sizeof(params),
-                              cudaMemcpyHostToDevice), "cudaMemcpy spatial resolve params");
-        sbt.raygenRecord = spatial_resolve_raygen_record;
+                              cudaMemcpyHostToDevice), "cudaMemcpy reference params");
+        sbt.raygenRecord = reference_raygen_record;
         check_optix(optixLaunch(pipeline, nullptr, device_params, sizeof(params), &sbt,
-                                width, height, 1), "optixLaunch spatial resolve");
+                                width, height, 1), "optixLaunch reference");
         check_cuda(cudaDeviceSynchronize(), "cudaDeviceSynchronize");
         float4 center_accumulation{};
         const std::size_t center_offset = ((height / 2) * width + width / 2) * sizeof(float4);
@@ -553,9 +589,30 @@ int main(int argc, char** argv) {
                        pixel.z >= 14 && pixel.z <= 30 &&
                        std::abs(static_cast<int>(pixel.x) - static_cast<int>(pixel.y)) <= 3;
             }));
-        if (argc <= 2 && shadow_pixels == 0)
-            throw std::runtime_error("default scene produced no verified shadow pixels");
+        double restir_absolute_error = 0.0;
+        std::size_t restir_error_channels = 0;
+        for (std::size_t pixel = 0; pixel < image.size(); ++pixel) {
+            if (frame_depth[pixel] <= 0.0f) continue;
+            restir_absolute_error += std::abs(static_cast<int>(image[pixel].x) -
+                                              static_cast<int>(restir_image[pixel].x));
+            restir_absolute_error += std::abs(static_cast<int>(image[pixel].y) -
+                                              static_cast<int>(restir_image[pixel].y));
+            restir_absolute_error += std::abs(static_cast<int>(image[pixel].z) -
+                                              static_cast<int>(restir_image[pixel].z));
+            restir_error_channels += 3;
+        }
+        const double restir_mean_absolute_error = restir_absolute_error /
+                                                  static_cast<double>(restir_error_channels);
+        if (restir_mean_absolute_error <= 0.5 || restir_mean_absolute_error >= 32.0)
+            throw std::runtime_error("ReSTIR/reference image error invariant failed");
+        unsigned int occluded_shadow_rays = 0;
+        check_cuda(cudaMemcpy(&occluded_shadow_rays, reinterpret_cast<void*>(shadow_occlusion_count),
+                              sizeof(occluded_shadow_rays), cudaMemcpyDeviceToHost),
+                   "cudaMemcpy shadow occlusion count");
+        if (argc <= 2 && occluded_shadow_rays == 0u)
+            throw std::runtime_error("default scene produced no occluded shadow rays");
         write_ppm(output_path, image, width, height);
+        write_ppm(debug_output_path(output_path, "restir"), restir_image, width, height);
         const float maximum_depth = *std::max_element(frame_depth.begin(), frame_depth.end());
         unsigned int maximum_candidates = 0;
         for (const OptixLightReservoir& reservoir : frame_spatial_reservoirs)
@@ -594,15 +651,17 @@ int main(int argc, char** argv) {
         write_ppm(debug_output_path(output_path, "validity"), validity_debug, width, height);
         write_ppm(debug_output_path(output_path, "reservoir"), reservoir_debug, width, height);
         std::cout << "OptiX indexed mesh rendered " << mesh.indices.size() << " triangles to "
-                  << output_path << " at " << samples_per_pixel << " spp (" << hit_pixels
-                  << " hit pixels, " << shadow_pixels
-                  << " verified shadow pixels, center RGB "
+                  << output_path << " with " << samples_per_pixel << " temporal samples + "
+                  << spatial_resolve_samples << " spatial resolve samples (" << hit_pixels
+                  << " hit pixels, " << occluded_shadow_rays << " occluded shadow rays, "
+                  << shadow_pixels << " dark reference pixels, center RGB "
                   << static_cast<int>(center_pixel.x) << ", " << static_cast<int>(center_pixel.y) << ", "
                   << static_cast<int>(center_pixel.z) << ", depth " << center_depth << ", normal "
                   << center_normal.x << ", " << center_normal.y << ", " << center_normal.z
                   << ", motion " << center_motion.x << ", " << center_motion.y
                   << ", history accepted/rejected " << accepted_history_pixels << "/"
                   << rejected_history_pixels
+                  << ", ReSTIR/reference hit-pixel MAE " << restir_mean_absolute_error
                   << ", temporal history accepted, temporal M=" << center_reservoir.candidate_count
                   << ", spatial M=" << center_spatial_reservoir.candidate_count << ")\n";
 
@@ -612,6 +671,7 @@ int main(int argc, char** argv) {
         cudaFree(reinterpret_cast<void*>(previous_reservoirs));
         cudaFree(reinterpret_cast<void*>(reservoirs));
         cudaFree(reinterpret_cast<void*>(temporal_validity));
+        cudaFree(reinterpret_cast<void*>(shadow_occlusion_count));
         cudaFree(reinterpret_cast<void*>(previous_albedo));
         cudaFree(reinterpret_cast<void*>(previous_depth));
         cudaFree(reinterpret_cast<void*>(previous_normal));
@@ -620,6 +680,7 @@ int main(int argc, char** argv) {
         cudaFree(reinterpret_cast<void*>(gbuffer_depth));
         cudaFree(reinterpret_cast<void*>(gbuffer_normal));
         cudaFree(reinterpret_cast<void*>(device_roughness));
+        cudaFree(reinterpret_cast<void*>(spatial_accumulation));
         cudaFree(reinterpret_cast<void*>(device_accumulation));
         cudaFree(reinterpret_cast<void*>(device_reflectivity));
         cudaFree(reinterpret_cast<void*>(device_colors));
@@ -628,6 +689,7 @@ int main(int argc, char** argv) {
         cudaFree(reinterpret_cast<void*>(device_image));
         cudaFree(reinterpret_cast<void*>(hit_record));
         cudaFree(reinterpret_cast<void*>(miss_record));
+        cudaFree(reinterpret_cast<void*>(reference_raygen_record));
         cudaFree(reinterpret_cast<void*>(spatial_resolve_raygen_record));
         cudaFree(reinterpret_cast<void*>(spatial_raygen_record));
         cudaFree(reinterpret_cast<void*>(raygen_record));
@@ -637,6 +699,7 @@ int main(int argc, char** argv) {
         optixProgramGroupDestroy(radiance_hit);
         optixProgramGroupDestroy(shadow_miss);
         optixProgramGroupDestroy(radiance_miss);
+        optixProgramGroupDestroy(reference_raygen);
         optixProgramGroupDestroy(spatial_resolve_raygen);
         optixProgramGroupDestroy(spatial_raygen);
         optixProgramGroupDestroy(raygen);

@@ -95,6 +95,11 @@ The renderer writes five diagnostic companions next to `output.ppm`:
 `output_validity.ppm`, and `output_reservoir.ppm`. Temporal validity uses green
 for accepted history and red for rejected disocclusions; the reservoir view
 visualizes spatial candidate count relative to the frame maximum.
+`output.ppm` is a four-light RTX reference and `output_restir.ppm` is the ReSTIR
+approximation. Reused temporal and spatial samples are reevaluated at the
+receiving hit before their source-reservoir normalization is applied. The demo
+averages 64 independent spatial resolves and requires the visible-pixel mean
+absolute error against the reference to remain within a deterministic range.
 
 Radiance hits can recursively trace up to two reflection bounces. Imported
 metallic factors determine the Fresnel reflection weight, while roughness sets
@@ -132,8 +137,10 @@ static center pixel. A second OptiX raygen pass reads those stable temporal
 reservoirs, rejects four-neighbor discontinuities using depth, normal, and
 albedo, and writes into a separate race-free spatial buffer. The default scene
 must produce `M = 160` at its center. A third raygen pass retraces primary rays,
-uses the spatial selection and normalization for one new visibility ray, keeps
-recursive GGX reflection shading active, and writes the resolved final image.
+uses the spatial selection and normalization for one new visibility ray and
+keeps recursive GGX reflection shading active. Repeating this with independent
+spatial seeds produces the 64-sample ReSTIR comparison image; the reference
+pass traces all four light visibility rays at each hit.
 
 Without the SDK, configuration stops immediately with an actionable message;
 normal CPU and CUDA builds remain unaffected.

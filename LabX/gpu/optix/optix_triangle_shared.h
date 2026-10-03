@@ -18,6 +18,7 @@ struct OptixLightReservoir {
 struct OptixTriangleParams {
     uchar4* image;
     float4* accumulation;
+    float4* spatial_accumulation;
     float3* gbuffer_normal;
     float* gbuffer_depth;
     float3* gbuffer_albedo;
@@ -26,6 +27,7 @@ struct OptixTriangleParams {
     const float* previous_depth;
     const float3* previous_albedo;
     unsigned int* temporal_validity;
+    unsigned int* shadow_occlusion_count;
     OptixLightReservoir* reservoirs;
     const OptixLightReservoir* previous_reservoirs;
     OptixLightReservoir* spatial_reservoirs;
@@ -34,6 +36,7 @@ struct OptixTriangleParams {
     unsigned int sample_index;
     unsigned int frame_index;
     unsigned int spatial_resolve;
+    unsigned int reference_resolve;
     OptixTraversableHandle handle;
     const float3* vertices;
     const uint3* indices;

@@ -36,6 +36,41 @@ static __forceinline__ __device__ float3 cross_vector(float3 lhs, float3 rhs) {
                        lhs.x * rhs.y - lhs.y * rhs.x);
 }
 
+static __forceinline__ __device__ void reservoir_update(OptixLightReservoir& reservoir,
+                                                         unsigned int light_index,
+                                                         float stream_weight,
+                                                         float selected_weight,
+                                                         unsigned int candidate_count,
+                                                         unsigned int& random_state);
+
+static __forceinline__ __device__ float light_target(unsigned int light_index, float3 hit, float3 normal) {
+    if (light_index >= params.light_count) return 0.0f;
+    const OptixPointLight light = params.lights[light_index];
+    const float3 delta = make_float3(light.position.x - hit.x, light.position.y - hit.y,
+                                     light.position.z - hit.z);
+    const float distance_squared = delta.x * delta.x + delta.y * delta.y + delta.z * delta.z;
+    const float inverse_distance = rsqrtf(fmaxf(distance_squared, 1.0e-8f));
+    const float cosine = fmaxf(0.0f, normal.x * delta.x * inverse_distance +
+                                     normal.y * delta.y * inverse_distance +
+                                     normal.z * delta.z * inverse_distance);
+    const float luminance = 0.2126f * light.intensity.x + 0.7152f * light.intensity.y +
+                            0.0722f * light.intensity.z;
+    return luminance * cosine / fmaxf(distance_squared, 1.0e-4f);
+}
+
+static __forceinline__ __device__ void merge_reservoir(OptixLightReservoir& destination,
+                                                        const OptixLightReservoir& source,
+                                                        float3 hit, float3 normal,
+                                                        unsigned int& random_state) {
+    if (source.candidate_count == 0u || source.selected_weight <= 0.0f || source.weight_sum <= 0.0f)
+        return;
+    const float target_at_receiver = light_target(source.light_index, hit, normal);
+    if (target_at_receiver <= 0.0f) return;
+    const float stream_weight = target_at_receiver * source.weight_sum / source.selected_weight;
+    reservoir_update(destination, source.light_index, stream_weight, target_at_receiver,
+                     source.candidate_count, random_state);
+}
+
 static __forceinline__ __device__ float2 project_to_pixel(float3 point, float3 camera_origin) {
     const float inverse_z = 1.0f / (point.z - camera_origin.z);
     const float screen_x = -2.5f * (point.x - camera_origin.x) * inverse_z;
@@ -139,11 +174,20 @@ extern "C" __global__ void __raygen__spatial_reuse() {
     const float center_depth = params.gbuffer_depth[pixel];
     const float3 center_normal = params.gbuffer_normal[pixel];
     const float3 center_albedo = params.gbuffer_albedo[pixel];
+    const float2 screen = make_float2(
+        (2.0f * (static_cast<float>(index.x) + 0.5f) / static_cast<float>(params.width) - 1.0f) *
+            (static_cast<float>(params.width) / static_cast<float>(params.height)),
+        2.0f * (static_cast<float>(index.y) + 0.5f) / static_cast<float>(params.height) - 1.0f);
+    const float3 direction = normalize_vector(make_float3(screen.x * params.view_scale,
+                                                           screen.y * params.view_scale,
+                                                           -2.5f * params.view_scale));
+    const float3 center_hit = make_float3(params.camera_origin.x + direction.x * center_depth,
+                                         params.camera_origin.y + direction.y * center_depth,
+                                         params.camera_origin.z + direction.z * center_depth);
     OptixLightReservoir result{};
-    unsigned int random_state = hash(pixel + 0xa511e9b3u);
+    unsigned int random_state = hash(pixel + 0xa511e9b3u + 0x9e3779b9u * params.sample_index);
     const OptixLightReservoir center = params.reservoirs[pixel];
-    reservoir_update(result, center.light_index, center.weight_sum, center.selected_weight,
-                     center.candidate_count, random_state);
+    merge_reservoir(result, center, center_hit, center_normal, random_state);
 
     const int2 offsets[4] = {make_int2(-1, 0), make_int2(1, 0), make_int2(0, -1), make_int2(0, 1)};
     for (unsigned int neighbor_index = 0; neighbor_index < 4; ++neighbor_index) {
@@ -167,8 +211,7 @@ extern "C" __global__ void __raygen__spatial_reuse() {
             normal_similarity >= 0.90f && albedo_difference <= 0.10f;
         if (!compatible) continue;
         const OptixLightReservoir neighbor = params.reservoirs[neighbor_pixel];
-        reservoir_update(result, neighbor.light_index, neighbor.weight_sum, neighbor.selected_weight,
-                         neighbor.candidate_count, random_state);
+        merge_reservoir(result, neighbor, center_hit, center_normal, random_state);
     }
     params.spatial_reservoirs[pixel] = result;
 }
@@ -184,6 +227,35 @@ extern "C" __global__ void __raygen__spatial_resolve() {
                                              screen.y * params.view_scale,
                                              -2.5f * params.view_scale);
     const float3 direction = normalize_vector(raw_direction);
+    unsigned int red = 0, green = 0, blue = 0, depth = 0;
+    optixTrace(params.handle, params.camera_origin, direction, 0.0f, 1.0e16f, 0.0f,
+               OptixVisibilityMask(255), OPTIX_RAY_FLAG_NONE,
+               OPTIX_RAY_TYPE_RADIANCE, OPTIX_RAY_TYPE_COUNT,
+               OPTIX_RAY_TYPE_RADIANCE, red, green, blue, depth);
+    const unsigned int pixel = index.y * params.width + index.x;
+    float4 accumulated = params.spatial_accumulation[pixel];
+    accumulated.x += __uint_as_float(red);
+    accumulated.y += __uint_as_float(green);
+    accumulated.z += __uint_as_float(blue);
+    accumulated.w += 1.0f;
+    params.spatial_accumulation[pixel] = accumulated;
+    const float inverse_samples = 1.0f / accumulated.w;
+    params.image[pixel] = make_uchar4(
+        static_cast<unsigned char>(fminf(fmaxf(accumulated.x * inverse_samples, 0.0f), 1.0f) * 255.0f),
+        static_cast<unsigned char>(fminf(fmaxf(accumulated.y * inverse_samples, 0.0f), 1.0f) * 255.0f),
+        static_cast<unsigned char>(fminf(fmaxf(accumulated.z * inverse_samples, 0.0f), 1.0f) * 255.0f), 255);
+}
+
+extern "C" __global__ void __raygen__reference() {
+    const uint3 index = optixGetLaunchIndex();
+    const uint3 dimensions = optixGetLaunchDimensions();
+    const float2 screen = make_float2(
+        (2.0f * (static_cast<float>(index.x) + 0.5f) / static_cast<float>(dimensions.x) - 1.0f) *
+            (static_cast<float>(dimensions.x) / static_cast<float>(dimensions.y)),
+        2.0f * (static_cast<float>(index.y) + 0.5f) / static_cast<float>(dimensions.y) - 1.0f);
+    const float3 direction = normalize_vector(make_float3(screen.x * params.view_scale,
+                                                           screen.y * params.view_scale,
+                                                           -2.5f * params.view_scale));
     unsigned int red = 0, green = 0, blue = 0, depth = 0;
     optixTrace(params.handle, params.camera_origin, direction, 0.0f, 1.0e16f, 0.0f,
                OptixVisibilityMask(255), OPTIX_RAY_FLAG_NONE,
@@ -294,26 +366,10 @@ extern "C" __global__ void __closesthit__lit() {
         if (params.sample_index == 0u || params.sample_index == 16u) reservoir = {};
         if (params.sample_index == 16u && temporal_valid) {
             const OptixLightReservoir previous = params.previous_reservoirs[temporal_pixel];
-            reservoir_update(reservoir, previous.light_index, previous.weight_sum,
-                             previous.selected_weight, previous.candidate_count, light_random);
+            merge_reservoir(reservoir, previous, hit, normal, light_random);
         }
         const unsigned int candidate = light_random % params.light_count;
-        const OptixPointLight candidate_light = params.lights[candidate];
-        const float3 candidate_delta = make_float3(candidate_light.position.x - hit.x,
-                                                   candidate_light.position.y - hit.y,
-                                                   candidate_light.position.z - hit.z);
-        const float candidate_distance_squared = candidate_delta.x * candidate_delta.x +
-                                                 candidate_delta.y * candidate_delta.y +
-                                                 candidate_delta.z * candidate_delta.z;
-        const float inverse_candidate_distance = rsqrtf(candidate_distance_squared);
-        const float candidate_cosine = fmaxf(0.0f,
-            normal.x * candidate_delta.x * inverse_candidate_distance +
-            normal.y * candidate_delta.y * inverse_candidate_distance +
-            normal.z * candidate_delta.z * inverse_candidate_distance);
-        const float luminance = 0.2126f * candidate_light.intensity.x +
-                                0.7152f * candidate_light.intensity.y +
-                                0.0722f * candidate_light.intensity.z;
-        const float target = luminance * candidate_cosine / fmaxf(candidate_distance_squared, 1.0e-4f);
+        const float target = light_target(candidate, hit, normal);
         reservoir_update(reservoir, candidate, target * static_cast<float>(params.light_count),
                          target, 1u, light_random);
         params.reservoirs[pixel] = reservoir;
@@ -324,27 +380,36 @@ extern "C" __global__ void __closesthit__lit() {
             : 0.0f;
     }
 
-    const OptixPointLight light = params.lights[selected_light];
-    const float3 to_light = make_float3(light.position.x - hit.x,
-                                        light.position.y - hit.y,
-                                        light.position.z - hit.z);
-    const float light_distance = sqrtf(to_light.x * to_light.x + to_light.y * to_light.y + to_light.z * to_light.z);
-    const float3 light_direction = make_float3(to_light.x / light_distance, to_light.y / light_distance,
-                                               to_light.z / light_distance);
-    unsigned int visible = 0;
-    optixTrace(params.handle,
-               make_float3(hit.x + normal.x * 1.0e-3f, hit.y + normal.y * 1.0e-3f, hit.z + normal.z * 1.0e-3f),
-               light_direction, 0.0f, light_distance - 1.0e-3f, 0.0f,
-               OptixVisibilityMask(255), OPTIX_RAY_FLAG_TERMINATE_ON_FIRST_HIT | OPTIX_RAY_FLAG_DISABLE_ANYHIT,
-               OPTIX_RAY_TYPE_SHADOW, OPTIX_RAY_TYPE_COUNT, OPTIX_RAY_TYPE_SHADOW, visible);
-
-    const float diffuse = fmaxf(0.0f, normal.x * light_direction.x + normal.y * light_direction.y +
-                                      normal.z * light_direction.z);
-    const float inverse_distance_squared = 1.0f / fmaxf(light_distance * light_distance, 1.0e-4f);
-    const float direct_scale = visible ? diffuse * inverse_distance_squared * reservoir_normalization : 0.0f;
-    const float3 lighting = make_float3(0.08f + light.intensity.x * direct_scale,
-                                        0.08f + light.intensity.y * direct_scale,
-                                        0.08f + light.intensity.z * direct_scale);
+    float3 lighting = make_float3(0.08f, 0.08f, 0.08f);
+    const unsigned int first_light = params.reference_resolve != 0u ? 0u : selected_light;
+    const unsigned int light_end = params.reference_resolve != 0u ? params.light_count : selected_light + 1u;
+    for (unsigned int light_index = first_light; light_index < light_end; ++light_index) {
+        const OptixPointLight light = params.lights[light_index];
+        const float3 to_light = make_float3(light.position.x - hit.x,
+                                            light.position.y - hit.y,
+                                            light.position.z - hit.z);
+        const float light_distance = sqrtf(to_light.x * to_light.x + to_light.y * to_light.y +
+                                           to_light.z * to_light.z);
+        const float3 light_direction = make_float3(to_light.x / light_distance, to_light.y / light_distance,
+                                                   to_light.z / light_distance);
+        unsigned int visible = 0;
+        optixTrace(params.handle,
+                   make_float3(hit.x + normal.x * 1.0e-3f, hit.y + normal.y * 1.0e-3f,
+                               hit.z + normal.z * 1.0e-3f),
+                   light_direction, 0.0f, light_distance - 1.0e-3f, 0.0f,
+                   OptixVisibilityMask(255),
+                   OPTIX_RAY_FLAG_TERMINATE_ON_FIRST_HIT | OPTIX_RAY_FLAG_DISABLE_ANYHIT,
+                   OPTIX_RAY_TYPE_SHADOW, OPTIX_RAY_TYPE_COUNT, OPTIX_RAY_TYPE_SHADOW, visible);
+        if (visible == 0u) atomicAdd(params.shadow_occlusion_count, 1u);
+        const float diffuse = fmaxf(0.0f, normal.x * light_direction.x + normal.y * light_direction.y +
+                                          normal.z * light_direction.z);
+        const float inverse_distance_squared = 1.0f / fmaxf(light_distance * light_distance, 1.0e-4f);
+        const float normalization = params.reference_resolve != 0u ? 1.0f : reservoir_normalization;
+        const float direct_scale = visible ? diffuse * inverse_distance_squared * normalization : 0.0f;
+        lighting.x += light.intensity.x * direct_scale;
+        lighting.y += light.intensity.y * direct_scale;
+        lighting.z += light.intensity.z * direct_scale;
+    }
     const float reflectivity = params.primitive_reflectivity[primitive];
     const float roughness = params.primitive_roughness[primitive];
     float3 reflection_color = make_float3(0.0f, 0.0f, 0.0f);
