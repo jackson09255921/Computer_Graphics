@@ -27,6 +27,8 @@ struct GltfTriangle {
     Vec2 second_uv;
     Vec2 third_uv;
     std::shared_ptr<const GltfTexture> base_color_texture;
+    std::shared_ptr<const GltfTexture> normal_texture;
+    double normal_scale{1.0};
     rt::Material material;
 };
 

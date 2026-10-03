@@ -18,9 +18,12 @@ int main(int argc, char** argv) {
         const std::size_t textured = static_cast<std::size_t>(std::count_if(
             asset.triangles().begin(), asset.triangles().end(),
             [](const cg::assets::GltfTriangle& triangle) { return triangle.base_color_texture != nullptr; }));
+        const std::size_t normal_mapped = static_cast<std::size_t>(std::count_if(
+            asset.triangles().begin(), asset.triangles().end(),
+            [](const cg::assets::GltfTriangle& triangle) { return triangle.normal_texture != nullptr; }));
         std::cout << "loaded " << asset.triangles().size() << " triangles (" << smooth
-                  << " with vertex normals, " << textured << " with base-color textures) from "
-                  << argv[1] << '\n';
+                  << " with vertex normals, " << textured << " with base-color textures, "
+                  << normal_mapped << " with normal maps) from " << argv[1] << '\n';
         return 0;
     } catch (const std::exception& error) {
         std::cerr << "glTF load failed: " << error.what() << '\n';

@@ -390,10 +390,10 @@ GltfAsset GltfAsset::load(const std::filesystem::path& path) {
             texture->width = static_cast<std::size_t>(width);
             texture->height = static_cast<std::size_t>(height);
             texture->pixels.reserve(texture->width * texture->height);
-            for (std::size_t pixel = 0; pixel < texture->width * texture->height; ++pixel) {
-                const auto linear = [&](int channel) { return std::pow(decoded[pixel * 4 + channel] / 255.0, 2.2); };
-                texture->pixels.push_back({linear(0), linear(1), linear(2)});
-            }
+            for (std::size_t pixel = 0; pixel < texture->width * texture->height; ++pixel)
+                texture->pixels.push_back({decoded[pixel * 4] / 255.0,
+                                           decoded[pixel * 4 + 1] / 255.0,
+                                           decoded[pixel * 4 + 2] / 255.0});
             stbi_image_free(decoded);
             textures.push_back(std::move(texture));
         }
@@ -434,13 +434,20 @@ GltfAsset GltfAsset::load(const std::filesystem::path& path) {
             if (element_indices.size() % 3 != 0) throw std::runtime_error("triangle index count must be divisible by three");
             rt::Material material;
             std::shared_ptr<const GltfTexture> base_color_texture;
+            std::shared_ptr<const GltfTexture> normal_texture;
+            double normal_scale = 1.0;
             if (const Json* material_index = primitive.find("material")) {
                 const std::size_t index = integer(*material_index);
                 material = material_at(root, index);
-                const Json* pbr = root.find("materials")->array().at(index).find("pbrMetallicRoughness");
+                const Json& material_source = root.find("materials")->array().at(index);
+                const Json* pbr = material_source.find("pbrMetallicRoughness");
                 if (pbr)
                     if (const Json* texture = pbr->find("baseColorTexture"))
                         base_color_texture = textures.at(member_integer(*texture, "index"));
+                if (const Json* texture = material_source.find("normalTexture")) {
+                    normal_texture = textures.at(member_integer(*texture, "index"));
+                    if (const Json* scale = texture->find("scale")) normal_scale = scale->number();
+                }
             }
             for (std::size_t i = 0; i < element_indices.size(); i += 3) {
                 const Vec3 a = transform(world, vertices.at(element_indices[i]));
@@ -451,7 +458,7 @@ GltfAsset GltfAsset::load(const std::filesystem::path& path) {
                         vertex_uvs.empty() ? Vec2{} : vertex_uvs.at(element_indices[i]),
                         vertex_uvs.empty() ? Vec2{} : vertex_uvs.at(element_indices[i + 1]),
                         vertex_uvs.empty() ? Vec2{} : vertex_uvs.at(element_indices[i + 2]),
-                        base_color_texture, material});
+                        base_color_texture, normal_texture, normal_scale, material});
                 } else {
                     result.triangles_.push_back({a, b, c,
                         transform_normal(world, vertex_normals.at(element_indices[i])),
@@ -460,7 +467,7 @@ GltfAsset GltfAsset::load(const std::filesystem::path& path) {
                         vertex_uvs.empty() ? Vec2{} : vertex_uvs.at(element_indices[i]),
                         vertex_uvs.empty() ? Vec2{} : vertex_uvs.at(element_indices[i + 1]),
                         vertex_uvs.empty() ? Vec2{} : vertex_uvs.at(element_indices[i + 2]),
-                        base_color_texture, material});
+                        base_color_texture, normal_texture, normal_scale, material});
                 }
             }
         }

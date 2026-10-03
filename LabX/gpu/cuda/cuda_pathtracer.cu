@@ -52,6 +52,7 @@ struct Triangle {
     float transmission; float index_of_refraction;
     float3 first_normal; float3 second_normal; float3 third_normal; bool smooth;
     float2 first_uv; float2 second_uv; float2 third_uv; int texture_index{-1};
+    float3 tangent; float tangent_handedness{1.0f}; int normal_texture_index{-1}; float normal_scale{1.0f};
 };
 struct TextureDescriptor { int offset; int width; int height; };
 struct ImportedAssets {
@@ -73,6 +74,7 @@ struct Hit {
     float distance; float3 position; float3 normal; float3 albedo; float metallic; float roughness;
     float transmission; float index_of_refraction; bool front_face; bool found;
     float2 uv; int texture_index;
+    float3 tangent; float tangent_handedness; int normal_texture_index; float normal_scale;
 };
 
 struct Rng {
@@ -155,6 +157,10 @@ __device__ void intersect_triangles(const Ray& ray, const Triangle* triangles, c
                                          triangle.first_uv.y * (1.0f - u - v) + triangle.second_uv.y * u +
                                          triangle.third_uv.y * v);
                 closest.texture_index = triangle.texture_index;
+                closest.tangent = triangle.tangent;
+                closest.tangent_handedness = triangle.tangent_handedness;
+                closest.normal_texture_index = triangle.normal_texture_index;
+                closest.normal_scale = triangle.normal_scale;
                 closest.found = true;
             }
         } else {
@@ -192,6 +198,7 @@ __device__ bool intersect_scene(const Ray& ray, const Sphere* spheres, int spher
         closest.transmission = sphere.transmission;
         closest.index_of_refraction = sphere.index_of_refraction;
         closest.texture_index = -1;
+        closest.normal_texture_index = -1;
         closest.found = true;
     }
     intersect_triangles(ray, triangles, nodes, node_count, closest);
@@ -478,6 +485,19 @@ __device__ float3 radiance(Ray ray, const Sphere* spheres, int sphere_count,
             break;
         }
         hit.albedo = mul(hit.albedo, sample_texture(textures, hit.texture_index, hit.uv));
+        if (hit.normal_texture_index >= 0) {
+            const float3 encoded = sample_texture(textures, hit.normal_texture_index, hit.uv);
+            const float3 tangent_normal = normalize3(make_float3(
+                (encoded.x * 2.0f - 1.0f) * hit.normal_scale,
+                (encoded.y * 2.0f - 1.0f) * hit.normal_scale,
+                encoded.z * 2.0f - 1.0f));
+            const float3 tangent = normalize3(sub(hit.tangent, mul(hit.normal, dot3(hit.normal, hit.tangent))));
+            const float3 bitangent = mul(cross3(hit.normal, tangent), hit.tangent_handedness);
+            const float3 mapped = normalize3(add(add(mul(tangent, tangent_normal.x),
+                                                      mul(bitangent, tangent_normal.y)),
+                                                  mul(hit.normal, tangent_normal.z)));
+            hit.normal = dot3(mapped, ray.direction) < 0.0f ? mapped : mul(mapped, -1.0f);
+        }
         const float3 view_direction = mul(ray.direction, -1.0f);
         const bool non_transmissive_surface = hit.transmission <= 0.0f;
         if (non_transmissive_surface) {
@@ -887,34 +907,55 @@ ImportedAssets load_gltf_triangles(const std::filesystem::path& path) {
     ImportedAssets result;
     result.triangles.reserve(asset.triangles().size());
     std::vector<std::shared_ptr<const cg::assets::GltfTexture>> texture_sources;
+    std::vector<bool> texture_srgb;
     const auto convert = [](const cg::Vec3& value) {
         return make_float3(static_cast<float>(value.x), static_cast<float>(value.y), static_cast<float>(value.z));
     };
-    for (const cg::assets::GltfTriangle& triangle : asset.triangles()) {
-        int texture_index = -1;
-        if (triangle.base_color_texture) {
-            const auto found = std::find(texture_sources.begin(), texture_sources.end(), triangle.base_color_texture);
-            if (found == texture_sources.end()) {
-                texture_index = static_cast<int>(texture_sources.size());
-                texture_sources.push_back(triangle.base_color_texture);
-                const int offset = static_cast<int>(result.texture_pixels.size());
-                result.textures.push_back({offset, static_cast<int>(triangle.base_color_texture->width),
-                                            static_cast<int>(triangle.base_color_texture->height)});
-                for (const cg::Color& pixel : triangle.base_color_texture->pixels)
-                    result.texture_pixels.push_back(convert(pixel));
-            } else texture_index = static_cast<int>(found - texture_sources.begin());
+    const auto register_texture = [&](const std::shared_ptr<const cg::assets::GltfTexture>& texture,
+                                      bool srgb) {
+        if (!texture) return -1;
+        for (std::size_t index = 0; index < texture_sources.size(); ++index)
+            if (texture_sources[index] == texture && texture_srgb[index] == srgb) return static_cast<int>(index);
+        const int index = static_cast<int>(texture_sources.size());
+        texture_sources.push_back(texture);
+        texture_srgb.push_back(srgb);
+        result.textures.push_back({static_cast<int>(result.texture_pixels.size()),
+                                   static_cast<int>(texture->width), static_cast<int>(texture->height)});
+        for (const cg::Color& pixel : texture->pixels) {
+            const cg::Color value = srgb ? cg::Color{std::pow(pixel.x, 2.2), std::pow(pixel.y, 2.2),
+                                                     std::pow(pixel.z, 2.2)} : pixel;
+            result.texture_pixels.push_back(convert(value));
         }
-        result.triangles.push_back({convert(triangle.first), convert(triangle.second), convert(triangle.third),
+        return index;
+    };
+    for (const cg::assets::GltfTriangle& triangle : asset.triangles()) {
+        const int texture_index = register_texture(triangle.base_color_texture, true);
+        const int normal_texture_index = register_texture(triangle.normal_texture, false);
+        const float3 first = convert(triangle.first), second = convert(triangle.second), third = convert(triangle.third);
+        const float2 uv0 = make_float2(static_cast<float>(triangle.first_uv.x), static_cast<float>(triangle.first_uv.y));
+        const float2 uv1 = make_float2(static_cast<float>(triangle.second_uv.x), static_cast<float>(triangle.second_uv.y));
+        const float2 uv2 = make_float2(static_cast<float>(triangle.third_uv.x), static_cast<float>(triangle.third_uv.y));
+        const float determinant = (uv1.x - uv0.x) * (uv2.y - uv0.y) - (uv1.y - uv0.y) * (uv2.x - uv0.x);
+        float3 tangent = make_float3(1, 0, 0);
+        float handedness = 1.0f;
+        if (fabsf(determinant) > 1.0e-8f) {
+            const float inverse = 1.0f / determinant;
+            const float3 edge1 = sub(second, first), edge2 = sub(third, first);
+            tangent = normalize3(mul(sub(mul(edge1, uv2.y - uv0.y), mul(edge2, uv1.y - uv0.y)), inverse));
+            const float3 bitangent = normalize3(mul(sub(mul(edge2, uv1.x - uv0.x), mul(edge1, uv2.x - uv0.x)), inverse));
+            const float3 normal = triangle.has_normals ? convert(triangle.first_normal)
+                                                        : normalize3(cross3(edge1, edge2));
+            handedness = dot3(cross3(normal, tangent), bitangent) < 0.0f ? -1.0f : 1.0f;
+        }
+        result.triangles.push_back({first, second, third,
                           convert(triangle.material.albedo), static_cast<float>(triangle.material.metallic),
                           static_cast<float>(triangle.material.roughness),
                           static_cast<float>(triangle.material.transmission),
                           static_cast<float>(triangle.material.index_of_refraction),
                           convert(triangle.first_normal), convert(triangle.second_normal),
                           convert(triangle.third_normal), triangle.has_normals,
-                          make_float2(static_cast<float>(triangle.first_uv.x), static_cast<float>(triangle.first_uv.y)),
-                          make_float2(static_cast<float>(triangle.second_uv.x), static_cast<float>(triangle.second_uv.y)),
-                          make_float2(static_cast<float>(triangle.third_uv.x), static_cast<float>(triangle.third_uv.y)),
-                          texture_index});
+                          uv0, uv1, uv2, texture_index, tangent, handedness, normal_texture_index,
+                          static_cast<float>(triangle.normal_scale)});
     }
     return result;
 }
@@ -930,6 +971,7 @@ void append_imported(ImportedAssets& destination, ImportedAssets source) {
                                       source.texture_pixels.begin(), source.texture_pixels.end());
     for (Triangle& triangle : source.triangles) {
         if (triangle.texture_index >= 0) triangle.texture_index += texture_base;
+        if (triangle.normal_texture_index >= 0) triangle.normal_texture_index += texture_base;
         destination.triangles.push_back(triangle);
     }
 }
