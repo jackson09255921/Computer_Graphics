@@ -54,13 +54,13 @@ ctest --test-dir build-cuda -R cuda_capability --output-on-failure
 3. Importance sampling and multiple importance sampling.
 4. Refraction, dielectric materials, HDR environment lighting, and glTF input (implemented).
 5. CUDA tiled path tracing sized for the 8 GiB GPU budget (geometry, glTF, matched GGX reflection/BTDF, MIS, and HDR implemented).
-6. OptiX context probe scaffold and ReSTIR DI reservoir core (implemented); renderer integration follows.
+6. OptiX context plus a hardware-traversed triangle pipeline, and the ReSTIR DI reservoir core (implemented); full renderer integration follows.
 7. Denoising and neural reconstruction only after stable temporal buffers exist.
 
 Every milestone must retain a CPU build, deterministic tests, and a small demo
 scene before the next one begins.
 
-## Optional OptiX probe (native Windows)
+## Optional OptiX demos (native Windows)
 
 OptiX on WSL2 still requires an experimental driver-library workaround. Keep
 the CPU/CUDA labs in WSL2, but run OptiX on native Windows. After downloading
@@ -70,9 +70,14 @@ the separate NVIDIA SDK, point `OPTIX_ROOT` at its extracted root:
 $env:OPTIX_ROOT = 'D:\github\.deps\optix-sdk-9.1.0'
 cmake -S . -B build-optix-windows `
   -DBUILD_LEGACY_LABS=OFF -DBUILD_CUDA_DEMOS=OFF -DBUILD_OPTIX_DEMOS=ON
-cmake --build build-optix-windows --config Release --target optix_context_probe
-ctest --test-dir build-optix-windows -C Release -R optix_context_probe --output-on-failure
+cmake --build build-optix-windows --config Release `
+  --target optix_context_probe optix_triangle_demo
+ctest --test-dir build-optix-windows -C Release -R optix_ --output-on-failure
 ```
+
+`optix_triangle_demo` compiles its raygen, miss, and closest-hit programs to
+PTX, builds a triangle geometry acceleration structure and shader binding
+table, launches RTX traversal, validates the center hit, and writes a PPM.
 
 Without the SDK, configuration stops immediately with an actionable message;
 normal CPU and CUDA builds remain unaffected.

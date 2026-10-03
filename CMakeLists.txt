@@ -49,8 +49,38 @@ if(BUILD_OPTIX_DEMOS)
     add_executable(optix_context_probe LabX/gpu/optix_context_probe.cpp)
     target_include_directories(optix_context_probe PRIVATE "${OPTIX_INCLUDE_DIR}")
     target_link_libraries(optix_context_probe PRIVATE CUDA::cuda_driver ${CMAKE_DL_LIBS})
+
+    set(OPTIX_TRIANGLE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/LabX/gpu/optix")
+    set(OPTIX_TRIANGLE_PTX "${CMAKE_CURRENT_BINARY_DIR}/optix_triangle_device.ptx")
+    set(OPTIX_NVCC_HOST_COMPILER_OPTION)
+    if(MSVC)
+        set(OPTIX_NVCC_HOST_COMPILER_OPTION
+            --allow-unsupported-compiler
+            -D_ALLOW_COMPILER_AND_STL_VERSION_MISMATCH)
+    endif()
+    add_custom_command(
+        OUTPUT "${OPTIX_TRIANGLE_PTX}"
+        COMMAND "${CUDAToolkit_NVCC_EXECUTABLE}" --ptx --std=c++17
+                ${OPTIX_NVCC_HOST_COMPILER_OPTION}
+                "-I${OPTIX_INCLUDE_DIR}" "-I${OPTIX_TRIANGLE_DIR}"
+                "${OPTIX_TRIANGLE_DIR}/optix_triangle_device.cu"
+                -o "${OPTIX_TRIANGLE_PTX}"
+        DEPENDS
+            "${OPTIX_TRIANGLE_DIR}/optix_triangle_device.cu"
+            "${OPTIX_TRIANGLE_DIR}/optix_triangle_shared.h"
+        COMMENT "Compiling OptiX triangle device programs to PTX"
+        VERBATIM)
+    add_custom_target(optix_triangle_ptx DEPENDS "${OPTIX_TRIANGLE_PTX}")
+    add_executable(optix_triangle_demo "${OPTIX_TRIANGLE_DIR}/optix_triangle_demo.cpp")
+    add_dependencies(optix_triangle_demo optix_triangle_ptx)
+    target_include_directories(optix_triangle_demo PRIVATE "${OPTIX_INCLUDE_DIR}" "${OPTIX_TRIANGLE_DIR}")
+    target_compile_definitions(optix_triangle_demo PRIVATE
+        OPTIX_TRIANGLE_PTX_PATH="${OPTIX_TRIANGLE_PTX}")
+    target_link_libraries(optix_triangle_demo PRIVATE CUDA::cudart CUDA::cuda_driver ${CMAKE_DL_LIBS})
     if(BUILD_TESTING)
         add_test(NAME optix_context_probe COMMAND optix_context_probe)
+        add_test(NAME optix_triangle_demo COMMAND optix_triangle_demo
+                 "${CMAKE_CURRENT_BINARY_DIR}/optix_triangle_test.ppm")
     endif()
 endif()
 
