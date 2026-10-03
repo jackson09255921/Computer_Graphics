@@ -72,6 +72,8 @@ per pixel (64 by default):
 
 The random seed is fixed, so identical settings produce reproducible images.
 Raise the sample count for a cleaner result or lower it for faster previews.
+Rendering is progressive and uses a deterministic multi-threaded tile scheduler;
+changing the thread count or tile execution order does not change the pixels.
 
 ![Path-traced demo scene](images/pathtracer_demo.png)
 

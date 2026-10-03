@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <chrono>
 #include <exception>
 #include <filesystem>
@@ -6,6 +7,7 @@
 #include <string>
 
 #include "raytracer/raytracer.hpp"
+#include "progressive/progressive_renderer.hpp"
 
 int main(int argc, char** argv) {
     try {
@@ -34,7 +36,8 @@ int main(int argc, char** argv) {
 
         const cg::rt::Camera camera({0.0, 0.9, 2.8}, {0.0, 0.0, -4.1}, {0.0, 1.0, 0.0}, 48.0,
                                     static_cast<double>(width) / static_cast<double>(height));
-        const cg::rt::PathTracer renderer(width, height, samples, 8);
+        const cg::progressive::Renderer renderer({width, height, samples, std::min<std::size_t>(4, samples),
+                                                   16, 0, 8, 0x5EEDu});
         const auto start = std::chrono::steady_clock::now();
         const cg::Image image = renderer.render(scene, camera);
         const auto elapsed = std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count();

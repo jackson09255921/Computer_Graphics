@@ -10,6 +10,7 @@ LabX/
 ├── curves/       # headless and interactive Bézier tools
 ├── gpu/          # optional CUDA/GPU capability and rendering work
 ├── pbr/          # GGX, Fresnel, and metallic/roughness material model
+├── progressive/  # deterministic multi-threaded tile rendering
 └── raytracing/   # Whitted ray tracing and Monte Carlo path tracing demos
 ```
 

@@ -169,6 +169,9 @@ public:
     PathTracer(std::size_t width, std::size_t height, std::size_t samples_per_pixel = 64,
                int maximum_depth = 8, std::uint64_t seed = 0x5EEDu);
     [[nodiscard]] Image render(const Scene& scene, const Camera& camera) const;
+    [[nodiscard]] Color sample_pixel(const Scene& scene, const Camera& camera,
+                                     std::size_t x, std::size_t y,
+                                     std::size_t sample_begin, std::size_t sample_count) const;
 
 private:
     std::size_t width_;

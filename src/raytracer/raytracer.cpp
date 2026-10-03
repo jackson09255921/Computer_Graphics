@@ -112,6 +112,13 @@ Color path_radiance(const Scene& scene, const Ray& ray, int depth, int maximum_d
         {hit.position + hit.normal * kRayBias, bounce_direction}, depth + 1, maximum_depth, sampler) * compensation;
 }
 
+std::uint64_t mix_seed(std::uint64_t value) {
+    value += 0x9E3779B97F4A7C15ull;
+    value = (value ^ (value >> 30u)) * 0xBF58476D1CE4E5B9ull;
+    value = (value ^ (value >> 27u)) * 0x94D049BB133111EBull;
+    return value ^ (value >> 31u);
+}
+
 }  // namespace
 
 bool Aabb::intersects(const Ray& ray, double minimum_distance, double maximum_distance) const {
@@ -444,19 +451,29 @@ PathTracer::PathTracer(std::size_t width, std::size_t height, std::size_t sample
 
 Image PathTracer::render(const Scene& scene, const Camera& camera) const {
     Image image(width_, height_);
-    Sampler sampler(seed_);
     for (std::size_t y = 0; y < height_; ++y) {
         for (std::size_t x = 0; x < width_; ++x) {
-            Color color{};
-            for (std::size_t sample = 0; sample < samples_per_pixel_; ++sample) {
-                const double horizontal = (static_cast<double>(x) + sampler.next()) / static_cast<double>(width_);
-                const double vertical = (static_cast<double>(y) + sampler.next()) / static_cast<double>(height_);
-                color += path_radiance(scene, camera.ray(horizontal, vertical), 0, maximum_depth_, sampler);
-            }
-            image.set(x, y, color / static_cast<double>(samples_per_pixel_));
+            image.set(x, y, sample_pixel(scene, camera, x, y, 0, samples_per_pixel_));
         }
     }
     return image;
+}
+
+Color PathTracer::sample_pixel(const Scene& scene, const Camera& camera, std::size_t x, std::size_t y,
+                               std::size_t sample_begin, std::size_t sample_count) const {
+    if (x >= width_ || y >= height_ || sample_count == 0) {
+        throw std::invalid_argument("invalid path tracer pixel sample range");
+    }
+    Color color{};
+    const std::uint64_t pixel = static_cast<std::uint64_t>(y * width_ + x);
+    for (std::size_t offset = 0; offset < sample_count; ++offset) {
+        const std::uint64_t sample = static_cast<std::uint64_t>(sample_begin + offset);
+        Sampler sampler(mix_seed(seed_ ^ mix_seed(pixel) ^ mix_seed(sample)));
+        const double horizontal = (static_cast<double>(x) + sampler.next()) / static_cast<double>(width_);
+        const double vertical = (static_cast<double>(y) + sampler.next()) / static_cast<double>(height_);
+        color += path_radiance(scene, camera.ray(horizontal, vertical), 0, maximum_depth_, sampler);
+    }
+    return color / static_cast<double>(sample_count);
 }
 
 }  // namespace cg::rt
