@@ -44,6 +44,8 @@ struct OptixTriangleParams {
     unsigned int light_count;
     float3 camera_origin;
     float3 previous_camera_origin;
+    float3 animated_object_motion;
+    unsigned int animated_primitive;
     float view_scale;
 };
 

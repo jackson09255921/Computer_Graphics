@@ -143,6 +143,10 @@ projecting each world-space primary hit into the previous view. Reprojection
 rejects history on depth, normal, or albedo discontinuities before carrying
 accumulation forward; depth validation compares against the hit's expected ray
 distance from the previous camera rather than mixing depths from two views.
+The default scene also translates its elevated triangle on frame 1 and updates
+the existing OptiX GAS in place. Per-primitive motion projects the corresponding
+previous world position, so newly exposed or occluded pixels reject stale
+accumulation and reservoirs while stable regions retain their history.
 The same validated reprojection now merges compact ReSTIR DI reservoirs across
 frames. Four point lights provide candidates, while only the selected sample
 receives an RTX shadow ray and reservoir-normalized direct-light contribution.

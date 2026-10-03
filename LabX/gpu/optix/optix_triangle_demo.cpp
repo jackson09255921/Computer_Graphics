@@ -161,19 +161,21 @@ int main(int argc, char** argv) {
         build_input.triangleArray.flags = geometry_flags;
         build_input.triangleArray.numSbtRecords = 1;
         OptixAccelBuildOptions accel_options{};
-        accel_options.buildFlags = OPTIX_BUILD_FLAG_PREFER_FAST_TRACE;
+        accel_options.buildFlags = OPTIX_BUILD_FLAG_PREFER_FAST_TRACE | OPTIX_BUILD_FLAG_ALLOW_UPDATE;
         accel_options.operation = OPTIX_BUILD_OPERATION_BUILD;
         OptixAccelBufferSizes sizes{};
         check_optix(optixAccelComputeMemoryUsage(context, &accel_options, &build_input, 1, &sizes),
                     "optixAccelComputeMemoryUsage");
         CUdeviceptr scratch = 0;
-        check_cuda(cudaMalloc(reinterpret_cast<void**>(&scratch), sizes.tempSizeInBytes), "cudaMalloc GAS scratch");
+        check_cuda(cudaMalloc(reinterpret_cast<void**>(&scratch),
+                              std::max(sizes.tempSizeInBytes, sizes.tempUpdateSizeInBytes)),
+                   "cudaMalloc GAS scratch");
         check_cuda(cudaMalloc(reinterpret_cast<void**>(&gas), sizes.outputSizeInBytes), "cudaMalloc GAS");
         OptixTraversableHandle gas_handle{};
         check_optix(optixAccelBuild(context, nullptr, &accel_options, &build_input, 1,
-                                    scratch, sizes.tempSizeInBytes, gas, sizes.outputSizeInBytes,
+                                    scratch, std::max(sizes.tempSizeInBytes, sizes.tempUpdateSizeInBytes),
+                                    gas, sizes.outputSizeInBytes,
                                     &gas_handle, nullptr, 0), "optixAccelBuild");
-        check_cuda(cudaFree(reinterpret_cast<void*>(scratch)), "cudaFree GAS scratch");
 
         OptixPipelineCompileOptions compile_options{};
         compile_options.traversableGraphFlags = OPTIX_TRAVERSABLE_GRAPH_FLAG_ALLOW_SINGLE_GAS;
@@ -381,7 +383,9 @@ int main(int argc, char** argv) {
                                          reinterpret_cast<float*>(device_roughness),
                                          reinterpret_cast<OptixPointLight*>(device_lights),
                                          static_cast<unsigned int>(lights.size()), first_frame_camera_origin,
-                                         first_frame_camera_origin, view_scale};
+                                         first_frame_camera_origin,
+                                         make_float3(0.0f, 0.0f, 0.0f),
+                                         argc <= 2 ? 2u : std::numeric_limits<unsigned int>::max(), view_scale};
         check_cuda(cudaMalloc(reinterpret_cast<void**>(&device_params), sizeof(params)), "cudaMalloc params");
         for (unsigned int sample = 0; sample < samples_per_frame; ++sample) {
             params.sample_index = sample;
@@ -403,6 +407,19 @@ int main(int argc, char** argv) {
                               reinterpret_cast<void*>(reservoirs),
                               width * height * sizeof(OptixLightReservoir), cudaMemcpyDeviceToDevice),
                    "cudaMemcpy previous reservoirs");
+        if (argc <= 2) {
+            params.animated_object_motion = make_float3(0.12f, 0.0f, 0.0f);
+            for (std::size_t vertex = 4; vertex < 7; ++vertex)
+                mesh.vertices[vertex].x += params.animated_object_motion.x;
+            check_cuda(cudaMemcpy(reinterpret_cast<void*>(device_vertices), mesh.vertices.data(), vertices_size,
+                                  cudaMemcpyHostToDevice), "cudaMemcpy animated vertices");
+            accel_options.operation = OPTIX_BUILD_OPERATION_UPDATE;
+            check_optix(optixAccelBuild(context, nullptr, &accel_options, &build_input, 1,
+                                        scratch, std::max(sizes.tempSizeInBytes, sizes.tempUpdateSizeInBytes),
+                                        gas, sizes.outputSizeInBytes, &gas_handle, nullptr, 0),
+                        "optixAccelBuild update");
+        }
+        check_cuda(cudaFree(reinterpret_cast<void*>(scratch)), "cudaFree GAS scratch");
         params.frame_index = 1;
         params.previous_camera_origin = params.camera_origin;
         params.camera_origin = camera_origin;
@@ -438,7 +455,7 @@ int main(int argc, char** argv) {
                               sizeof(center_temporal_validity), cudaMemcpyDeviceToHost),
                    "cudaMemcpy temporal validity");
         if (center_temporal_validity != 1u)
-            throw std::runtime_error("static-frame temporal reprojection was rejected");
+            throw std::runtime_error("moving-scene center temporal reprojection was rejected");
         OptixLightReservoir center_reservoir{};
         check_cuda(cudaMemcpy(&center_reservoir,
                               reinterpret_cast<void*>(reservoirs +
@@ -482,6 +499,23 @@ int main(int argc, char** argv) {
         if (center_depth <= 0.0f || normal_length_squared < 0.9f || normal_length_squared > 1.1f ||
             center_albedo.x <= 0.0f || fabsf(center_motion.x) < 0.5f || fabsf(center_motion.y) > 0.01f)
             throw std::runtime_error("primary-hit G-buffer invariant failed");
+        std::vector<float> frame_depth(width * height);
+        std::vector<unsigned int> frame_validity(width * height);
+        check_cuda(cudaMemcpy(frame_depth.data(), reinterpret_cast<void*>(gbuffer_depth),
+                              frame_depth.size() * sizeof(float), cudaMemcpyDeviceToHost),
+                   "cudaMemcpy frame depth");
+        check_cuda(cudaMemcpy(frame_validity.data(), reinterpret_cast<void*>(temporal_validity),
+                              frame_validity.size() * sizeof(unsigned int), cudaMemcpyDeviceToHost),
+                   "cudaMemcpy frame temporal validity");
+        std::size_t accepted_history_pixels = 0;
+        std::size_t rejected_history_pixels = 0;
+        for (std::size_t pixel = 0; pixel < frame_depth.size(); ++pixel) {
+            if (frame_depth[pixel] <= 0.0f) continue;
+            if (frame_validity[pixel] != 0u) ++accepted_history_pixels;
+            else ++rejected_history_pixels;
+        }
+        if (accepted_history_pixels == 0 || (argc <= 2 && rejected_history_pixels == 0))
+            throw std::runtime_error("moving-scene disocclusion invariant failed");
         std::vector<uchar4> image(width * height);
         check_cuda(cudaMemcpy(image.data(), reinterpret_cast<void*>(device_image), image.size() * sizeof(uchar4),
                               cudaMemcpyDeviceToHost), "cudaMemcpy image");
@@ -508,6 +542,8 @@ int main(int argc, char** argv) {
                   << static_cast<int>(center_pixel.z) << ", depth " << center_depth << ", normal "
                   << center_normal.x << ", " << center_normal.y << ", " << center_normal.z
                   << ", motion " << center_motion.x << ", " << center_motion.y
+                  << ", history accepted/rejected " << accepted_history_pixels << "/"
+                  << rejected_history_pixels
                   << ", temporal history accepted, temporal M=" << center_reservoir.candidate_count
                   << ", spatial M=" << center_spatial_reservoir.candidate_count << ")\n";
 

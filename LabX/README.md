@@ -58,7 +58,7 @@ ctest --test-dir build-cuda -R cuda_capability --output-on-failure
 3. Importance sampling and multiple importance sampling.
 4. Refraction, dielectric materials, HDR environment lighting, and glTF input (implemented).
 5. CUDA tiled path tracing sized for the 8 GiB GPU budget (geometry, glTF, matched GGX reflection/BTDF, MIS, and HDR implemented).
-6. OptiX indexed-mesh/glTF rendering with recursive GGX reflections, progressive G-buffers, moving-camera reprojection, and temporally plus spatially reused and resolved ReSTIR DI reservoirs (implemented); animated geometry follows.
+6. OptiX indexed-mesh/glTF rendering with recursive GGX reflections, progressive G-buffers, moving-camera and animated-geometry reprojection, and temporally plus spatially reused and resolved ReSTIR DI reservoirs (implemented).
 7. Denoising and neural reconstruction only after stable temporal buffers exist.
 
 Every milestone must retain a CPU build, deterministic tests, and a small demo
@@ -101,13 +101,18 @@ Primary hits populate persistent world-normal, linear-depth, albedo, and
 motion-vector attachments. Reflection and shadow rays are excluded by payload
 depth. Frame 1 moves the camera horizontally; each world-space hit is projected
 into the previous camera to produce a non-zero screen-space motion vector.
+The default elevated triangle also translates between frames. Its vertices are
+uploaded and the existing GAS is updated with `OPTIX_BUILD_OPERATION_UPDATE`;
+per-primitive motion maps current hits back to their previous world positions.
 
 The renderer splits its 32 samples across two frames. Frame 1 reprojects into
 frame 0 with motion vectors, then validates 1% relative depth, normal
 similarity, and albedo continuity. Previous-view depth is checked against the
 current world-space hit's expected distance from the previous camera. Rejected
 pixels clear their history; the moving-camera center pixel must report at least
-0.5 pixel motion and retain all 32 samples for the test to pass.
+0.5 pixel motion and retain all 32 samples for the test to pass. The complete
+frame must contain both accepted history and rejected foreground pixels,
+covering stable surfaces as well as true disocclusions.
 
 Direct lighting uses four point-light candidates. Each primary pixel streams
 one weighted candidate per sample into a compact ReSTIR DI reservoir. Frame 1
