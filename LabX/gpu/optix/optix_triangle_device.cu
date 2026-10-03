@@ -189,6 +189,29 @@ extern "C" __global__ void __raygen__spatial_reuse() {
     params.spatial_reservoirs[pixel] = result;
 }
 
+extern "C" __global__ void __raygen__spatial_resolve() {
+    const uint3 index = optixGetLaunchIndex();
+    const uint3 dimensions = optixGetLaunchDimensions();
+    const float2 screen = make_float2(
+        (2.0f * (static_cast<float>(index.x) + 0.5f) / static_cast<float>(dimensions.x) - 1.0f) *
+            (static_cast<float>(dimensions.x) / static_cast<float>(dimensions.y)),
+        2.0f * (static_cast<float>(index.y) + 0.5f) / static_cast<float>(dimensions.y) - 1.0f);
+    const float3 raw_direction = make_float3(screen.x * params.view_scale,
+                                             screen.y * params.view_scale,
+                                             -2.5f * params.view_scale);
+    const float3 direction = normalize_vector(raw_direction);
+    unsigned int red = 0, green = 0, blue = 0, depth = 0;
+    optixTrace(params.handle, params.camera_origin, direction, 0.0f, 1.0e16f, 0.0f,
+               OptixVisibilityMask(255), OPTIX_RAY_FLAG_NONE,
+               OPTIX_RAY_TYPE_RADIANCE, OPTIX_RAY_TYPE_COUNT,
+               OPTIX_RAY_TYPE_RADIANCE, red, green, blue, depth);
+    const unsigned int pixel = index.y * params.width + index.x;
+    params.image[pixel] = make_uchar4(
+        static_cast<unsigned char>(fminf(fmaxf(__uint_as_float(red), 0.0f), 1.0f) * 255.0f),
+        static_cast<unsigned char>(fminf(fmaxf(__uint_as_float(green), 0.0f), 1.0f) * 255.0f),
+        static_cast<unsigned char>(fminf(fmaxf(__uint_as_float(blue), 0.0f), 1.0f) * 255.0f), 255);
+}
+
 extern "C" __global__ void __miss__background() {
     set_color(0.03f, 0.05f, 0.10f);
 }
@@ -230,7 +253,7 @@ extern "C" __global__ void __closesthit__lit() {
     const float3 base_color = params.primitive_colors[primitive];
     bool temporal_valid = false;
     unsigned int temporal_pixel = pixel;
-    if (depth == 0u) {
+    if (depth == 0u && params.spatial_resolve == 0u) {
         params.gbuffer_normal[pixel] = normal;
         params.gbuffer_depth[pixel] = distance;
         params.gbuffer_albedo[pixel] = base_color;
@@ -260,7 +283,14 @@ extern "C" __global__ void __closesthit__lit() {
     unsigned int light_random = hash(pixel + 0x27d4eb2du * (params.sample_index + 1u));
     unsigned int selected_light = light_random % params.light_count;
     float reservoir_normalization = static_cast<float>(params.light_count);
-    if (depth == 0u) {
+    if (depth == 0u && params.spatial_resolve != 0u) {
+        const OptixLightReservoir reservoir = params.spatial_reservoirs[pixel];
+        selected_light = reservoir.light_index;
+        reservoir_normalization = reservoir.candidate_count > 0u && reservoir.selected_weight > 0.0f
+            ? reservoir.weight_sum /
+                  (static_cast<float>(reservoir.candidate_count) * reservoir.selected_weight)
+            : 0.0f;
+    } else if (depth == 0u) {
         OptixLightReservoir reservoir = params.reservoirs[pixel];
         if (params.sample_index == 0u || params.sample_index == 16u) reservoir = {};
         if (params.sample_index == 16u && temporal_valid) {

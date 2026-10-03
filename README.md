@@ -146,8 +146,10 @@ receives an RTX shadow ray and reservoir-normalized direct-light contribution.
 A separate, race-free spatial pass then validates four-neighbor depth, normal,
 and albedo continuity and merges compatible temporal reservoirs into an
 independent output buffer. The default-scene invariant grows the center
-reservoir from `M = 32` to `M = 160`; resolving that spatially selected sample
-back into final lighting is the next renderer milestone.
+reservoir from `M = 32` to `M = 160`. A final OptiX raygen pass retraces the
+primary ray with the spatially selected light, performs a fresh RTX visibility
+test, preserves recursive GGX reflections, and writes the resolved result to
+the output image.
 
 The dependency-free `LabX/assets` loader imports glTF 2.x triangle primitives
 from external binary buffers, including indexed or non-indexed geometry, scene

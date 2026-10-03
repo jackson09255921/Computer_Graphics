@@ -58,7 +58,7 @@ ctest --test-dir build-cuda -R cuda_capability --output-on-failure
 3. Importance sampling and multiple importance sampling.
 4. Refraction, dielectric materials, HDR environment lighting, and glTF input (implemented).
 5. CUDA tiled path tracing sized for the 8 GiB GPU budget (geometry, glTF, matched GGX reflection/BTDF, MIS, and HDR implemented).
-6. OptiX indexed-mesh/glTF rendering with recursive GGX reflections, progressive G-buffers, and temporally plus spatially reused ReSTIR DI reservoirs (implemented); spatial lighting resolve and dynamic motion follow.
+6. OptiX indexed-mesh/glTF rendering with recursive GGX reflections, progressive G-buffers, and temporally plus spatially reused and resolved ReSTIR DI reservoirs (implemented); dynamic motion follows.
 7. Denoising and neural reconstruction only after stable temporal buffers exist.
 
 Every milestone must retain a CPU build, deterministic tests, and a small demo
@@ -115,8 +115,9 @@ reservoir normalization. The deterministic test requires `M = 32` at the
 static center pixel. A second OptiX raygen pass reads those stable temporal
 reservoirs, rejects four-neighbor discontinuities using depth, normal, and
 albedo, and writes into a separate race-free spatial buffer. The default scene
-must produce `M = 160` at its center; final lighting still uses the temporal
-selection until the dedicated spatial resolve pass is added.
+must produce `M = 160` at its center. A third raygen pass retraces primary rays,
+uses the spatial selection and normalization for one new visibility ray, keeps
+recursive GGX reflection shading active, and writes the resolved final image.
 
 Without the SDK, configuration stops immediately with an actionable message;
 normal CPU and CUDA builds remain unaffected.

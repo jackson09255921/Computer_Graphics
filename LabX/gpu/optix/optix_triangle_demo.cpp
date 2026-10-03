@@ -120,10 +120,11 @@ int main(int argc, char** argv) {
     OptixDeviceContext context = nullptr;
     OptixModule module = nullptr;
     OptixPipeline pipeline = nullptr;
-    OptixProgramGroup raygen = nullptr, spatial_raygen = nullptr;
+    OptixProgramGroup raygen = nullptr, spatial_raygen = nullptr, spatial_resolve_raygen = nullptr;
     OptixProgramGroup radiance_miss = nullptr, shadow_miss = nullptr;
     OptixProgramGroup radiance_hit = nullptr, shadow_hit = nullptr;
-    CUdeviceptr gas = 0, raygen_record = 0, spatial_raygen_record = 0, miss_record = 0, hit_record = 0;
+    CUdeviceptr gas = 0, raygen_record = 0, spatial_raygen_record = 0;
+    CUdeviceptr spatial_resolve_raygen_record = 0, miss_record = 0, hit_record = 0;
     CUdeviceptr device_image = 0, device_accumulation = 0, device_params = 0;
     CUdeviceptr device_colors = 0, device_reflectivity = 0;
     CUdeviceptr device_roughness = 0;
@@ -209,6 +210,11 @@ int main(int argc, char** argv) {
         spatial_raygen_desc.raygen.module = module;
         spatial_raygen_desc.raygen.entryFunctionName = "__raygen__spatial_reuse";
         create_group(spatial_raygen_desc, spatial_raygen, "spatial raygen program");
+        OptixProgramGroupDesc spatial_resolve_raygen_desc{};
+        spatial_resolve_raygen_desc.kind = OPTIX_PROGRAM_GROUP_KIND_RAYGEN;
+        spatial_resolve_raygen_desc.raygen.module = module;
+        spatial_resolve_raygen_desc.raygen.entryFunctionName = "__raygen__spatial_resolve";
+        create_group(spatial_resolve_raygen_desc, spatial_resolve_raygen, "spatial resolve raygen program");
         OptixProgramGroupDesc miss_desc{};
         miss_desc.kind = OPTIX_PROGRAM_GROUP_KIND_MISS;
         miss_desc.miss.module = module;
@@ -230,8 +236,9 @@ int main(int argc, char** argv) {
         shadow_hit_desc.hitgroup.entryFunctionNameCH = "__closesthit__shadow";
         create_group(shadow_hit_desc, shadow_hit, "shadow closest-hit program");
 
-        const std::array<OptixProgramGroup, 6> groups{
-            raygen, spatial_raygen, radiance_miss, shadow_miss, radiance_hit, shadow_hit};
+        const std::array<OptixProgramGroup, 7> groups{
+            raygen, spatial_raygen, spatial_resolve_raygen,
+            radiance_miss, shadow_miss, radiance_hit, shadow_hit};
         OptixPipelineLinkOptions link_options{};
         link_options.maxTraceDepth = 4;
         log.fill(0); log_size = log.size();
@@ -261,6 +268,7 @@ int main(int argc, char** argv) {
         };
         upload_records({raygen}, raygen_record);
         upload_records({spatial_raygen}, spatial_raygen_record);
+        upload_records({spatial_resolve_raygen}, spatial_resolve_raygen_record);
         upload_records({radiance_miss, shadow_miss}, miss_record);
         upload_records({radiance_hit, shadow_hit}, hit_record);
         OptixShaderBindingTable sbt{};
@@ -362,7 +370,7 @@ int main(int argc, char** argv) {
                                          reinterpret_cast<OptixLightReservoir*>(reservoirs),
                                          reinterpret_cast<OptixLightReservoir*>(previous_reservoirs),
                                          reinterpret_cast<OptixLightReservoir*>(spatial_reservoirs),
-                                         width, height, 0, 0,
+                                         width, height, 0, 0, 0,
                                          gas_handle,
                                          reinterpret_cast<float3*>(device_vertices),
                                          reinterpret_cast<uint3*>(device_indices),
@@ -403,6 +411,12 @@ int main(int argc, char** argv) {
         sbt.raygenRecord = spatial_raygen_record;
         check_optix(optixLaunch(pipeline, nullptr, device_params, sizeof(params), &sbt,
                                 width, height, 1), "optixLaunch spatial reuse");
+        params.spatial_resolve = 1u;
+        check_cuda(cudaMemcpy(reinterpret_cast<void*>(device_params), &params, sizeof(params),
+                              cudaMemcpyHostToDevice), "cudaMemcpy spatial resolve params");
+        sbt.raygenRecord = spatial_resolve_raygen_record;
+        check_optix(optixLaunch(pipeline, nullptr, device_params, sizeof(params), &sbt,
+                                width, height, 1), "optixLaunch spatial resolve");
         check_cuda(cudaDeviceSynchronize(), "cudaDeviceSynchronize");
         float4 center_accumulation{};
         const std::size_t center_offset = ((height / 2) * width + width / 2) * sizeof(float4);
@@ -513,6 +527,7 @@ int main(int argc, char** argv) {
         cudaFree(reinterpret_cast<void*>(device_image));
         cudaFree(reinterpret_cast<void*>(hit_record));
         cudaFree(reinterpret_cast<void*>(miss_record));
+        cudaFree(reinterpret_cast<void*>(spatial_resolve_raygen_record));
         cudaFree(reinterpret_cast<void*>(spatial_raygen_record));
         cudaFree(reinterpret_cast<void*>(raygen_record));
         cudaFree(reinterpret_cast<void*>(gas));
@@ -521,6 +536,7 @@ int main(int argc, char** argv) {
         optixProgramGroupDestroy(radiance_hit);
         optixProgramGroupDestroy(shadow_miss);
         optixProgramGroupDestroy(radiance_miss);
+        optixProgramGroupDestroy(spatial_resolve_raygen);
         optixProgramGroupDestroy(spatial_raygen);
         optixProgramGroupDestroy(raygen);
         optixModuleDestroy(module);

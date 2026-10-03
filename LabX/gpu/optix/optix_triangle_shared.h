@@ -33,6 +33,7 @@ struct OptixTriangleParams {
     unsigned int height;
     unsigned int sample_index;
     unsigned int frame_index;
+    unsigned int spatial_resolve;
     OptixTraversableHandle handle;
     const float3* vertices;
     const uint3* indices;
