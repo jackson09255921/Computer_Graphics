@@ -203,6 +203,47 @@ __device__ float3 sample_ggx_normal(float3 normal, float roughness, Rng& rng) {
                               mul(bitangent, sine * sinf(azimuth))), mul(normal, cosine)));
 }
 
+__host__ __device__ float ggx_distribution(float normal_dot_half, float roughness) {
+    const float alpha = fmaxf(0.001f, roughness * roughness);
+    const float alpha_squared = alpha * alpha;
+    const float cosine_squared = fmaxf(0.0f, normal_dot_half) * fmaxf(0.0f, normal_dot_half);
+    const float denominator = cosine_squared * (alpha_squared - 1.0f) + 1.0f;
+    return alpha_squared / (kPi * denominator * denominator);
+}
+
+__host__ __device__ float smith_schlick(float normal_dot_direction, float roughness) {
+    const float r = roughness + 1.0f;
+    const float k = r * r / 8.0f;
+    return normal_dot_direction / (normal_dot_direction * (1.0f - k) + k);
+}
+
+__host__ __device__ float3 fresnel_schlick(float cosine, float3 reflectance_at_normal) {
+    const float factor = powf(1.0f - fminf(1.0f, fmaxf(0.0f, cosine)), 5.0f);
+    return add(reflectance_at_normal, mul(sub(make_float3(1, 1, 1), reflectance_at_normal), factor));
+}
+
+__device__ float3 evaluate_ggx_metal(float3 normal, float3 view, float3 light,
+                                     float3 base_color, float roughness) {
+    const float n_dot_v = fmaxf(0.0f, dot3(normal, view));
+    const float n_dot_l = fmaxf(0.0f, dot3(normal, light));
+    if (n_dot_v <= 0.0f || n_dot_l <= 0.0f) return make_float3(0, 0, 0);
+    const float3 half_vector = normalize3(add(view, light));
+    const float n_dot_h = fmaxf(0.0f, dot3(normal, half_vector));
+    const float v_dot_h = fmaxf(0.0f, dot3(view, half_vector));
+    const float distribution = ggx_distribution(n_dot_h, roughness);
+    const float geometry = smith_schlick(n_dot_v, roughness) * smith_schlick(n_dot_l, roughness);
+    return mul(fresnel_schlick(v_dot_h, base_color),
+               distribution * geometry / fmaxf(4.0f * n_dot_v * n_dot_l, 1.0e-8f));
+}
+
+__device__ float ggx_reflection_pdf(float3 normal, float3 view, float3 light, float roughness) {
+    if (dot3(normal, view) <= 0.0f || dot3(normal, light) <= 0.0f) return 0.0f;
+    const float3 half_vector = normalize3(add(view, light));
+    const float n_dot_h = fmaxf(0.0f, dot3(normal, half_vector));
+    const float v_dot_h = fabsf(dot3(view, half_vector));
+    return v_dot_h > 0.0f ? ggx_distribution(n_dot_h, roughness) * n_dot_h / (4.0f * v_dot_h) : 0.0f;
+}
+
 __device__ float fresnel_dielectric(float cosine, float eta_incident, float eta_transmitted) {
     cosine = fminf(1.0f, fabsf(cosine));
     const float sine_transmitted = eta_incident / eta_transmitted *
@@ -358,9 +399,9 @@ __device__ float3 radiance(Ray ray, const Sphere* spheres, int sphere_count,
             result = add(result, mul(mul(throughput, sample_environment(environment, ray.direction)), weight));
             break;
         }
-        throughput = mul(throughput, hit.albedo);
-        const bool diffuse_surface = hit.transmission <= 0.0f && hit.metallic <= 0.5f;
-        if (diffuse_surface) {
+        const float3 view_direction = mul(ray.direction, -1.0f);
+        const bool non_transmissive_surface = hit.transmission <= 0.0f;
+        if (non_transmissive_surface) {
             const float3 light_point = add(light.center, add(mul(light.half_u, 2.0f * rng.next() - 1.0f),
                                                                mul(light.half_v, 2.0f * rng.next() - 1.0f)));
             const float3 offset = sub(light_point, hit.position);
@@ -377,10 +418,16 @@ __device__ float3 radiance(Ray ray, const Sphere* spheres, int sphere_count,
                                                      node_count, blocker) && blocker.distance < distance - 1.0e-4f;
                 if (!blocked) {
                     const float light_pdf = distance_squared / (light_cosine * light_area(light));
-                    const float bsdf_pdf = surface_cosine / kPi;
+                    const float3 brdf = hit.metallic > 0.5f
+                        ? evaluate_ggx_metal(hit.normal, view_direction, direction_to_light,
+                                             hit.albedo, hit.roughness)
+                        : mul(hit.albedo, 1.0f / kPi);
+                    const float bsdf_pdf = hit.metallic > 0.5f
+                        ? ggx_reflection_pdf(hit.normal, view_direction, direction_to_light, hit.roughness)
+                        : surface_cosine / kPi;
                     const float weight = power_heuristic(light_pdf, bsdf_pdf);
-                    result = add(result, mul(mul(throughput, light.emission),
-                                             surface_cosine * weight / (kPi * light_pdf)));
+                    result = add(result, mul(mul(mul(throughput, brdf), light.emission),
+                                             surface_cosine * weight / light_pdf));
                 }
             }
             float3 environment_direction{};
@@ -395,11 +442,16 @@ __device__ float3 radiance(Ray ray, const Sphere* spheres, int sphere_count,
                     const bool blocked = intersect_scene(shadow, spheres, sphere_count, triangles, nodes,
                                                          node_count, blocker);
                     if (!blocked) {
-                        const float bsdf_pdf = environment_cosine / kPi;
+                        const float3 brdf = hit.metallic > 0.5f
+                            ? evaluate_ggx_metal(hit.normal, view_direction, environment_direction,
+                                                 hit.albedo, hit.roughness)
+                            : mul(hit.albedo, 1.0f / kPi);
+                        const float bsdf_pdf = hit.metallic > 0.5f
+                            ? ggx_reflection_pdf(hit.normal, view_direction, environment_direction, hit.roughness)
+                            : environment_cosine / kPi;
                         const float weight = power_heuristic(environment_sample_pdf, bsdf_pdf);
-                        result = add(result, mul(mul(throughput, environment_value),
-                                                 environment_cosine * weight /
-                                                 (kPi * environment_sample_pdf)));
+                        result = add(result, mul(mul(mul(throughput, brdf), environment_value),
+                                                 environment_cosine * weight / environment_sample_pdf));
                     }
                 }
             }
@@ -418,14 +470,22 @@ __device__ float3 radiance(Ray ray, const Sphere* spheres, int sphere_count,
                 direction = normalize3(reflect3(ray.direction, microfacet));
             else
                 direction = transmitted;
+            throughput = mul(throughput, hit.albedo);
             previous_uses_mis = false;
         } else if (hit.metallic > 0.5f) {
             const float3 microfacet = sample_ggx_normal(hit.normal, hit.roughness, rng);
             direction = normalize3(reflect3(ray.direction, microfacet));
-            if (dot3(direction, hit.normal) <= 0.0f) direction = normalize3(reflect3(ray.direction, hit.normal));
-            previous_uses_mis = false;
+            const float pdf = ggx_reflection_pdf(hit.normal, view_direction, direction, hit.roughness);
+            const float cosine = fmaxf(0.0f, dot3(hit.normal, direction));
+            if (pdf <= 0.0f || cosine <= 0.0f) break;
+            const float3 brdf = evaluate_ggx_metal(hit.normal, view_direction, direction,
+                                                    hit.albedo, hit.roughness);
+            throughput = mul(throughput, mul(brdf, cosine / pdf));
+            previous_bsdf_pdf = pdf;
+            previous_uses_mis = true;
         } else {
             direction = cosine_direction(hit.normal, rng);
+            throughput = mul(throughput, hit.albedo);
             previous_bsdf_pdf = fmaxf(0.0f, dot3(hit.normal, direction)) / kPi;
             previous_uses_mis = true;
         }
@@ -513,6 +573,21 @@ __global__ void probe_environment(GpuEnvironment environment, int* passed) {
               fabsf(color.z - 0.5f) < 1.0e-6f && sampled_direction &&
               fabsf(dot3(direction, direction) - 1.0f) < 1.0e-5f &&
               fabsf(pdf - 1.0f / (4.0f * kPi)) < 1.0e-5f;
+}
+
+__global__ void probe_ggx(int* passed) {
+    const float3 normal = make_float3(0, 1, 0);
+    const float3 view = make_float3(0, 1, 0);
+    Rng rng(91u);
+    const float3 half_vector = sample_ggx_normal(normal, 0.35f, rng);
+    const float3 light = normalize3(reflect3(mul(view, -1.0f), half_vector));
+    const float pdf = ggx_reflection_pdf(normal, view, light, 0.35f);
+    const float3 brdf = evaluate_ggx_metal(normal, view, light, make_float3(0.8f, 0.6f, 0.2f), 0.35f);
+    const float cosine = fmaxf(0.0f, dot3(normal, light));
+    const float3 weight = pdf > 0.0f ? mul(brdf, cosine / pdf) : make_float3(0, 0, 0);
+    *passed = ggx_distribution(1.0f, 0.1f) > ggx_distribution(1.0f, 0.8f) &&
+              pdf > 0.0f && isfinite(weight.x) && isfinite(weight.y) && isfinite(weight.z) &&
+              weight.x > 0.0f;
 }
 
 float component(float3 value, int axis) { return axis == 0 ? value.x : axis == 1 ? value.y : value.z; }
@@ -673,6 +748,23 @@ void validate_environment_on_gpu() {
         if (device_cdf) cudaFree(device_cdf);
         if (device_pmf) cudaFree(device_pmf);
         if (device_pixels) cudaFree(device_pixels);
+        throw;
+    }
+}
+
+void validate_ggx_on_gpu() {
+    int* device_passed = nullptr;
+    try {
+        check(cudaMalloc(&device_passed, sizeof(int)), "cudaMalloc GGX probe result");
+        probe_ggx<<<1, 1>>>(device_passed);
+        check(cudaGetLastError(), "GGX probe launch");
+        int passed = 0;
+        check(cudaMemcpy(&passed, device_passed, sizeof(int), cudaMemcpyDeviceToHost), "copy GGX probe result");
+        check(cudaFree(device_passed), "cudaFree GGX probe result");
+        device_passed = nullptr;
+        if (!passed) throw std::runtime_error("GPU GGX BRDF, sampling, or reflection PDF probe failed");
+    } catch (...) {
+        if (device_passed) cudaFree(device_passed);
         throw;
     }
 }
@@ -916,6 +1008,7 @@ void self_test() {
     validate_dielectric_on_gpu();
     validate_mis_on_gpu();
     validate_environment_on_gpu();
+    validate_ggx_on_gpu();
     const std::filesystem::path gltf_path = "cuda_gltf_test.gltf";
     const std::filesystem::path bin_path = "cuda_gltf_test.bin";
     {

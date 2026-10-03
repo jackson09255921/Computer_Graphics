@@ -110,9 +110,11 @@ flattened GPU BVH. Radiance RGBE environments retain linear HDR energy during
 upload and use device-side latitude-longitude bilinear filtering. A CPU-built
 `luminance * sin(theta)` PMF/CDF concentrates CUDA samples on bright texels;
 solid-angle environment PDFs and the power heuristic combine environment NEE
-with cosine-weighted BSDF paths. The remaining major GPU parity item is matched
-GGX BSDF/PDF weighting; the current non-delta MIS path covers diffuse surfaces,
-area lights, and HDR environments.
+with cosine-weighted BSDF paths. Metallic paths use the same GGX distribution
+for half-vector sampling, Cook-Torrance BRDF evaluation, reflection PDFs, and
+`BRDF * cos / PDF` throughput. Their area-light and HDR samples participate in
+the same MIS framework. Rough dielectric transmission remains a sampling
+baseline rather than a fully weighted microfacet BTDF.
 
 The dependency-free `LabX/assets` loader imports glTF 2.x triangle primitives
 from external binary buffers, including indexed or non-indexed geometry, scene
