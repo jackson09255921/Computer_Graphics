@@ -130,7 +130,8 @@ The OptiX branch now includes an indexed-mesh pipeline with triangle GAS,
 raygen/miss/closest-hit programs, per-primitive colors, an SBT, RTX traversal,
 PPM output, and optional input through the shared glTF loader. Geometric
 normals drive Lambert direct lighting, with a second ray type providing
-hardware-traversed hard shadows.
+hardware-traversed hard shadows. Recursive radiance rays add Whitted-style
+reflections, with glTF metallic and roughness factors controlling their weight.
 
 The dependency-free `LabX/assets` loader imports glTF 2.x triangle primitives
 from external binary buffers, including indexed or non-indexed geometry, scene

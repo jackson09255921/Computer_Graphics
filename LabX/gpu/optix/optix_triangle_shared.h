@@ -11,6 +11,7 @@ struct OptixTriangleParams {
     const float3* vertices;
     const uint3* indices;
     const float3* primitive_colors;
+    const float* primitive_reflectivity;
     float3 camera_origin;
     float view_scale;
     float3 light_position;

@@ -14,6 +14,7 @@
 #include <algorithm>
 #include <array>
 #include <cstdint>
+#include <cstdlib>
 #include <fstream>
 #include <iostream>
 #include <limits>
@@ -45,6 +46,7 @@ struct MeshData {
     std::vector<float3> vertices;
     std::vector<uint3> indices;
     std::vector<float3> colors;
+    std::vector<float> reflectivity;
 };
 
 MeshData default_mesh() {
@@ -54,7 +56,8 @@ MeshData default_mesh() {
              {0.05f, 0.38f, 0.45f}},
             {{0, 1, 2}, {0, 2, 3}, {4, 5, 6}},
             {{0.72f, 0.72f, 0.72f}, {0.72f, 0.72f, 0.72f},
-             {0.95f, 0.22f, 0.12f}}};
+             {0.95f, 0.22f, 0.12f}},
+            {0.08f, 0.08f, 0.72f}};
 }
 
 MeshData load_gltf_mesh(const std::string& path) {
@@ -76,6 +79,10 @@ MeshData load_gltf_mesh(const std::string& path) {
         mesh.colors.push_back(make_float3(static_cast<float>(triangle.material.albedo.x),
                                           static_cast<float>(triangle.material.albedo.y),
                                           static_cast<float>(triangle.material.albedo.z)));
+        const float metallic = static_cast<float>(triangle.material.metallic);
+        const float roughness = static_cast<float>(triangle.material.roughness);
+        const float fresnel = 0.04f * (1.0f - metallic) + metallic;
+        mesh.reflectivity.push_back(std::clamp(fresnel * (1.0f - 0.65f * roughness), 0.0f, 0.95f));
     }
     return mesh;
 }
@@ -111,7 +118,7 @@ int main(int argc, char** argv) {
     OptixProgramGroup raygen = nullptr, radiance_miss = nullptr, shadow_miss = nullptr;
     OptixProgramGroup radiance_hit = nullptr, shadow_hit = nullptr;
     CUdeviceptr gas = 0, raygen_record = 0, miss_record = 0, hit_record = 0;
-    CUdeviceptr device_image = 0, device_params = 0, device_colors = 0;
+    CUdeviceptr device_image = 0, device_params = 0, device_colors = 0, device_reflectivity = 0;
     CUdeviceptr device_vertices = 0, device_indices = 0;
 
     try {
@@ -158,7 +165,7 @@ int main(int argc, char** argv) {
 
         OptixPipelineCompileOptions compile_options{};
         compile_options.traversableGraphFlags = OPTIX_TRAVERSABLE_GRAPH_FLAG_ALLOW_SINGLE_GAS;
-        compile_options.numPayloadValues = 3;
+        compile_options.numPayloadValues = 4;
         compile_options.numAttributeValues = 2;
         compile_options.pipelineLaunchParamsVariableName = "params";
         compile_options.pipelineLaunchParamsSizeInBytes = sizeof(OptixTriangleParams);
@@ -210,7 +217,7 @@ int main(int argc, char** argv) {
         const std::array<OptixProgramGroup, 5> groups{
             raygen, radiance_miss, shadow_miss, radiance_hit, shadow_hit};
         OptixPipelineLinkOptions link_options{};
-        link_options.maxTraceDepth = 2;
+        link_options.maxTraceDepth = 4;
         log.fill(0); log_size = log.size();
         check_optix(optixPipelineCreate(context, &compile_options, &link_options, groups.data(),
                                         static_cast<unsigned int>(groups.size()), log.data(), &log_size, &pipeline),
@@ -220,7 +227,7 @@ int main(int argc, char** argv) {
             check_optix(optixUtilAccumulateStackSizes(group, &stack_sizes, pipeline),
                         "optixUtilAccumulateStackSizes");
         unsigned int direct_traversal = 0, direct_state = 0, continuation = 0;
-        check_optix(optixUtilComputeStackSizes(&stack_sizes, 2, 0, 0, &direct_traversal,
+        check_optix(optixUtilComputeStackSizes(&stack_sizes, 4, 0, 0, &direct_traversal,
                                                &direct_state, &continuation), "optixUtilComputeStackSizes");
         check_optix(optixPipelineSetStackSize(pipeline, direct_traversal, direct_state, continuation, 1),
                     "optixPipelineSetStackSize");
@@ -255,6 +262,12 @@ int main(int argc, char** argv) {
         check_cuda(cudaMemcpy(reinterpret_cast<void*>(device_colors), mesh.colors.data(),
                               mesh.colors.size() * sizeof(float3), cudaMemcpyHostToDevice),
                    "cudaMemcpy primitive colors");
+        check_cuda(cudaMalloc(reinterpret_cast<void**>(&device_reflectivity),
+                              mesh.reflectivity.size() * sizeof(float)),
+                   "cudaMalloc primitive reflectivity");
+        check_cuda(cudaMemcpy(reinterpret_cast<void*>(device_reflectivity), mesh.reflectivity.data(),
+                              mesh.reflectivity.size() * sizeof(float), cudaMemcpyHostToDevice),
+                   "cudaMemcpy primitive reflectivity");
         float3 minimum = make_float3(std::numeric_limits<float>::max(), std::numeric_limits<float>::max(),
                                      std::numeric_limits<float>::max());
         float3 maximum = make_float3(std::numeric_limits<float>::lowest(), std::numeric_limits<float>::lowest(),
@@ -277,8 +290,9 @@ int main(int argc, char** argv) {
         const OptixTriangleParams params{reinterpret_cast<uchar4*>(device_image), width, height, gas_handle,
                                          reinterpret_cast<float3*>(device_vertices),
                                          reinterpret_cast<uint3*>(device_indices),
-                                         reinterpret_cast<float3*>(device_colors), camera_origin, view_scale,
-                                         light_position};
+                                         reinterpret_cast<float3*>(device_colors),
+                                         reinterpret_cast<float*>(device_reflectivity), camera_origin,
+                                         view_scale, light_position};
         check_cuda(cudaMalloc(reinterpret_cast<void**>(&device_params), sizeof(params)), "cudaMalloc params");
         check_cuda(cudaMemcpy(reinterpret_cast<void*>(device_params), &params, sizeof(params),
                               cudaMemcpyHostToDevice), "cudaMemcpy params");
@@ -296,7 +310,9 @@ int main(int argc, char** argv) {
         if (hit_pixels == 0) throw std::runtime_error("rendered mesh produced no visible pixels");
         const std::size_t shadow_pixels = static_cast<std::size_t>(std::count_if(
             image.begin(), image.end(), [](uchar4 pixel) {
-                return pixel.x == 18 && pixel.y == 18 && pixel.z == 18;
+                return pixel.x >= 14 && pixel.x <= 25 && pixel.y >= 14 && pixel.y <= 25 &&
+                       pixel.z >= 14 && pixel.z <= 30 &&
+                       std::abs(static_cast<int>(pixel.x) - static_cast<int>(pixel.y)) <= 3;
             }));
         if (argc <= 2 && shadow_pixels == 0)
             throw std::runtime_error("default scene produced no verified shadow pixels");
@@ -308,6 +324,7 @@ int main(int argc, char** argv) {
                   << static_cast<int>(center_pixel.z) << ")\n";
 
         cudaFree(reinterpret_cast<void*>(device_params));
+        cudaFree(reinterpret_cast<void*>(device_reflectivity));
         cudaFree(reinterpret_cast<void*>(device_colors));
         cudaFree(reinterpret_cast<void*>(device_indices));
         cudaFree(reinterpret_cast<void*>(device_vertices));

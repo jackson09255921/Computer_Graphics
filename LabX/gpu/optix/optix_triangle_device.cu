@@ -34,10 +34,11 @@ extern "C" __global__ void __raygen__triangle() {
     unsigned int red = 0;
     unsigned int green = 0;
     unsigned int blue = 0;
+    unsigned int depth = 0;
     optixTrace(params.handle, origin, direction, 0.0f, 1.0e16f, 0.0f,
                OptixVisibilityMask(255), OPTIX_RAY_FLAG_NONE,
                OPTIX_RAY_TYPE_RADIANCE, OPTIX_RAY_TYPE_COUNT,
-               OPTIX_RAY_TYPE_RADIANCE, red, green, blue);
+               OPTIX_RAY_TYPE_RADIANCE, red, green, blue, depth);
 
     const float r = __uint_as_float(red);
     const float g = __uint_as_float(green);
@@ -100,5 +101,31 @@ extern "C" __global__ void __closesthit__lit() {
                                       normal.z * light_direction.z);
     const float lighting = 0.10f + (visible ? 0.90f * diffuse : 0.0f);
     const float3 base_color = params.primitive_colors[primitive];
-    set_color(base_color.x * lighting, base_color.y * lighting, base_color.z * lighting);
+    const float reflectivity = params.primitive_reflectivity[primitive];
+    float3 reflection_color = make_float3(0.0f, 0.0f, 0.0f);
+    const unsigned int depth = optixGetPayload_3();
+    if (reflectivity > 0.001f && depth < 2) {
+        const float incoming_dot_normal = incoming.x * normal.x + incoming.y * normal.y + incoming.z * normal.z;
+        const float3 reflection_direction = make_float3(
+            incoming.x - 2.0f * incoming_dot_normal * normal.x,
+            incoming.y - 2.0f * incoming_dot_normal * normal.y,
+            incoming.z - 2.0f * incoming_dot_normal * normal.z);
+        unsigned int reflected_red = 0;
+        unsigned int reflected_green = 0;
+        unsigned int reflected_blue = 0;
+        unsigned int reflected_depth = depth + 1;
+        optixTrace(params.handle,
+                   make_float3(hit.x + normal.x * 1.0e-3f, hit.y + normal.y * 1.0e-3f,
+                               hit.z + normal.z * 1.0e-3f),
+                   reflection_direction, 0.0f, 1.0e16f, 0.0f, OptixVisibilityMask(255),
+                   OPTIX_RAY_FLAG_NONE, OPTIX_RAY_TYPE_RADIANCE, OPTIX_RAY_TYPE_COUNT,
+                   OPTIX_RAY_TYPE_RADIANCE, reflected_red, reflected_green, reflected_blue,
+                   reflected_depth);
+        reflection_color = make_float3(__uint_as_float(reflected_red), __uint_as_float(reflected_green),
+                                       __uint_as_float(reflected_blue));
+    }
+    const float local_weight = 1.0f - reflectivity;
+    set_color(base_color.x * lighting * local_weight + reflection_color.x * reflectivity,
+              base_color.y * lighting * local_weight + reflection_color.y * reflectivity,
+              base_color.z * lighting * local_weight + reflection_color.z * reflectivity);
 }
