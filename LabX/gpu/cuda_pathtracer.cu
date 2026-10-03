@@ -266,6 +266,46 @@ __device__ bool refract3(float3 incident, float3 normal, float eta_ratio, float3
     return true;
 }
 
+__device__ float dielectric_reflection_pdf(float3 normal, float3 view, float3 light,
+                                           float3 half_vector, float roughness, float fresnel) {
+    const float n_dot_h = fmaxf(0.0f, dot3(normal, half_vector));
+    const float v_dot_h = fabsf(dot3(view, half_vector));
+    return v_dot_h > 0.0f
+        ? fresnel * ggx_distribution(n_dot_h, roughness) * n_dot_h / (4.0f * v_dot_h)
+        : 0.0f;
+}
+
+__device__ float dielectric_transmission_pdf(float3 normal, float3 view, float3 transmitted,
+                                             float3 half_vector, float roughness, float fresnel,
+                                             float eta_incident, float eta_transmitted) {
+    const float n_dot_h = fmaxf(0.0f, dot3(normal, half_vector));
+    const float denominator = eta_incident * dot3(view, half_vector) +
+                              eta_transmitted * dot3(transmitted, half_vector);
+    if (fabsf(denominator) <= 1.0e-8f) return 0.0f;
+    const float jacobian = eta_transmitted * eta_transmitted *
+                           fabsf(dot3(transmitted, half_vector)) / (denominator * denominator);
+    return (1.0f - fresnel) * ggx_distribution(n_dot_h, roughness) * n_dot_h * jacobian;
+}
+
+__device__ float3 evaluate_dielectric_btdf(float3 normal, float3 view, float3 transmitted,
+                                           float3 half_vector, float3 tint, float roughness,
+                                           float fresnel, float eta_incident, float eta_transmitted) {
+    const float n_dot_v = fabsf(dot3(normal, view));
+    const float n_dot_l = fabsf(dot3(normal, transmitted));
+    const float n_dot_h = fmaxf(0.0f, dot3(normal, half_vector));
+    const float v_dot_h = dot3(view, half_vector);
+    const float l_dot_h = dot3(transmitted, half_vector);
+    const float denominator = eta_incident * v_dot_h + eta_transmitted * l_dot_h;
+    if (n_dot_v <= 0.0f || n_dot_l <= 0.0f || fabsf(denominator) <= 1.0e-8f)
+        return make_float3(0, 0, 0);
+    const float distribution = ggx_distribution(n_dot_h, roughness);
+    const float geometry = smith_schlick(n_dot_v, roughness) * smith_schlick(n_dot_l, roughness);
+    const float factor = (1.0f - fresnel) * distribution * geometry * eta_transmitted * eta_transmitted *
+                         fabsf(v_dot_h * l_dot_h) /
+                         (n_dot_v * n_dot_l * denominator * denominator);
+    return mul(tint, factor);
+}
+
 __host__ __device__ float power_heuristic(float first_pdf, float second_pdf) {
     const float first = first_pdf * first_pdf;
     const float second = second_pdf * second_pdf;
@@ -465,12 +505,35 @@ __device__ float3 radiance(Ray ray, const Sphere* spheres, int sphere_count,
             const float fresnel = fresnel_dielectric(-dot3(ray.direction, microfacet),
                                                       eta_incident, eta_transmitted);
             float3 transmitted{};
-            if (rng.next() < fresnel ||
-                !refract3(ray.direction, microfacet, eta_incident / eta_transmitted, transmitted))
+            const bool can_refract = refract3(ray.direction, microfacet,
+                                               eta_incident / eta_transmitted, transmitted);
+            if (!can_refract || rng.next() < fresnel) {
                 direction = normalize3(reflect3(ray.direction, microfacet));
-            else
+                const float n_dot_v = fmaxf(0.0f, dot3(hit.normal, view_direction));
+                const float n_dot_l = fmaxf(0.0f, dot3(hit.normal, direction));
+                const float n_dot_h = fmaxf(0.0f, dot3(hit.normal, microfacet));
+                const float v_dot_h = fabsf(dot3(view_direction, microfacet));
+                const float event_fresnel = can_refract ? fresnel : 1.0f;
+                const float pdf = dielectric_reflection_pdf(hit.normal, view_direction, direction,
+                                                             microfacet, hit.roughness, event_fresnel);
+                const float geometry = smith_schlick(n_dot_v, hit.roughness) *
+                                       smith_schlick(n_dot_l, hit.roughness);
+                const float brdf = event_fresnel * ggx_distribution(n_dot_h, hit.roughness) * geometry /
+                                   fmaxf(4.0f * n_dot_v * n_dot_l, 1.0e-8f);
+                if (pdf <= 0.0f || n_dot_l <= 0.0f || v_dot_h <= 0.0f) break;
+                throughput = mul(throughput, brdf * n_dot_l / pdf);
+            } else {
                 direction = transmitted;
-            throughput = mul(throughput, hit.albedo);
+                const float pdf = dielectric_transmission_pdf(hit.normal, view_direction, direction,
+                                                               microfacet, hit.roughness, fresnel,
+                                                               eta_incident, eta_transmitted);
+                const float3 btdf = evaluate_dielectric_btdf(hit.normal, view_direction, direction,
+                                                              microfacet, hit.albedo, hit.roughness,
+                                                              fresnel, eta_incident, eta_transmitted);
+                const float cosine = fabsf(dot3(hit.normal, direction));
+                if (pdf <= 0.0f || cosine <= 0.0f) break;
+                throughput = mul(throughput, mul(btdf, cosine / pdf));
+            }
             previous_uses_mis = false;
         } else if (hit.metallic > 0.5f) {
             const float3 microfacet = sample_ggx_normal(hit.normal, hit.roughness, rng);
@@ -547,8 +610,19 @@ __global__ void probe_dielectric(int* passed) {
                                              1.0f / 1.5f, straight);
     const bool total_internal_reflection = !refract3(normalize3(make_float3(0.8660254f, -0.5f, 0)),
                                                       make_float3(0, 1, 0), 1.5f, total_internal);
+    const float3 normal = make_float3(0, 1, 0);
+    const float3 view = make_float3(0, 1, 0);
+    const float3 transmitted = make_float3(0, -1, 0);
+    const float fresnel = fresnel_dielectric(1.0f, 1.0f, 1.5f);
+    const float pdf = dielectric_transmission_pdf(normal, view, transmitted, normal, 0.3f,
+                                                  fresnel, 1.0f, 1.5f);
+    const float3 btdf = evaluate_dielectric_btdf(normal, view, transmitted, normal,
+                                                 make_float3(0.9f, 0.95f, 1.0f), 0.3f,
+                                                 fresnel, 1.0f, 1.5f);
+    const float3 weight = pdf > 0.0f ? mul(btdf, 1.0f / pdf) : make_float3(0, 0, 0);
     *passed = fabsf(fresnel_dielectric(1.0f, 1.0f, 1.5f) - 0.04f) < 1.0e-5f &&
-              normal_refraction && fabsf(straight.y + 1.0f) < 1.0e-5f && total_internal_reflection;
+              normal_refraction && fabsf(straight.y + 1.0f) < 1.0e-5f && total_internal_reflection &&
+              pdf > 0.0f && isfinite(weight.x) && weight.x > 0.0f;
 }
 
 __global__ void probe_mis(int* passed) {

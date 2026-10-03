@@ -113,8 +113,9 @@ solid-angle environment PDFs and the power heuristic combine environment NEE
 with cosine-weighted BSDF paths. Metallic paths use the same GGX distribution
 for half-vector sampling, Cook-Torrance BRDF evaluation, reflection PDFs, and
 `BRDF * cos / PDF` throughput. Their area-light and HDR samples participate in
-the same MIS framework. Rough dielectric transmission remains a sampling
-baseline rather than a fully weighted microfacet BTDF.
+the same MIS framework. Rough dielectric transmission uses the Walter
+transmission Jacobian, matched microfacet BTDF/PDF, and
+`BTDF * abs(cos) / PDF` throughput.
 
 The dependency-free `LabX/assets` loader imports glTF 2.x triangle primitives
 from external binary buffers, including indexed or non-indexed geometry, scene

@@ -14,7 +14,7 @@ implementation of an engineering technique.
 | 1995 | Veach–Guibas multiple importance sampling | Implemented on CPU and CUDA |
 | 1998 | High-dynamic-range image-based lighting | Implemented on CPU and CUDA |
 | 2002 | Ray tracing on programmable GPU hardware | Implemented baseline |
-| 2007 | GGX microfacet reflection and rough transmission | Matched reflection on CPU and CUDA; rough transmission sampling implemented |
+| 2007 | GGX microfacet reflection and rough transmission | Matched reflection on CPU/CUDA and matched rough BTDF on CUDA |
 | 2017 | glTF 2.0 scene and physically based material interchange | Implemented |
 | 2020 | ReSTIR direct illumination | Planned |
 
