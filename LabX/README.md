@@ -24,19 +24,24 @@ GPU experiments therefore use these constraints:
 - CPU targets remain available and are the default on machines without CUDA.
 - GPU tests are opt-in because hosted CI runners generally have no NVIDIA GPU.
 
-The installed CUDA 11.8 toolkit is older than the current MSVC standard library
-accepts (MSVC requires CUDA 12.4 or newer), and its Visual Studio integration is
-not registered. Upgrade the toolkit and select its Visual Studio integration
-component before enabling `BUILD_CUDA_DEMOS`. The driver already supports a
-newer CUDA runtime, so this is a compiler-toolchain update rather than a GPU
-replacement.
+The legacy Windows CUDA 11.8 toolkit is older than the current MSVC standard
+library accepts. GPU development therefore uses Ubuntu 24.04 on WSL2 with the
+repository's `computer-graphics` conda environment and CUDA Toolkit 13.1.2. The
+Windows NVIDIA driver is shared with WSL; no Linux display driver is installed.
+
+Create or update the environment inside WSL2:
+
+```bash
+conda env create -f environment.yml
+conda activate computer-graphics
+```
 
 Validate the local CUDA toolchain and device with:
 
-```powershell
+```bash
 cmake -S . -B build-cuda -DBUILD_LEGACY_LABS=OFF -DBUILD_CUDA_DEMOS=ON
-cmake --build build-cuda --config Release --target cuda_capability
-ctest --test-dir build-cuda -C Release -R cuda_capability --output-on-failure
+cmake --build build-cuda --target cuda_capability
+ctest --test-dir build-cuda -R cuda_capability --output-on-failure
 ```
 
 ## Planned milestones

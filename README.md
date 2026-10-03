@@ -202,6 +202,10 @@ portable while allowing different presentation backends later. See the
 The categorized experiments, detected RTX 4060 constraints, and staged GPU
 roadmap are documented in [`LabX/README.md`](LabX/README.md).
 
+For GPU development, use the reproducible WSL2 environment in
+[`environment.yml`](environment.yml). It supplies CUDA 13.1, CMake, and Ninja
+without installing a Linux display driver inside WSL.
+
 For a headless build of only the portable core and its tests:
 
 ```bash

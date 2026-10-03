@@ -62,12 +62,15 @@ pipeline {
             steps {
                 script {
                     if (isUnix()) {
-                        error('RUN_GPU_TESTS currently expects the configured Windows RTX 4060 agent')
+                        sh '/home/cgdev/miniconda3/bin/conda run -n computer-graphics cmake -S . -B build-jenkins-cuda -G Ninja -DBUILD_LEGACY_LABS=OFF -DBUILD_CUDA_DEMOS=ON -DCG_CUDA_ARCHITECTURES=89 -DCMAKE_BUILD_TYPE=Release'
+                        sh '/home/cgdev/miniconda3/bin/conda run -n computer-graphics cmake --build build-jenkins-cuda --target cuda_capability'
+                        sh '/home/cgdev/miniconda3/bin/conda run -n computer-graphics ctest --test-dir build-jenkins-cuda -R cuda_capability --output-on-failure'
+                    } else {
+                        bat 'nvidia-smi'
+                        bat 'cmake -S . -B build-jenkins-cuda -A x64 -DBUILD_LEGACY_LABS=OFF -DBUILD_CUDA_DEMOS=ON -DCG_CUDA_ARCHITECTURES=89'
+                        bat 'cmake --build build-jenkins-cuda --config Release --target cuda_capability'
+                        bat 'ctest --test-dir build-jenkins-cuda -C Release -R cuda_capability --output-on-failure'
                     }
-                    bat 'nvidia-smi'
-                    bat 'cmake -S . -B build-jenkins-cuda -A x64 -DBUILD_LEGACY_LABS=OFF -DBUILD_CUDA_DEMOS=ON -DCG_CUDA_ARCHITECTURES=89'
-                    bat 'cmake --build build-jenkins-cuda --config Release --target cuda_capability'
-                    bat 'ctest --test-dir build-jenkins-cuda -C Release -R cuda_capability --output-on-failure'
                 }
             }
         }

@@ -1,0 +1,11 @@
+name: computer-graphics
+channels:
+  - nvidia
+  - conda-forge
+  - nodefaults
+dependencies:
+  - python=3.12
+  - cmake
+  - ninja
+  - pkg-config
+  - cuda-toolkit=13.1.2
