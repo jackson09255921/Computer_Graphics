@@ -65,6 +65,8 @@ indirect diffuse illumination, explicit area-light sampling, mirror bounces,
 Russian roulette termination, and a metallic/roughness GGX BRDF with Schlick
 Fresnel and Smith visibility. Dielectric materials add Snell refraction, exact
 Fresnel sampling, total internal reflection, and GGX rough transmission.
+Radiance RGBE environment maps retain HDR values and provide latitude-longitude
+image-based lighting with bilinear filtering.
 Area-light and BSDF importance sampling are
 combined with the 1995 Veach–Guibas power heuristic for lower-variance direct
 lighting. The optional second argument controls samples

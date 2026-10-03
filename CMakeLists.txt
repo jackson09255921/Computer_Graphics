@@ -14,6 +14,7 @@ option(BUILD_CUDA_DEMOS "Build CUDA experiments under LabX/gpu" OFF)
 set(CG_CUDA_ARCHITECTURES "89" CACHE STRING "CUDA architectures for LabX GPU experiments")
 
 add_library(cg_core
+    LabX/environment/environment_map.cpp
     LabX/pbr/pbr.cpp
     LabX/progressive/progressive_renderer.cpp
     LabX/sampling/mis.cpp
@@ -60,6 +61,10 @@ if(BUILD_TESTING)
     add_executable(animation_tests tests/animation_tests.cpp)
     target_link_libraries(animation_tests PRIVATE cg_core)
     add_test(NAME animation_tests COMMAND animation_tests)
+
+    add_executable(environment_tests LabX/environment/environment_tests.cpp)
+    target_link_libraries(environment_tests PRIVATE cg_core)
+    add_test(NAME environment_tests COMMAND environment_tests)
 endif()
 
 add_executable(bezier_demo LabX/curves/bezier_demo.cpp)

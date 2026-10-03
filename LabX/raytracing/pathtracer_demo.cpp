@@ -5,7 +5,9 @@
 #include <iostream>
 #include <memory>
 #include <string>
+#include <vector>
 
+#include "environment/environment_map.hpp"
 #include "raytracer/raytracer.hpp"
 #include "progressive/progressive_renderer.hpp"
 
@@ -29,6 +31,20 @@ int main(int argc, char** argv) {
 
         cg::rt::Scene scene;
         scene.background = {0.004, 0.006, 0.012};
+        constexpr std::size_t environment_width = 32;
+        constexpr std::size_t environment_height = 16;
+        std::vector<cg::Color> environment_pixels(environment_width * environment_height);
+        for (std::size_t y = 0; y < environment_height; ++y) {
+            const double horizon = 1.0 - std::abs(2.0 * static_cast<double>(y) /
+                                                  static_cast<double>(environment_height - 1) - 1.0);
+            for (std::size_t x = 0; x < environment_width; ++x) {
+                environment_pixels[y * environment_width + x] =
+                    cg::Color{0.025, 0.045, 0.09} + cg::Color{0.10, 0.12, 0.15} * horizon;
+            }
+        }
+        environment_pixels[4 * environment_width + 22] = {8.0, 5.5, 2.5};
+        scene.environment = std::make_shared<cg::environment::EnvironmentMap>(
+            environment_width, environment_height, std::move(environment_pixels));
         scene.add(std::make_shared<cg::rt::Sphere>(cg::Vec3{-1.25, -0.05, -4.3}, 1.0, coral));
         scene.add(std::make_shared<cg::rt::Sphere>(cg::Vec3{1.1, -0.2, -3.7}, 0.85, mirror));
         scene.add(std::make_shared<cg::rt::Sphere>(cg::Vec3{0.2, 1.25, -5.1}, 0.62, blue_glass));

@@ -11,6 +11,7 @@ implementation of an engineering technique.
 | 1986 | Kajiya rendering equation and path tracing | Implemented |
 | 1991 | Progressive multi-pass global illumination (representative publication) | Implemented |
 | 1995 | Veach–Guibas multiple importance sampling | Implemented |
+| 1998 | High-dynamic-range image-based lighting | Implemented |
 | 2007 | GGX microfacet reflection and rough transmission | Implemented |
 | 2020 | ReSTIR direct illumination | Planned |
 
@@ -25,4 +26,5 @@ invention date.
 - Kajiya, *The Rendering Equation*, SIGGRAPH 1986.
 - Chen et al., *A Progressive Multi-Pass Method for Global Illumination*, SIGGRAPH 1991.
 - Veach and Guibas, *Optimally Combining Sampling Techniques for Monte Carlo Rendering*, SIGGRAPH 1995.
+- Debevec, *Rendering Synthetic Objects into Real Scenes*, SIGGRAPH 1998.
 - Walter et al., *Microfacet Models for Refraction through Rough Surfaces*, 2007.

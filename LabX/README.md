@@ -52,7 +52,7 @@ ctest --test-dir build-cuda -R cuda_capability --output-on-failure
 1. Physically based materials: GGX, Fresnel, metallic/roughness workflow.
 2. Progressive, multi-threaded CPU rendering and convergence snapshots.
 3. Importance sampling and multiple importance sampling.
-4. Refraction, dielectric materials, HDR environment lighting, and glTF input.
+4. Refraction, dielectric materials, and HDR environment lighting (implemented); glTF input next.
 5. CUDA tiled path tracing sized for the 8 GiB GPU budget.
 6. OptiX/DXR evaluation, then ReSTIR direct illumination.
 7. Denoising and neural reconstruction only after stable temporal buffers exist.

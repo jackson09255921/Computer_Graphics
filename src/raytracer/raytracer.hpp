@@ -8,6 +8,8 @@
 #include "core/image.hpp"
 #include "core/math.hpp"
 
+namespace cg::environment { class EnvironmentMap; }
+
 namespace cg::rt {
 
 struct Ray {
@@ -128,6 +130,7 @@ public:
     [[nodiscard]] const std::vector<AreaLight>& area_lights() const noexcept { return area_lights_; }
 
     Color background{0.015, 0.025, 0.06};
+    std::shared_ptr<const environment::EnvironmentMap> environment;
 
 private:
     std::vector<std::shared_ptr<Primitive>> primitives_;

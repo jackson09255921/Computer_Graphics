@@ -1,4 +1,6 @@
 #include "raytracer/raytracer.hpp"
+
+#include "environment/environment_map.hpp"
 #include "pbr/pbr.hpp"
 #include "sampling/mis.hpp"
 
@@ -60,6 +62,7 @@ Vec3 cosine_hemisphere(const Vec3& normal, Sampler& sampler) {
 }
 
 Color sky(const Scene& scene, const Vec3& direction) {
+    if (scene.environment) return scene.environment->sample(direction);
     const double blend = 0.5 * (normalized(direction).y + 1.0);
     return lerp(scene.background, Color{0.12, 0.20, 0.35}, blend);
 }
