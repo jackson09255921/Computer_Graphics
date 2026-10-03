@@ -18,6 +18,8 @@ public:
     [[nodiscard]] Color sample(const Vec3& direction) const;
     [[nodiscard]] std::size_t width() const noexcept { return width_; }
     [[nodiscard]] std::size_t height() const noexcept { return height_; }
+    [[nodiscard]] const std::vector<Color>& pixels() const noexcept { return pixels_; }
+    [[nodiscard]] double intensity() const noexcept { return intensity_; }
 
 private:
     [[nodiscard]] const Color& pixel(std::size_t x, std::size_t y) const;

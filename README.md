@@ -100,13 +100,18 @@ cmake --build build-wsl --target cuda_pathtracer
 ./build-wsl/cuda_pathtracer cuda_pathtracer.bmp 64
 ./build-wsl/cuda_pathtracer --self-test
 ./build-wsl/cuda_pathtracer --gltf model.gltf cuda_model.bmp 64
+./build-wsl/cuda_pathtracer --hdr environment.hdr cuda_hdr.bmp 64
+./build-wsl/cuda_pathtracer --gltf model.gltf cuda_model.bmp 64 environment.hdr
 ```
 
 The `--gltf` path converts imported scene triangles and base-color,
 metallic, and roughness factors into compact CUDA buffers and rebuilds the
-flattened GPU BVH. The GPU baseline does not yet have CPU feature parity:
-matched GGX BSDF/PDF weighting and HDR environments are the next staged
-migrations; the current GPU MIS path covers diffuse surfaces and area lights.
+flattened GPU BVH. Radiance RGBE environments retain linear HDR energy during
+upload and use device-side latitude-longitude bilinear filtering for miss rays.
+The GPU baseline does not yet have CPU feature parity: matched GGX BSDF/PDF
+weighting and luminance-weighted environment importance sampling are the next
+staged migrations; the current GPU MIS path covers diffuse surfaces and area
+lights.
 
 The dependency-free `LabX/assets` loader imports glTF 2.x triangle primitives
 from external binary buffers, including indexed or non-indexed geometry, scene
