@@ -55,6 +55,21 @@ static __forceinline__ __device__ float3 sample_ggx_half_vector(float3 normal, f
         tangent.z * cosf(phi) * sine + bitangent.z * sinf(phi) * sine + normal.z * cosine));
 }
 
+static __forceinline__ __device__ void reservoir_update(OptixLightReservoir& reservoir,
+                                                         unsigned int light_index,
+                                                         float stream_weight,
+                                                         float selected_weight,
+                                                         unsigned int candidate_count,
+                                                         unsigned int& random_state) {
+    if (stream_weight <= 0.0f || candidate_count == 0u) return;
+    reservoir.weight_sum += stream_weight;
+    reservoir.candidate_count += candidate_count;
+    if (random_float(random_state) * reservoir.weight_sum <= stream_weight) {
+        reservoir.light_index = light_index;
+        reservoir.selected_weight = selected_weight;
+    }
+}
+
 extern "C" __global__ void __raygen__triangle() {
     const uint3 index = optixGetLaunchIndex();
     const uint3 dimensions = optixGetLaunchDimensions();
@@ -169,9 +184,81 @@ extern "C" __global__ void __closesthit__lit() {
     const float3 hit = make_float3(ray_origin.x + incoming.x * distance,
                                    ray_origin.y + incoming.y * distance,
                                    ray_origin.z + incoming.z * distance);
-    const float3 to_light = make_float3(params.light_position.x - hit.x,
-                                        params.light_position.y - hit.y,
-                                        params.light_position.z - hit.z);
+    const unsigned int depth = optixGetPayload_3();
+    const uint3 launch_index = optixGetLaunchIndex();
+    const unsigned int pixel = launch_index.y * params.width + launch_index.x;
+    const float3 base_color = params.primitive_colors[primitive];
+    bool temporal_valid = false;
+    unsigned int temporal_pixel = pixel;
+    if (depth == 0u) {
+        params.gbuffer_normal[pixel] = normal;
+        params.gbuffer_depth[pixel] = distance;
+        params.gbuffer_albedo[pixel] = base_color;
+        if (params.frame_index > 0u && params.sample_index == 16u) {
+            const float2 motion = params.gbuffer_motion[pixel];
+            const int previous_x = static_cast<int>(static_cast<float>(launch_index.x) - motion.x + 0.5f);
+            const int previous_y = static_cast<int>(static_cast<float>(launch_index.y) - motion.y + 0.5f);
+            if (previous_x >= 0 && previous_x < static_cast<int>(params.width) && previous_y >= 0 &&
+                previous_y < static_cast<int>(params.height)) {
+                temporal_pixel = static_cast<unsigned int>(previous_y) * params.width +
+                                 static_cast<unsigned int>(previous_x);
+                const float previous_depth = params.previous_depth[temporal_pixel];
+                const float3 previous_normal = params.previous_normal[temporal_pixel];
+                const float3 previous_albedo = params.previous_albedo[temporal_pixel];
+                const float normal_similarity = normal.x * previous_normal.x + normal.y * previous_normal.y +
+                                                normal.z * previous_normal.z;
+                const float albedo_difference = fabsf(base_color.x - previous_albedo.x) +
+                                                fabsf(base_color.y - previous_albedo.y) +
+                                                fabsf(base_color.z - previous_albedo.z);
+                temporal_valid = previous_depth > 0.0f &&
+                                 fabsf(distance - previous_depth) <= fmaxf(1.0e-3f, distance * 0.01f) &&
+                                 normal_similarity >= 0.95f && albedo_difference <= 0.05f;
+            }
+        }
+    }
+
+    unsigned int light_random = hash(pixel + 0x27d4eb2du * (params.sample_index + 1u));
+    unsigned int selected_light = light_random % params.light_count;
+    float reservoir_normalization = static_cast<float>(params.light_count);
+    if (depth == 0u) {
+        OptixLightReservoir reservoir = params.reservoirs[pixel];
+        if (params.sample_index == 0u || params.sample_index == 16u) reservoir = {};
+        if (params.sample_index == 16u && temporal_valid) {
+            const OptixLightReservoir previous = params.previous_reservoirs[temporal_pixel];
+            reservoir_update(reservoir, previous.light_index, previous.weight_sum,
+                             previous.selected_weight, previous.candidate_count, light_random);
+        }
+        const unsigned int candidate = light_random % params.light_count;
+        const OptixPointLight candidate_light = params.lights[candidate];
+        const float3 candidate_delta = make_float3(candidate_light.position.x - hit.x,
+                                                   candidate_light.position.y - hit.y,
+                                                   candidate_light.position.z - hit.z);
+        const float candidate_distance_squared = candidate_delta.x * candidate_delta.x +
+                                                 candidate_delta.y * candidate_delta.y +
+                                                 candidate_delta.z * candidate_delta.z;
+        const float inverse_candidate_distance = rsqrtf(candidate_distance_squared);
+        const float candidate_cosine = fmaxf(0.0f,
+            normal.x * candidate_delta.x * inverse_candidate_distance +
+            normal.y * candidate_delta.y * inverse_candidate_distance +
+            normal.z * candidate_delta.z * inverse_candidate_distance);
+        const float luminance = 0.2126f * candidate_light.intensity.x +
+                                0.7152f * candidate_light.intensity.y +
+                                0.0722f * candidate_light.intensity.z;
+        const float target = luminance * candidate_cosine / fmaxf(candidate_distance_squared, 1.0e-4f);
+        reservoir_update(reservoir, candidate, target * static_cast<float>(params.light_count),
+                         target, 1u, light_random);
+        params.reservoirs[pixel] = reservoir;
+        selected_light = reservoir.light_index;
+        reservoir_normalization = reservoir.candidate_count > 0u && reservoir.selected_weight > 0.0f
+            ? reservoir.weight_sum /
+                  (static_cast<float>(reservoir.candidate_count) * reservoir.selected_weight)
+            : 0.0f;
+    }
+
+    const OptixPointLight light = params.lights[selected_light];
+    const float3 to_light = make_float3(light.position.x - hit.x,
+                                        light.position.y - hit.y,
+                                        light.position.z - hit.z);
     const float light_distance = sqrtf(to_light.x * to_light.x + to_light.y * to_light.y + to_light.z * to_light.z);
     const float3 light_direction = make_float3(to_light.x / light_distance, to_light.y / light_distance,
                                                to_light.z / light_distance);
@@ -184,21 +271,15 @@ extern "C" __global__ void __closesthit__lit() {
 
     const float diffuse = fmaxf(0.0f, normal.x * light_direction.x + normal.y * light_direction.y +
                                       normal.z * light_direction.z);
-    const float lighting = 0.10f + (visible ? 0.90f * diffuse : 0.0f);
-    const float3 base_color = params.primitive_colors[primitive];
-    if (optixGetPayload_3() == 0u) {
-        const uint3 launch_index = optixGetLaunchIndex();
-        const unsigned int pixel = launch_index.y * params.width + launch_index.x;
-        params.gbuffer_normal[pixel] = normal;
-        params.gbuffer_depth[pixel] = distance;
-        params.gbuffer_albedo[pixel] = base_color;
-    }
+    const float inverse_distance_squared = 1.0f / fmaxf(light_distance * light_distance, 1.0e-4f);
+    const float direct_scale = visible ? diffuse * inverse_distance_squared * reservoir_normalization : 0.0f;
+    const float3 lighting = make_float3(0.08f + light.intensity.x * direct_scale,
+                                        0.08f + light.intensity.y * direct_scale,
+                                        0.08f + light.intensity.z * direct_scale);
     const float reflectivity = params.primitive_reflectivity[primitive];
     const float roughness = params.primitive_roughness[primitive];
     float3 reflection_color = make_float3(0.0f, 0.0f, 0.0f);
-    const unsigned int depth = optixGetPayload_3();
     if (reflectivity > 0.001f && depth < 2) {
-        const uint3 launch_index = optixGetLaunchIndex();
         unsigned int random_state = hash(launch_index.x + params.width * launch_index.y +
                                          0x9e3779b9u * (depth + 1u) +
                                          0x85ebca6bu * (params.sample_index + 1u));
@@ -235,7 +316,7 @@ extern "C" __global__ void __closesthit__lit() {
                                        __uint_as_float(reflected_blue));
     }
     const float local_weight = 1.0f - reflectivity;
-    set_color(base_color.x * lighting * local_weight + reflection_color.x * reflectivity,
-              base_color.y * lighting * local_weight + reflection_color.y * reflectivity,
-              base_color.z * lighting * local_weight + reflection_color.z * reflectivity);
+    set_color(base_color.x * lighting.x * local_weight + reflection_color.x * reflectivity,
+              base_color.y * lighting.y * local_weight + reflection_color.y * reflectivity,
+              base_color.z * lighting.z * local_weight + reflection_color.z * reflectivity);
 }

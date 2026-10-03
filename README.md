@@ -140,6 +140,9 @@ Primary rays also populate world-normal, linear-depth, albedo, and motion-vector
 G-buffer attachments; secondary reflection and shadow rays cannot overwrite them.
 Two simulated frames exercise motion-vector reprojection and reject history on
 depth, normal, or albedo discontinuities before carrying accumulation forward.
+The same validated reprojection now merges compact ReSTIR DI reservoirs across
+frames. Four point lights provide candidates, while only the selected sample
+receives an RTX shadow ray and reservoir-normalized direct-light contribution.
 
 The dependency-free `LabX/assets` loader imports glTF 2.x triangle primitives
 from external binary buffers, including indexed or non-indexed geometry, scene

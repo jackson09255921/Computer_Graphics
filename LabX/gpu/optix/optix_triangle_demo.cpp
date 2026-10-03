@@ -128,6 +128,7 @@ int main(int argc, char** argv) {
     CUdeviceptr device_roughness = 0;
     CUdeviceptr gbuffer_normal = 0, gbuffer_depth = 0, gbuffer_albedo = 0, gbuffer_motion = 0;
     CUdeviceptr previous_normal = 0, previous_depth = 0, previous_albedo = 0, temporal_validity = 0;
+    CUdeviceptr reservoirs = 0, previous_reservoirs = 0, device_lights = 0;
     CUdeviceptr device_vertices = 0, device_indices = 0;
 
     try {
@@ -288,6 +289,12 @@ int main(int argc, char** argv) {
                    "cudaMalloc temporal validity");
         check_cuda(cudaMemset(reinterpret_cast<void*>(temporal_validity), 0,
                               width * height * sizeof(unsigned int)), "cudaMemset temporal validity");
+        check_cuda(cudaMalloc(reinterpret_cast<void**>(&reservoirs),
+                              width * height * sizeof(OptixLightReservoir)), "cudaMalloc reservoirs");
+        check_cuda(cudaMalloc(reinterpret_cast<void**>(&previous_reservoirs),
+                              width * height * sizeof(OptixLightReservoir)), "cudaMalloc previous reservoirs");
+        check_cuda(cudaMemset(reinterpret_cast<void*>(reservoirs), 0,
+                              width * height * sizeof(OptixLightReservoir)), "cudaMemset reservoirs");
         check_cuda(cudaMalloc(reinterpret_cast<void**>(&device_colors), mesh.colors.size() * sizeof(float3)),
                    "cudaMalloc primitive colors");
         check_cuda(cudaMemcpy(reinterpret_cast<void*>(device_colors), mesh.colors.data(),
@@ -321,9 +328,18 @@ int main(int argc, char** argv) {
                                                           maximum.y - minimum.y) * 0.65f);
         const float3 camera_origin = make_float3(scene_center.x, scene_center.y,
                                                  maximum.z + 2.5f * view_scale);
-        const float3 light_position = make_float3(scene_center.x - 1.25f * view_scale,
-                                                  scene_center.y + 1.75f * view_scale,
-                                                  maximum.z + 2.0f * view_scale);
+        const std::array<OptixPointLight, 4> lights{{
+            {make_float3(scene_center.x - 1.25f * view_scale, scene_center.y + 1.75f * view_scale,
+                         maximum.z + 2.0f * view_scale), make_float3(5.0f, 4.2f, 3.5f)},
+            {make_float3(scene_center.x + 1.50f * view_scale, scene_center.y + 0.75f * view_scale,
+                         maximum.z + 1.5f * view_scale), make_float3(2.0f, 3.0f, 5.0f)},
+            {make_float3(scene_center.x - 0.25f * view_scale, scene_center.y - 1.50f * view_scale,
+                         maximum.z + 1.0f * view_scale), make_float3(3.5f, 2.0f, 1.5f)},
+            {make_float3(scene_center.x + 0.25f * view_scale, scene_center.y + 0.25f * view_scale,
+                         maximum.z + 2.5f * view_scale), make_float3(2.5f, 2.5f, 2.5f)}}};
+        check_cuda(cudaMalloc(reinterpret_cast<void**>(&device_lights), sizeof(lights)), "cudaMalloc lights");
+        check_cuda(cudaMemcpy(reinterpret_cast<void*>(device_lights), lights.data(), sizeof(lights),
+                              cudaMemcpyHostToDevice), "cudaMemcpy lights");
         OptixTriangleParams params{reinterpret_cast<uchar4*>(device_image),
                                          reinterpret_cast<float4*>(device_accumulation),
                                          reinterpret_cast<float3*>(gbuffer_normal),
@@ -334,14 +350,17 @@ int main(int argc, char** argv) {
                                          reinterpret_cast<float*>(previous_depth),
                                          reinterpret_cast<float3*>(previous_albedo),
                                          reinterpret_cast<unsigned int*>(temporal_validity),
+                                         reinterpret_cast<OptixLightReservoir*>(reservoirs),
+                                         reinterpret_cast<OptixLightReservoir*>(previous_reservoirs),
                                          width, height, 0, 0,
                                          gas_handle,
                                          reinterpret_cast<float3*>(device_vertices),
                                          reinterpret_cast<uint3*>(device_indices),
                                          reinterpret_cast<float3*>(device_colors),
                                          reinterpret_cast<float*>(device_reflectivity),
-                                         reinterpret_cast<float*>(device_roughness), camera_origin, view_scale,
-                                         light_position};
+                                         reinterpret_cast<float*>(device_roughness),
+                                         reinterpret_cast<OptixPointLight*>(device_lights),
+                                         static_cast<unsigned int>(lights.size()), camera_origin, view_scale};
         check_cuda(cudaMalloc(reinterpret_cast<void**>(&device_params), sizeof(params)), "cudaMalloc params");
         for (unsigned int sample = 0; sample < samples_per_frame; ++sample) {
             params.sample_index = sample;
@@ -359,6 +378,10 @@ int main(int argc, char** argv) {
         check_cuda(cudaMemcpy(reinterpret_cast<void*>(previous_albedo),
                               reinterpret_cast<void*>(gbuffer_albedo), width * height * sizeof(float3),
                               cudaMemcpyDeviceToDevice), "cudaMemcpy previous albedo");
+        check_cuda(cudaMemcpy(reinterpret_cast<void*>(previous_reservoirs),
+                              reinterpret_cast<void*>(reservoirs),
+                              width * height * sizeof(OptixLightReservoir), cudaMemcpyDeviceToDevice),
+                   "cudaMemcpy previous reservoirs");
         params.frame_index = 1;
         for (unsigned int sample = samples_per_frame; sample < samples_per_pixel; ++sample) {
             params.sample_index = sample;
@@ -384,6 +407,15 @@ int main(int argc, char** argv) {
                    "cudaMemcpy temporal validity");
         if (center_temporal_validity != 1u)
             throw std::runtime_error("static-frame temporal reprojection was rejected");
+        OptixLightReservoir center_reservoir{};
+        check_cuda(cudaMemcpy(&center_reservoir,
+                              reinterpret_cast<void*>(reservoirs +
+                                  ((height / 2) * width + width / 2) * sizeof(OptixLightReservoir)),
+                              sizeof(center_reservoir), cudaMemcpyDeviceToHost),
+                   "cudaMemcpy center reservoir");
+        if (center_reservoir.candidate_count < samples_per_pixel || center_reservoir.weight_sum <= 0.0f ||
+            center_reservoir.selected_weight <= 0.0f || center_reservoir.light_index >= lights.size())
+            throw std::runtime_error("ReSTIR temporal reservoir invariant failed");
         float3 center_normal{};
         float center_depth = 0.0f;
         float3 center_albedo{};
@@ -432,9 +464,12 @@ int main(int argc, char** argv) {
                   << static_cast<int>(center_pixel.x) << ", " << static_cast<int>(center_pixel.y) << ", "
                   << static_cast<int>(center_pixel.z) << ", depth " << center_depth << ", normal "
                   << center_normal.x << ", " << center_normal.y << ", " << center_normal.z
-                  << ", temporal history accepted)\n";
+                  << ", temporal history accepted, reservoir M=" << center_reservoir.candidate_count << ")\n";
 
         cudaFree(reinterpret_cast<void*>(device_params));
+        cudaFree(reinterpret_cast<void*>(device_lights));
+        cudaFree(reinterpret_cast<void*>(previous_reservoirs));
+        cudaFree(reinterpret_cast<void*>(reservoirs));
         cudaFree(reinterpret_cast<void*>(temporal_validity));
         cudaFree(reinterpret_cast<void*>(previous_albedo));
         cudaFree(reinterpret_cast<void*>(previous_depth));

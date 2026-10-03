@@ -58,7 +58,7 @@ ctest --test-dir build-cuda -R cuda_capability --output-on-failure
 3. Importance sampling and multiple importance sampling.
 4. Refraction, dielectric materials, HDR environment lighting, and glTF input (implemented).
 5. CUDA tiled path tracing sized for the 8 GiB GPU budget (geometry, glTF, matched GGX reflection/BTDF, MIS, and HDR implemented).
-6. OptiX indexed-mesh/glTF rendering with Lambert lighting, shadow rays, recursive GGX reflections, progressive accumulation, and primary-hit G-buffers, plus the ReSTIR DI reservoir core (implemented); temporal integration follows.
+6. OptiX indexed-mesh/glTF rendering with recursive GGX reflections, progressive G-buffers, and temporally reused ReSTIR DI reservoirs (implemented); spatial reuse and dynamic motion follow.
 7. Denoising and neural reconstruction only after stable temporal buffers exist.
 
 Every milestone must retain a CPU build, deterministic tests, and a small demo
@@ -106,6 +106,14 @@ The renderer splits its 32 samples across two simulated frames. Frame 1
 reprojects into frame 0 with motion vectors, then validates 1% relative depth,
 normal similarity, and albedo continuity. Rejected pixels clear their history;
 the static center pixel must retain all 32 samples for the test to pass.
+
+Direct lighting uses four point-light candidates. Each primary pixel streams
+one weighted candidate per sample into a compact ReSTIR DI reservoir. Frame 1
+merges the motion-reprojected Frame 0 reservoir only after the same G-buffer
+validation, then traces one visibility ray for the selected light and applies
+reservoir normalization. The deterministic test requires `M = 32` at the
+static center pixel. Spatial reservoir reuse remains in the standalone CUDA
+core and is the next renderer-integration step.
 
 Without the SDK, configuration stops immediately with an actionable message;
 normal CPU and CUDA builds remain unaffected.
