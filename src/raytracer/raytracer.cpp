@@ -239,6 +239,16 @@ Triangle::Triangle(Vec3 first, Vec3 second, Vec3 third, Material material)
     }
 }
 
+Triangle::Triangle(Vec3 first, Vec3 second, Vec3 third, Vec3 first_normal, Vec3 second_normal,
+                   Vec3 third_normal, Material material)
+    : Triangle(first, second, third, material) {
+    first_normal_ = normalized(first_normal);
+    second_normal_ = normalized(second_normal);
+    third_normal_ = normalized(third_normal);
+    smooth_ = length(first_normal_) > kEpsilon && length(second_normal_) > kEpsilon &&
+              length(third_normal_) > kEpsilon;
+}
+
 Aabb Triangle::bounds() const {
     constexpr double padding = 1e-6;
     return {
@@ -274,8 +284,11 @@ bool Triangle::intersect(const Ray& ray, double minimum_distance, double maximum
     }
     hit.distance = distance;
     hit.position = ray.at(distance);
+    const Vec3 shading_normal = smooth_
+        ? normalized(first_normal_ * (1.0 - u - v) + second_normal_ * u + third_normal_ * v)
+        : normal_;
     hit.front_face = dot(normal_, ray.direction) < 0.0;
-    hit.normal = hit.front_face ? normal_ : -normal_;
+    hit.normal = dot(shading_normal, ray.direction) < 0.0 ? shading_normal : -shading_normal;
     hit.material = &material_;
     return true;
 }

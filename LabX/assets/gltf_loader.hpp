@@ -11,6 +11,10 @@ struct GltfTriangle {
     Vec3 first;
     Vec3 second;
     Vec3 third;
+    Vec3 first_normal;
+    Vec3 second_normal;
+    Vec3 third_normal;
+    bool has_normals{false};
     rt::Material material;
 };
 

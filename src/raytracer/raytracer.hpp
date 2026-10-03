@@ -72,6 +72,8 @@ private:
 class Triangle final : public Primitive {
 public:
     Triangle(Vec3 first, Vec3 second, Vec3 third, Material material);
+    Triangle(Vec3 first, Vec3 second, Vec3 third, Vec3 first_normal, Vec3 second_normal,
+             Vec3 third_normal, Material material);
     [[nodiscard]] Aabb bounds() const override;
     [[nodiscard]] bool intersect(const Ray& ray, double minimum_distance, double maximum_distance,
                                  Hit& hit) const override;
@@ -81,6 +83,10 @@ private:
     Vec3 second_;
     Vec3 third_;
     Vec3 normal_;
+    Vec3 first_normal_;
+    Vec3 second_normal_;
+    Vec3 third_normal_;
+    bool smooth_{false};
     Material material_;
 };
 

@@ -12,7 +12,7 @@ namespace {
 void require(bool condition, const char* message) {
     if (!condition) throw std::runtime_error(message);
 }
-bool near(double lhs, double rhs) { return std::abs(lhs - rhs) < 1e-8; }
+bool near(double lhs, double rhs, double tolerance = 1e-8) { return std::abs(lhs - rhs) < tolerance; }
 template <typename T>
 void write(std::ofstream& output, T value) {
     output.write(reinterpret_cast<const char*>(&value), sizeof(value));
@@ -35,19 +35,23 @@ int main() {
             write<std::uint16_t>(output, 0);
             write<std::uint16_t>(output, 1);
             write<std::uint16_t>(output, 2);
+            const float normals[] = {0, 0, 1, 0, 1, 0, 1, 0, 0};
+            for (float value : normals) write(output, value);
         }
         {
             std::ofstream output(gltf_path);
             output << R"({
   "asset":{"version":"2.0"},
-  "buffers":[{"uri":"gltf_test.bin","byteLength":42}],
-  "bufferViews":[{"buffer":0,"byteOffset":0,"byteLength":36},{"buffer":0,"byteOffset":36,"byteLength":6}],
+  "buffers":[{"uri":"gltf_test.bin","byteLength":78}],
+  "bufferViews":[{"buffer":0,"byteOffset":0,"byteLength":36},{"buffer":0,"byteOffset":36,"byteLength":6},
+    {"buffer":0,"byteOffset":42,"byteLength":36}],
   "accessors":[
     {"bufferView":0,"componentType":5126,"count":3,"type":"VEC3"},
-    {"bufferView":1,"componentType":5123,"count":3,"type":"SCALAR"}
+    {"bufferView":1,"componentType":5123,"count":3,"type":"SCALAR"},
+    {"bufferView":2,"componentType":5126,"count":3,"type":"VEC3"}
   ],
   "materials":[{"pbrMetallicRoughness":{"baseColorFactor":[0.2,0.4,0.8,1],"metallicFactor":0.6,"roughnessFactor":0.25}}],
-  "meshes":[{"primitives":[{"attributes":{"POSITION":0},"indices":1,"material":0}]}],
+  "meshes":[{"primitives":[{"attributes":{"POSITION":0,"NORMAL":2},"indices":1,"material":0}]}],
   "nodes":[{"mesh":0,"translation":[2,3,4],"scale":[2,2,2]}],
   "scenes":[{"nodes":[0]}],"scene":0
 })";
@@ -63,6 +67,9 @@ int main() {
         require(near(triangle.material.albedo.z, 0.8) && near(triangle.material.metallic, 0.6) &&
                     near(triangle.material.roughness, 0.25),
                 "metallic-roughness material factors must be imported");
+        require(triangle.has_normals && near(triangle.first_normal.z, 1.0) &&
+                    near(triangle.second_normal.y, 1.0) && near(triangle.third_normal.x, 1.0),
+                "NORMAL accessor must be imported and transformed");
 
         cg::rt::Scene scene;
         asset.add_to(scene);
@@ -70,6 +77,10 @@ int main() {
         cg::rt::Hit hit;
         require(scene.intersect({{2.5, 3.5, 6.0}, {0.0, 0.0, -1.0}}, 1e-5, 10.0, hit),
                 "imported glTF triangles must be usable by the ray tracer");
+        require(near(hit.normal.x, 0.408248290463863, 1e-6) &&
+                    near(hit.normal.y, 0.408248290463863, 1e-6) &&
+                    near(hit.normal.z, 0.816496580927726, 1e-6),
+                "ray-triangle hits must barycentrically interpolate vertex normals");
 
         {
             std::ofstream output(gltf_path, std::ios::trunc);

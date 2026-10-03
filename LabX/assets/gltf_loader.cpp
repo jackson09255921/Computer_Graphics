@@ -203,6 +203,20 @@ Vec3 transform(const Matrix& matrix, const Vec3& value) {
             matrix.m[2] * value.x + matrix.m[6] * value.y + matrix.m[10] * value.z + matrix.m[14]};
 }
 
+Vec3 transform_normal(const Matrix& matrix, const Vec3& value) {
+    const double a00 = matrix.m[0], a01 = matrix.m[4], a02 = matrix.m[8];
+    const double a10 = matrix.m[1], a11 = matrix.m[5], a12 = matrix.m[9];
+    const double a20 = matrix.m[2], a21 = matrix.m[6], a22 = matrix.m[10];
+    const double c00 = a11*a22 - a12*a21, c01 = a12*a20 - a10*a22, c02 = a10*a21 - a11*a20;
+    const double c10 = a02*a21 - a01*a22, c11 = a00*a22 - a02*a20, c12 = a01*a20 - a00*a21;
+    const double c20 = a01*a12 - a02*a11, c21 = a02*a10 - a00*a12, c22 = a00*a11 - a01*a10;
+    const double determinant = a00*c00 + a01*c01 + a02*c02;
+    if (std::abs(determinant) <= kEpsilon) throw std::runtime_error("glTF node transform is singular");
+    return normalized(Vec3{c00*value.x + c01*value.y + c02*value.z,
+                           c10*value.x + c11*value.y + c12*value.z,
+                           c20*value.x + c21*value.y + c22*value.z} / determinant);
+}
+
 Matrix node_matrix(const Json& node) {
     if (const Json* matrix = node.find("matrix")) {
         if (matrix->array().size() != 16) throw std::runtime_error("glTF node matrix must contain 16 values");
@@ -331,6 +345,13 @@ GltfAsset GltfAsset::load(const std::filesystem::path& path) {
             const std::size_t position_index = integer(*position);
             const Accessor& position_accessor = accessors.at(position_index);
             std::vector<Vec3> vertices = positions(position_accessor, views.at(position_accessor.view), buffer);
+            std::vector<Vec3> vertex_normals;
+            if (const Json* normal = attributes->find("NORMAL")) {
+                const Accessor& normal_accessor = accessors.at(integer(*normal));
+                vertex_normals = positions(normal_accessor, views.at(normal_accessor.view), buffer);
+                if (vertex_normals.size() != vertices.size())
+                    throw std::runtime_error("NORMAL and POSITION accessor counts must match");
+            }
             std::vector<std::uint32_t> element_indices;
             if (const Json* index = primitive.find("indices")) {
                 const Accessor& index_accessor = accessors.at(integer(*index));
@@ -346,7 +367,14 @@ GltfAsset GltfAsset::load(const std::filesystem::path& path) {
                 const Vec3 a = transform(world, vertices.at(element_indices[i]));
                 const Vec3 b = transform(world, vertices.at(element_indices[i + 1]));
                 const Vec3 c = transform(world, vertices.at(element_indices[i + 2]));
-                result.triangles_.push_back({a, b, c, material});
+                if (vertex_normals.empty()) {
+                    result.triangles_.push_back({a, b, c, {}, {}, {}, false, material});
+                } else {
+                    result.triangles_.push_back({a, b, c,
+                        transform_normal(world, vertex_normals.at(element_indices[i])),
+                        transform_normal(world, vertex_normals.at(element_indices[i + 1])),
+                        transform_normal(world, vertex_normals.at(element_indices[i + 2])), true, material});
+                }
             }
         }
     };
@@ -380,8 +408,14 @@ GltfAsset GltfAsset::load(const std::filesystem::path& path) {
 }
 
 void GltfAsset::add_to(rt::Scene& scene) const {
-    for (const GltfTriangle& triangle : triangles_)
-        scene.add(std::make_shared<rt::Triangle>(triangle.first, triangle.second, triangle.third, triangle.material));
+    for (const GltfTriangle& triangle : triangles_) {
+        if (triangle.has_normals)
+            scene.add(std::make_shared<rt::Triangle>(triangle.first, triangle.second, triangle.third,
+                triangle.first_normal, triangle.second_normal, triangle.third_normal, triangle.material));
+        else
+            scene.add(std::make_shared<rt::Triangle>(triangle.first, triangle.second, triangle.third,
+                                                     triangle.material));
+    }
 }
 
 }  // namespace cg::assets

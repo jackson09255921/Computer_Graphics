@@ -72,10 +72,14 @@ pipeline {
                 script {
                     if (isUnix()) {
                         sh 'python3 tools/fetch_gltf_sample.py BoxTextured'
+                        sh 'python3 tools/fetch_gltf_sample.py Duck'
                         sh './build-jenkins/gltf_demo LabX/data/external/gltf_samples/BoxTextured/BoxTextured.glb'
+                        sh './build-jenkins/gltf_demo LabX/data/external/gltf_samples/Duck/Duck.glb'
                     } else {
                         bat 'python tools\\fetch_gltf_sample.py BoxTextured'
+                        bat 'python tools\\fetch_gltf_sample.py Duck'
                         bat 'build-jenkins\\Release\\gltf_demo.exe LabX\\data\\external\\gltf_samples\\BoxTextured\\BoxTextured.glb'
+                        bat 'build-jenkins\\Release\\gltf_demo.exe LabX\\data\\external\\gltf_samples\\Duck\\Duck.glb'
                     }
                 }
             }

@@ -50,6 +50,7 @@ struct Sphere {
 struct Triangle {
     float3 first; float3 second; float3 third; float3 albedo; float metallic; float roughness;
     float transmission; float index_of_refraction;
+    float3 first_normal; float3 second_normal; float3 third_normal; bool smooth;
 };
 struct AreaLight { float3 center; float3 half_u; float3 half_v; float3 emission; };
 struct GpuEnvironment {
@@ -127,9 +128,14 @@ __device__ void intersect_triangles(const Ray& ray, const Triangle* triangles, c
                 if (distance <= 1.0e-4f || distance >= closest.distance) continue;
                 closest.distance = distance;
                 closest.position = add(ray.origin, mul(ray.direction, distance));
-                closest.normal = normalize3(cross3(edge1, edge2));
-                closest.front_face = dot3(closest.normal, ray.direction) < 0.0f;
-                if (!closest.front_face) closest.normal = mul(closest.normal, -1.0f);
+                const float3 geometric_normal = normalize3(cross3(edge1, edge2));
+                closest.normal = triangle.smooth
+                    ? normalize3(add(mul(triangle.first_normal, 1.0f - u - v),
+                                     add(mul(triangle.second_normal, u), mul(triangle.third_normal, v))))
+                    : geometric_normal;
+                closest.front_face = dot3(geometric_normal, ray.direction) < 0.0f;
+                if (dot3(closest.normal, ray.direction) >= 0.0f)
+                    closest.normal = mul(closest.normal, -1.0f);
                 closest.albedo = triangle.albedo;
                 closest.metallic = triangle.metallic;
                 closest.roughness = triangle.roughness;
@@ -855,7 +861,9 @@ std::vector<Triangle> load_gltf_triangles(const std::filesystem::path& path) {
                           convert(triangle.material.albedo), static_cast<float>(triangle.material.metallic),
                           static_cast<float>(triangle.material.roughness),
                           static_cast<float>(triangle.material.transmission),
-                          static_cast<float>(triangle.material.index_of_refraction)});
+                          static_cast<float>(triangle.material.index_of_refraction),
+                          convert(triangle.first_normal), convert(triangle.second_normal),
+                          convert(triangle.third_normal), triangle.has_normals});
     }
     return result;
 }
