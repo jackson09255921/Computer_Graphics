@@ -63,7 +63,9 @@ per area-light sample.
 The separate Monte Carlo path tracer adds cosine-weighted hemisphere sampling,
 indirect diffuse illumination, explicit area-light sampling, mirror bounces,
 Russian roulette termination, and a metallic/roughness GGX BRDF with Schlick
-Fresnel and Smith visibility. The optional second argument controls samples
+Fresnel and Smith visibility. Area-light and BSDF importance sampling are
+combined with the 1995 Veach–Guibas power heuristic for lower-variance direct
+lighting. The optional second argument controls samples
 per pixel (64 by default):
 
 ```bash
@@ -204,6 +206,8 @@ portable while allowing different presentation backends later. See the
 
 The categorized experiments, detected RTX 4060 constraints, and staged GPU
 roadmap are documented in [`LabX/README.md`](LabX/README.md).
+The corresponding research milestones are listed in the
+[`rendering technology timeline`](docs/timeline.md).
 
 For GPU development, use the reproducible WSL2 environment in
 [`environment.yml`](environment.yml). It supplies CUDA 13.1, CMake, and Ninja

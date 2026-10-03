@@ -1,5 +1,6 @@
 #include "raytracer/raytracer.hpp"
 #include "pbr/pbr.hpp"
+#include "sampling/mis.hpp"
 
 #include <algorithm>
 #include <array>
@@ -85,8 +86,32 @@ Color path_radiance(const Scene& scene, const Ray& ray, int depth, int maximum_d
                              distance - kRayBias, blocker)) {
             const Color brdf = pbr::evaluate_ggx(hit.normal, normalized(-ray.direction), direction,
                                                  material.albedo, material.metallic, material.roughness);
-            result += brdf * light.color * (material.diffuse * light.intensity * light.area() *
-                                            surface_cosine * light_cosine / distance_squared);
+            const double light_pdf = distance_squared / (light_cosine * light.area());
+            const double bsdf_pdf = sampling::cosine_hemisphere_pdf(surface_cosine);
+            const double weight = sampling::power_heuristic(light_pdf, bsdf_pdf);
+            result += brdf * light.color *
+                      (material.diffuse * light.intensity * surface_cosine * weight / light_pdf);
+        }
+
+        const Vec3 bsdf_direction = cosine_hemisphere(hit.normal, sampler);
+        sampling::RectangleHit light_hit;
+        if (sampling::intersect_area_light(light, hit.position + hit.normal * kRayBias,
+                                           bsdf_direction, light_hit)) {
+            Hit bsdf_blocker;
+            if (!scene.intersect({hit.position + hit.normal * kRayBias, bsdf_direction}, kRayBias,
+                                 light_hit.distance - kRayBias, bsdf_blocker)) {
+                const double bsdf_surface_cosine = std::max(0.0, dot(hit.normal, bsdf_direction));
+                const double bsdf_pdf = sampling::cosine_hemisphere_pdf(bsdf_surface_cosine);
+                const double light_pdf = sampling::area_light_pdf(
+                    light, hit.position + hit.normal * kRayBias, bsdf_direction);
+                const double weight = sampling::power_heuristic(bsdf_pdf, light_pdf);
+                const Color brdf = pbr::evaluate_ggx(hit.normal, normalized(-ray.direction), bsdf_direction,
+                                                     material.albedo, material.metallic, material.roughness);
+                if (bsdf_pdf > 0.0) {
+                    result += brdf * light.color *
+                              (material.diffuse * light.intensity * bsdf_surface_cosine * weight / bsdf_pdf);
+                }
+            }
         }
     }
 

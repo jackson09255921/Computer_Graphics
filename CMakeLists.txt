@@ -16,6 +16,7 @@ set(CG_CUDA_ARCHITECTURES "89" CACHE STRING "CUDA architectures for LabX GPU exp
 add_library(cg_core
     LabX/pbr/pbr.cpp
     LabX/progressive/progressive_renderer.cpp
+    LabX/sampling/mis.cpp
     src/animation/animation.cpp
     src/core/draw.cpp
     src/core/image.cpp
@@ -51,6 +52,10 @@ if(BUILD_TESTING)
     add_executable(progressive_tests LabX/progressive/progressive_tests.cpp)
     target_link_libraries(progressive_tests PRIVATE cg_core)
     add_test(NAME progressive_tests COMMAND progressive_tests)
+
+    add_executable(mis_tests LabX/sampling/mis_tests.cpp)
+    target_link_libraries(mis_tests PRIVATE cg_core)
+    add_test(NAME mis_tests COMMAND mis_tests)
 
     add_executable(animation_tests tests/animation_tests.cpp)
     target_link_libraries(animation_tests PRIVATE cg_core)

@@ -11,6 +11,7 @@ LabX/
 ├── gpu/          # optional CUDA/GPU capability and rendering work
 ├── pbr/          # GGX, Fresnel, and metallic/roughness material model
 ├── progressive/  # deterministic multi-threaded tile rendering
+├── sampling/     # importance sampling, PDFs, and MIS heuristics
 └── raytracing/   # Whitted ray tracing and Monte Carlo path tracing demos
 ```
 
