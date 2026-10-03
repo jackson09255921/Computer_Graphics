@@ -67,6 +67,20 @@ pipeline {
             }
         }
 
+        stage('External GLB validation') {
+            steps {
+                script {
+                    if (isUnix()) {
+                        sh 'python3 tools/fetch_gltf_sample.py BoxTextured'
+                        sh './build-jenkins/gltf_demo LabX/data/external/gltf_samples/BoxTextured/BoxTextured.glb'
+                    } else {
+                        bat 'python tools\\fetch_gltf_sample.py BoxTextured'
+                        bat 'build-jenkins\\Release\\gltf_demo.exe LabX\\data\\external\\gltf_samples\\BoxTextured\\BoxTextured.glb'
+                    }
+                }
+            }
+        }
+
         stage('CUDA capability') {
             when {
                 expression { return params.RUN_GPU_TESTS }
@@ -90,7 +104,7 @@ pipeline {
 
     post {
         always {
-            archiveArtifacts artifacts: '*.bmp,build-jenkins/*visual*.ppm,build-jenkins/*diff*.ppm', allowEmptyArchive: true
+            archiveArtifacts artifacts: '*.bmp,build-jenkins/*visual*.ppm,build-jenkins/*diff*.ppm,LabX/images/*.png', allowEmptyArchive: true
             junit testResults: 'build-jenkins/**/Test.xml', allowEmptyResults: true
         }
     }

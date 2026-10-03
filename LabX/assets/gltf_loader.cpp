@@ -133,16 +133,55 @@ std::size_t member_integer(const Json& object, const std::string& key, std::size
     return value ? integer(*value) : fallback;
 }
 
-std::string read_text(const std::filesystem::path& path) {
-    std::ifstream input(path, std::ios::binary);
-    if (!input) throw std::runtime_error("failed to open glTF file: " + path.string());
-    return {std::istreambuf_iterator<char>(input), std::istreambuf_iterator<char>()};
-}
-
 std::vector<std::uint8_t> read_binary(const std::filesystem::path& path) {
     std::ifstream input(path, std::ios::binary);
     if (!input) throw std::runtime_error("failed to open glTF buffer: " + path.string());
     return {std::istreambuf_iterator<char>(input), std::istreambuf_iterator<char>()};
+}
+
+std::uint32_t little_u32(const std::vector<std::uint8_t>& bytes, std::size_t offset) {
+    if (offset + 4 > bytes.size()) throw std::runtime_error("truncated GLB header or chunk");
+    return static_cast<std::uint32_t>(bytes[offset]) |
+           (static_cast<std::uint32_t>(bytes[offset + 1]) << 8u) |
+           (static_cast<std::uint32_t>(bytes[offset + 2]) << 16u) |
+           (static_cast<std::uint32_t>(bytes[offset + 3]) << 24u);
+}
+
+struct Document {
+    std::string json;
+    std::vector<std::uint8_t> binary;
+    bool embedded_binary{false};
+};
+
+Document read_document(const std::filesystem::path& path) {
+    const std::vector<std::uint8_t> bytes = read_binary(path);
+    if (bytes.size() < 4 || std::memcmp(bytes.data(), "glTF", 4) != 0)
+        return {std::string(bytes.begin(), bytes.end()), {}, false};
+    if (bytes.size() < 20 || little_u32(bytes, 4) != 2)
+        throw std::runtime_error("only GLB version 2 is supported");
+    if (little_u32(bytes, 8) != bytes.size())
+        throw std::runtime_error("GLB declared length does not match file size");
+    std::size_t cursor = 12;
+    std::string json;
+    std::vector<std::uint8_t> binary;
+    while (cursor < bytes.size()) {
+        const std::uint32_t length = little_u32(bytes, cursor);
+        const std::uint32_t type = little_u32(bytes, cursor + 4);
+        cursor += 8;
+        if (cursor + length > bytes.size()) throw std::runtime_error("GLB chunk exceeds file bounds");
+        if (type == 0x4e4f534au) {
+            if (!json.empty()) throw std::runtime_error("GLB contains multiple JSON chunks");
+            json.assign(reinterpret_cast<const char*>(bytes.data() + cursor), length);
+            while (!json.empty() && (json.back() == ' ' || json.back() == '\0')) json.pop_back();
+        } else if (type == 0x004e4942u) {
+            if (!binary.empty()) throw std::runtime_error("GLB contains multiple BIN chunks");
+            binary.assign(bytes.begin() + static_cast<std::ptrdiff_t>(cursor),
+                          bytes.begin() + static_cast<std::ptrdiff_t>(cursor + length));
+        }
+        cursor += length;
+    }
+    if (json.empty()) throw std::runtime_error("GLB has no JSON chunk");
+    return {std::move(json), std::move(binary), true};
 }
 
 struct Matrix {
@@ -248,17 +287,28 @@ rt::Material material_at(const Json& root, std::size_t index) {
 }  // namespace
 
 GltfAsset GltfAsset::load(const std::filesystem::path& path) {
-    const Json root = JsonParser(read_text(path)).parse();
+    const Document document = read_document(path);
+    const Json root = JsonParser(document.json).parse();
     const Json* asset = root.find("asset");
     if (!asset || !asset->find("version") || asset->find("version")->string().rfind("2.", 0) != 0)
         throw std::runtime_error("only glTF 2.x assets are supported");
     const auto& buffers = root.find("buffers")->array();
-    if (buffers.size() != 1 || !buffers[0].find("uri"))
-        throw std::runtime_error("this LabX loader requires one external binary buffer");
-    const std::string uri = buffers[0].find("uri")->string();
-    if (uri.find("..") != std::string::npos || uri.find(':') != std::string::npos)
-        throw std::runtime_error("unsafe or embedded glTF buffer URI");
-    const std::vector<std::uint8_t> buffer = read_binary(path.parent_path() / uri);
+    if (buffers.size() != 1)
+        throw std::runtime_error("this LabX loader requires exactly one buffer");
+    std::vector<std::uint8_t> buffer;
+    if (document.embedded_binary) {
+        if (buffers[0].find("uri")) throw std::runtime_error("GLB buffer must not declare an external URI");
+        buffer = document.binary;
+    } else {
+        const Json* uri_value = buffers[0].find("uri");
+        if (!uri_value) throw std::runtime_error("JSON glTF buffer requires an external URI");
+        const std::string uri = uri_value->string();
+        if (uri.find("..") != std::string::npos || uri.find(':') != std::string::npos)
+            throw std::runtime_error("unsafe or embedded glTF buffer URI");
+        buffer = read_binary(path.parent_path() / uri);
+    }
+    if (const Json* length = buffers[0].find("byteLength"))
+        if (buffer.size() < integer(*length)) throw std::runtime_error("glTF buffer is shorter than byteLength");
 
     std::vector<View> views;
     for (const Json& source : root.find("bufferViews")->array())

@@ -17,11 +17,16 @@ template <typename T>
 void write(std::ofstream& output, T value) {
     output.write(reinterpret_cast<const char*>(&value), sizeof(value));
 }
+void append_u32(std::vector<std::uint8_t>& output, std::uint32_t value) {
+    for (int shift = 0; shift < 32; shift += 8)
+        output.push_back(static_cast<std::uint8_t>((value >> shift) & 0xffu));
+}
 }
 
 int main() {
     const std::filesystem::path gltf_path = "gltf_test.gltf";
     const std::filesystem::path bin_path = "gltf_test.bin";
+    const std::filesystem::path glb_path = "gltf_test.glb";
     try {
         {
             std::ofstream output(bin_path, std::ios::binary);
@@ -79,13 +84,44 @@ int main() {
                     near(default_scene_asset.triangles()[0].material.albedo.x, 0.8),
                 "root nodes and the default material must work without scenes or materials arrays");
 
+        const std::string glb_json = R"({"asset":{"version":"2.0"},"buffers":[{"byteLength":42}],
+"bufferViews":[{"buffer":0,"byteLength":36},{"buffer":0,"byteOffset":36,"byteLength":6}],
+"accessors":[{"bufferView":0,"componentType":5126,"count":3,"type":"VEC3"},
+{"bufferView":1,"componentType":5123,"count":3,"type":"SCALAR"}],
+"meshes":[{"primitives":[{"attributes":{"POSITION":0},"indices":1}]}],
+"nodes":[{"mesh":0}],"scenes":[{"nodes":[0]}],"scene":0})";
+        std::vector<std::uint8_t> json_chunk(glb_json.begin(), glb_json.end());
+        while (json_chunk.size() % 4 != 0) json_chunk.push_back(' ');
+        std::ifstream binary_input(bin_path, std::ios::binary);
+        const std::vector<std::uint8_t> bin_chunk{std::istreambuf_iterator<char>(binary_input),
+                                                  std::istreambuf_iterator<char>()};
+        std::vector<std::uint8_t> glb;
+        glb.insert(glb.end(), {'g', 'l', 'T', 'F'});
+        append_u32(glb, 2);
+        append_u32(glb, static_cast<std::uint32_t>(12 + 8 + json_chunk.size() + 8 + bin_chunk.size() + 2));
+        append_u32(glb, static_cast<std::uint32_t>(json_chunk.size()));
+        append_u32(glb, 0x4e4f534au);
+        glb.insert(glb.end(), json_chunk.begin(), json_chunk.end());
+        append_u32(glb, static_cast<std::uint32_t>(bin_chunk.size() + 2));
+        append_u32(glb, 0x004e4942u);
+        glb.insert(glb.end(), bin_chunk.begin(), bin_chunk.end());
+        glb.insert(glb.end(), {0, 0});
+        {
+            std::ofstream output(glb_path, std::ios::binary);
+            output.write(reinterpret_cast<const char*>(glb.data()), static_cast<std::streamsize>(glb.size()));
+        }
+        const cg::assets::GltfAsset glb_asset = cg::assets::GltfAsset::load(glb_path);
+        require(glb_asset.triangles().size() == 1, "GLB v2 JSON and BIN chunks must load");
+
         std::filesystem::remove(gltf_path);
         std::filesystem::remove(bin_path);
+        std::filesystem::remove(glb_path);
         std::cout << "glTF tests passed\n";
         return 0;
     } catch (const std::exception& error) {
         std::filesystem::remove(gltf_path);
         std::filesystem::remove(bin_path);
+        std::filesystem::remove(glb_path);
         std::cerr << "glTF tests failed: " << error.what() << '\n';
         return 1;
     }
