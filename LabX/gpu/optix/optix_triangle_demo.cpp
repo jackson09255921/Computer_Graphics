@@ -15,6 +15,7 @@
 #include <array>
 #include <cstdint>
 #include <cstdlib>
+#include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <limits>
@@ -106,6 +107,15 @@ void write_ppm(const std::string& path, const std::vector<uchar4>& image,
         output.put(static_cast<char>(pixel.y));
         output.put(static_cast<char>(pixel.z));
     }
+}
+
+std::string debug_output_path(const std::string& output_path, const std::string& channel) {
+    const std::filesystem::path path(output_path);
+    return (path.parent_path() / (path.stem().string() + "_" + channel + ".ppm")).string();
+}
+
+unsigned char to_byte(float value) {
+    return static_cast<unsigned char>(std::clamp(value, 0.0f, 1.0f) * 255.0f);
 }
 }
 
@@ -501,12 +511,24 @@ int main(int argc, char** argv) {
             throw std::runtime_error("primary-hit G-buffer invariant failed");
         std::vector<float> frame_depth(width * height);
         std::vector<unsigned int> frame_validity(width * height);
+        std::vector<float3> frame_normal(width * height);
+        std::vector<float2> frame_motion(width * height);
+        std::vector<OptixLightReservoir> frame_spatial_reservoirs(width * height);
         check_cuda(cudaMemcpy(frame_depth.data(), reinterpret_cast<void*>(gbuffer_depth),
                               frame_depth.size() * sizeof(float), cudaMemcpyDeviceToHost),
                    "cudaMemcpy frame depth");
         check_cuda(cudaMemcpy(frame_validity.data(), reinterpret_cast<void*>(temporal_validity),
                               frame_validity.size() * sizeof(unsigned int), cudaMemcpyDeviceToHost),
                    "cudaMemcpy frame temporal validity");
+        check_cuda(cudaMemcpy(frame_normal.data(), reinterpret_cast<void*>(gbuffer_normal),
+                              frame_normal.size() * sizeof(float3), cudaMemcpyDeviceToHost),
+                   "cudaMemcpy frame normal");
+        check_cuda(cudaMemcpy(frame_motion.data(), reinterpret_cast<void*>(gbuffer_motion),
+                              frame_motion.size() * sizeof(float2), cudaMemcpyDeviceToHost),
+                   "cudaMemcpy frame motion");
+        check_cuda(cudaMemcpy(frame_spatial_reservoirs.data(), reinterpret_cast<void*>(spatial_reservoirs),
+                              frame_spatial_reservoirs.size() * sizeof(OptixLightReservoir),
+                              cudaMemcpyDeviceToHost), "cudaMemcpy frame spatial reservoirs");
         std::size_t accepted_history_pixels = 0;
         std::size_t rejected_history_pixels = 0;
         for (std::size_t pixel = 0; pixel < frame_depth.size(); ++pixel) {
@@ -534,6 +556,43 @@ int main(int argc, char** argv) {
         if (argc <= 2 && shadow_pixels == 0)
             throw std::runtime_error("default scene produced no verified shadow pixels");
         write_ppm(output_path, image, width, height);
+        const float maximum_depth = *std::max_element(frame_depth.begin(), frame_depth.end());
+        unsigned int maximum_candidates = 0;
+        for (const OptixLightReservoir& reservoir : frame_spatial_reservoirs)
+            maximum_candidates = std::max(maximum_candidates, reservoir.candidate_count);
+        if (maximum_depth <= 0.0f || maximum_candidates == 0u)
+            throw std::runtime_error("debug visualization input invariant failed");
+        std::vector<uchar4> normal_debug(width * height);
+        std::vector<uchar4> depth_debug(width * height);
+        std::vector<uchar4> motion_debug(width * height);
+        std::vector<uchar4> validity_debug(width * height);
+        std::vector<uchar4> reservoir_debug(width * height);
+        for (std::size_t pixel = 0; pixel < frame_depth.size(); ++pixel) {
+            const bool hit = frame_depth[pixel] > 0.0f;
+            const float3 normal = frame_normal[pixel];
+            normal_debug[pixel] = hit
+                ? make_uchar4(to_byte(normal.x * 0.5f + 0.5f), to_byte(normal.y * 0.5f + 0.5f),
+                              to_byte(normal.z * 0.5f + 0.5f), 255)
+                : make_uchar4(0, 0, 0, 255);
+            const unsigned char depth_value = hit ? to_byte(frame_depth[pixel] / maximum_depth) : 0;
+            depth_debug[pixel] = make_uchar4(depth_value, depth_value, depth_value, 255);
+            motion_debug[pixel] = hit
+                ? make_uchar4(to_byte(0.5f + frame_motion[pixel].x / 32.0f),
+                              to_byte(0.5f + frame_motion[pixel].y / 32.0f), 128, 255)
+                : make_uchar4(0, 0, 0, 255);
+            validity_debug[pixel] = !hit ? make_uchar4(0, 0, 0, 255)
+                : frame_validity[pixel] != 0u ? make_uchar4(32, 255, 64, 255)
+                                              : make_uchar4(255, 32, 32, 255);
+            const unsigned char reservoir_value = hit
+                ? to_byte(static_cast<float>(frame_spatial_reservoirs[pixel].candidate_count) /
+                          static_cast<float>(maximum_candidates)) : 0;
+            reservoir_debug[pixel] = make_uchar4(reservoir_value, 32, 255 - reservoir_value, 255);
+        }
+        write_ppm(debug_output_path(output_path, "normal"), normal_debug, width, height);
+        write_ppm(debug_output_path(output_path, "depth"), depth_debug, width, height);
+        write_ppm(debug_output_path(output_path, "motion"), motion_debug, width, height);
+        write_ppm(debug_output_path(output_path, "validity"), validity_debug, width, height);
+        write_ppm(debug_output_path(output_path, "reservoir"), reservoir_debug, width, height);
         std::cout << "OptiX indexed mesh rendered " << mesh.indices.size() << " triangles to "
                   << output_path << " at " << samples_per_pixel << " spp (" << hit_pixels
                   << " hit pixels, " << shadow_pixels

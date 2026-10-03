@@ -90,6 +90,12 @@ output path and then a `.gltf` path to upload a scene through the shared loader:
 .\build-optix-windows\Release\optix_triangle_demo.exe output.ppm model.gltf
 ```
 
+The renderer writes five diagnostic companions next to `output.ppm`:
+`output_normal.ppm`, `output_depth.ppm`, `output_motion.ppm`,
+`output_validity.ppm`, and `output_reservoir.ppm`. Temporal validity uses green
+for accepted history and red for rejected disocclusions; the reservoir view
+visualizes spatial candidate count relative to the frame maximum.
+
 Radiance hits can recursively trace up to two reflection bounces. Imported
 metallic factors determine the Fresnel reflection weight, while roughness sets
 the width of deterministic GGX half-vector samples. Each pixel and bounce uses
@@ -104,6 +110,9 @@ into the previous camera to produce a non-zero screen-space motion vector.
 The default elevated triangle also translates between frames. Its vertices are
 uploaded and the existing GAS is updated with `OPTIX_BUILD_OPERATION_UPDATE`;
 per-primitive motion maps current hits back to their previous world positions.
+The same buffers are copied into deterministic debug visualizations after the
+spatial resolve pass, providing the diagnostics needed by a future live viewer
+and denoiser.
 
 The renderer splits its 32 samples across two frames. Frame 1 reprojects into
 frame 0 with motion vectors, then validates 1% relative depth, normal

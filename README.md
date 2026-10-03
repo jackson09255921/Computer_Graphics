@@ -157,6 +157,10 @@ reservoir from `M = 32` to `M = 160`. A final OptiX raygen pass retraces the
 primary ray with the spatially selected light, performs a fresh RTX visibility
 test, preserves recursive GGX reflections, and writes the resolved result to
 the output image.
+Every OptiX render also writes `_normal`, `_depth`, `_motion`, `_validity`, and
+`_reservoir` PPM companions beside the beauty image. These views expose
+G-buffer orientation and range, screen-space velocity, accepted versus rejected
+history, and spatial reservoir candidate density without requiring a GUI.
 
 The dependency-free `LabX/assets` loader imports glTF 2.x triangle primitives
 from external binary buffers, including indexed or non-indexed geometry, scene
