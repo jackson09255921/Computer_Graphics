@@ -41,10 +41,19 @@ __host__ __device__ float3 reflect3(float3 direction, float3 normal) {
 }
 
 struct Ray { float3 origin; float3 direction; };
-struct Sphere { float3 center; float radius; float3 albedo; float metallic; float roughness; };
-struct Triangle { float3 first; float3 second; float3 third; float3 albedo; float metallic; float roughness; };
+struct Sphere {
+    float3 center; float radius; float3 albedo; float metallic; float roughness;
+    float transmission; float index_of_refraction;
+};
+struct Triangle {
+    float3 first; float3 second; float3 third; float3 albedo; float metallic; float roughness;
+    float transmission; float index_of_refraction;
+};
 struct BvhNode { float3 minimum; float3 maximum; int left; int right; int first; int count; };
-struct Hit { float distance; float3 position; float3 normal; float3 albedo; float metallic; float roughness; bool found; };
+struct Hit {
+    float distance; float3 position; float3 normal; float3 albedo; float metallic; float roughness;
+    float transmission; float index_of_refraction; bool front_face; bool found;
+};
 
 struct Rng {
     std::uint32_t state;
@@ -109,10 +118,13 @@ __device__ void intersect_triangles(const Ray& ray, const Triangle* triangles, c
                 closest.distance = distance;
                 closest.position = add(ray.origin, mul(ray.direction, distance));
                 closest.normal = normalize3(cross3(edge1, edge2));
-                if (dot3(closest.normal, ray.direction) > 0.0f) closest.normal = mul(closest.normal, -1.0f);
+                closest.front_face = dot3(closest.normal, ray.direction) < 0.0f;
+                if (!closest.front_face) closest.normal = mul(closest.normal, -1.0f);
                 closest.albedo = triangle.albedo;
                 closest.metallic = triangle.metallic;
                 closest.roughness = triangle.roughness;
+                closest.transmission = triangle.transmission;
+                closest.index_of_refraction = triangle.index_of_refraction;
                 closest.found = true;
             }
         } else {
@@ -142,10 +154,13 @@ __device__ bool intersect_scene(const Ray& ray, const Sphere* spheres, int spher
         closest.distance = distance;
         closest.position = add(ray.origin, mul(ray.direction, distance));
         closest.normal = normalize3(sub(closest.position, sphere.center));
-        if (dot3(closest.normal, ray.direction) > 0.0f) closest.normal = mul(closest.normal, -1.0f);
+        closest.front_face = dot3(closest.normal, ray.direction) < 0.0f;
+        if (!closest.front_face) closest.normal = mul(closest.normal, -1.0f);
         closest.albedo = sphere.albedo;
         closest.metallic = sphere.metallic;
         closest.roughness = sphere.roughness;
+        closest.transmission = sphere.transmission;
+        closest.index_of_refraction = sphere.index_of_refraction;
         closest.found = true;
     }
     intersect_triangles(ray, triangles, nodes, node_count, closest);
@@ -164,6 +179,42 @@ __device__ float3 cosine_direction(float3 normal, Rng& rng) {
     return normalize3(add(add(mul(tangent, x), mul(bitangent, y)), mul(normal, z)));
 }
 
+__device__ float3 sample_ggx_normal(float3 normal, float roughness, Rng& rng) {
+    const float alpha = fmaxf(0.001f, roughness * roughness);
+    const float uniform = fminf(rng.next(), 1.0f - 1.0e-7f);
+    const float tangent_squared = alpha * alpha * uniform / (1.0f - uniform);
+    const float cosine = rsqrtf(1.0f + tangent_squared);
+    const float sine = sqrtf(fmaxf(0.0f, 1.0f - cosine * cosine));
+    const float azimuth = 2.0f * kPi * rng.next();
+    const float3 helper = fabsf(normal.x) > 0.9f ? make_float3(0, 1, 0) : make_float3(1, 0, 0);
+    const float3 tangent = normalize3(cross3(helper, normal));
+    const float3 bitangent = cross3(normal, tangent);
+    return normalize3(add(add(mul(tangent, sine * cosf(azimuth)),
+                              mul(bitangent, sine * sinf(azimuth))), mul(normal, cosine)));
+}
+
+__device__ float fresnel_dielectric(float cosine, float eta_incident, float eta_transmitted) {
+    cosine = fminf(1.0f, fabsf(cosine));
+    const float sine_transmitted = eta_incident / eta_transmitted *
+                                   sqrtf(fmaxf(0.0f, 1.0f - cosine * cosine));
+    if (sine_transmitted >= 1.0f) return 1.0f;
+    const float cosine_transmitted = sqrtf(fmaxf(0.0f, 1.0f - sine_transmitted * sine_transmitted));
+    const float parallel = (eta_transmitted * cosine - eta_incident * cosine_transmitted) /
+                           (eta_transmitted * cosine + eta_incident * cosine_transmitted);
+    const float perpendicular = (eta_incident * cosine - eta_transmitted * cosine_transmitted) /
+                                (eta_incident * cosine + eta_transmitted * cosine_transmitted);
+    return 0.5f * (parallel * parallel + perpendicular * perpendicular);
+}
+
+__device__ bool refract3(float3 incident, float3 normal, float eta_ratio, float3& transmitted) {
+    const float cosine = fminf(1.0f, -dot3(incident, normal));
+    const float discriminant = 1.0f - eta_ratio * eta_ratio * (1.0f - cosine * cosine);
+    if (discriminant < 0.0f) return false;
+    transmitted = normalize3(add(mul(incident, eta_ratio),
+                                 mul(normal, eta_ratio * cosine - sqrtf(discriminant))));
+    return true;
+}
+
 __device__ float3 radiance(Ray ray, const Sphere* spheres, int sphere_count,
                            const Triangle* triangles, const BvhNode* nodes, int node_count, Rng& rng) {
     float3 result = make_float3(0, 0, 0);
@@ -179,14 +230,28 @@ __device__ float3 radiance(Ray ray, const Sphere* spheres, int sphere_count,
         }
         throughput = mul(throughput, hit.albedo);
         float3 direction;
-        if (hit.metallic > 0.5f) {
-            direction = reflect3(ray.direction, hit.normal);
-            direction = normalize3(add(direction, mul(cosine_direction(hit.normal, rng),
-                                                       0.2f * hit.roughness)));
+        if (hit.transmission > 0.0f && rng.next() < hit.transmission) {
+            float3 microfacet = sample_ggx_normal(hit.normal, hit.roughness, rng);
+            if (dot3(ray.direction, microfacet) > 0.0f) microfacet = mul(microfacet, -1.0f);
+            const float eta_incident = hit.front_face ? 1.0f : hit.index_of_refraction;
+            const float eta_transmitted = hit.front_face ? hit.index_of_refraction : 1.0f;
+            const float fresnel = fresnel_dielectric(-dot3(ray.direction, microfacet),
+                                                      eta_incident, eta_transmitted);
+            float3 transmitted{};
+            if (rng.next() < fresnel ||
+                !refract3(ray.direction, microfacet, eta_incident / eta_transmitted, transmitted))
+                direction = normalize3(reflect3(ray.direction, microfacet));
+            else
+                direction = transmitted;
+        } else if (hit.metallic > 0.5f) {
+            const float3 microfacet = sample_ggx_normal(hit.normal, hit.roughness, rng);
+            direction = normalize3(reflect3(ray.direction, microfacet));
+            if (dot3(direction, hit.normal) <= 0.0f) direction = normalize3(reflect3(ray.direction, hit.normal));
         } else {
             direction = cosine_direction(hit.normal, rng);
         }
-        ray = {add(hit.position, mul(hit.normal, 1.0e-4f)), direction};
+        const float bias = dot3(direction, hit.normal) >= 0.0f ? 1.0e-4f : -1.0e-4f;
+        ray = {add(hit.position, mul(hit.normal, bias)), direction};
         if (depth >= 3) {
             const float survival = fminf(0.95f, fmaxf(throughput.x, fmaxf(throughput.y, throughput.z)));
             if (rng.next() > survival) break;
@@ -233,6 +298,17 @@ __global__ void probe_bvh(const Triangle* triangles, const BvhNode* nodes, int n
     intersect_triangles({make_float3(0, 1, 0), make_float3(0, -1, 0)},
                         triangles, nodes, node_count, hit);
     *passed = hit.found && fabsf(hit.distance - 1.0f) < 1.0e-5f;
+}
+
+__global__ void probe_dielectric(int* passed) {
+    float3 straight{};
+    float3 total_internal{};
+    const bool normal_refraction = refract3(make_float3(0, -1, 0), make_float3(0, 1, 0),
+                                             1.0f / 1.5f, straight);
+    const bool total_internal_reflection = !refract3(normalize3(make_float3(0.8660254f, -0.5f, 0)),
+                                                      make_float3(0, 1, 0), 1.5f, total_internal);
+    *passed = fabsf(fresnel_dielectric(1.0f, 1.0f, 1.5f) - 0.04f) < 1.0e-5f &&
+              normal_refraction && fabsf(straight.y + 1.0f) < 1.0e-5f && total_internal_reflection;
 }
 
 float component(float3 value, int axis) { return axis == 0 ? value.x : axis == 1 ? value.y : value.z; }
@@ -287,7 +363,7 @@ std::vector<BvhNode> build_bvh(std::vector<Triangle>& triangles) {
 void validate_bvh_on_gpu() {
     std::vector<Triangle> triangles{
         {make_float3(-1, 0, -1), make_float3(1, 0, -1), make_float3(0, 0, 1),
-         make_float3(1, 1, 1), 0.0f, 0.5f},
+         make_float3(1, 1, 1), 0.0f, 0.5f, 0.0f, 1.5f},
     };
     const std::vector<BvhNode> nodes = build_bvh(triangles);
     Triangle* device_triangles = nullptr;
@@ -320,6 +396,24 @@ void validate_bvh_on_gpu() {
     }
 }
 
+void validate_dielectric_on_gpu() {
+    int* device_passed = nullptr;
+    try {
+        check(cudaMalloc(&device_passed, sizeof(int)), "cudaMalloc dielectric probe result");
+        probe_dielectric<<<1, 1>>>(device_passed);
+        check(cudaGetLastError(), "dielectric probe launch");
+        int passed = 0;
+        check(cudaMemcpy(&passed, device_passed, sizeof(int), cudaMemcpyDeviceToHost),
+              "copy dielectric probe result");
+        check(cudaFree(device_passed), "cudaFree dielectric probe result");
+        device_passed = nullptr;
+        if (!passed) throw std::runtime_error("GPU dielectric Fresnel, refraction, or TIR probe failed");
+    } catch (...) {
+        if (device_passed) cudaFree(device_passed);
+        throw;
+    }
+}
+
 std::vector<Triangle> load_gltf_triangles(const std::filesystem::path& path) {
     const cg::assets::GltfAsset asset = cg::assets::GltfAsset::load(path);
     std::vector<Triangle> result;
@@ -330,7 +424,9 @@ std::vector<Triangle> load_gltf_triangles(const std::filesystem::path& path) {
     for (const cg::assets::GltfTriangle& triangle : asset.triangles()) {
         result.push_back({convert(triangle.first), convert(triangle.second), convert(triangle.third),
                           convert(triangle.material.albedo), static_cast<float>(triangle.material.metallic),
-                          static_cast<float>(triangle.material.roughness)});
+                          static_cast<float>(triangle.material.roughness),
+                          static_cast<float>(triangle.material.transmission),
+                          static_cast<float>(triangle.material.index_of_refraction)});
     }
     return result;
 }
@@ -340,19 +436,20 @@ std::vector<float3> render(int width, int height, int samples, std::uint32_t see
     std::vector<Sphere> spheres;
     if (show_demo_spheres) {
         spheres = {
-            {make_float3(-1.15f, -0.05f, -4.2f), 0.95f, make_float3(0.85f, 0.12f, 0.06f), 0.0f, 0.5f},
-            {make_float3(1.05f, -0.15f, -3.8f), 0.85f, make_float3(0.88f, 0.9f, 0.95f), 1.0f, 0.3f},
+            {make_float3(-1.3f, -0.05f, -4.2f), 0.95f, make_float3(0.85f, 0.12f, 0.06f), 0.0f, 0.5f, 0.0f, 1.5f},
+            {make_float3(1.25f, -0.15f, -4.1f), 0.85f, make_float3(0.88f, 0.9f, 0.95f), 1.0f, 0.28f, 0.0f, 1.5f},
+            {make_float3(0.0f, 0.55f, -5.2f), 0.65f, make_float3(0.72f, 0.88f, 1.0f), 0.0f, 0.12f, 0.94f, 1.5f},
         };
     }
     std::vector<Triangle> triangles{
         {make_float3(-7, -1, 2), make_float3(7, -1, 2), make_float3(7, -1, -12),
-         make_float3(0.65f, 0.68f, 0.72f), 0.0f, 0.8f},
+         make_float3(0.65f, 0.68f, 0.72f), 0.0f, 0.8f, 0.0f, 1.5f},
         {make_float3(-7, -1, 2), make_float3(7, -1, -12), make_float3(-7, -1, -12),
-         make_float3(0.65f, 0.68f, 0.72f), 0.0f, 0.8f},
+         make_float3(0.65f, 0.68f, 0.72f), 0.0f, 0.8f, 0.0f, 1.5f},
         {make_float3(-7, -1, -9), make_float3(7, -1, -9), make_float3(7, 6, -9),
-         make_float3(0.3f, 0.38f, 0.5f), 0.0f, 0.7f},
+         make_float3(0.3f, 0.38f, 0.5f), 0.0f, 0.7f, 0.0f, 1.5f},
         {make_float3(-7, -1, -9), make_float3(7, 6, -9), make_float3(-7, 6, -9),
-         make_float3(0.3f, 0.38f, 0.5f), 0.0f, 0.7f},
+         make_float3(0.3f, 0.38f, 0.5f), 0.0f, 0.7f, 0.0f, 1.5f},
     };
     triangles.insert(triangles.end(), imported.begin(), imported.end());
     const std::vector<BvhNode> nodes = build_bvh(triangles);
@@ -469,6 +566,7 @@ void write_image(const std::string& path, int width, int height, const std::vect
 
 void self_test() {
     validate_bvh_on_gpu();
+    validate_dielectric_on_gpu();
     const std::filesystem::path gltf_path = "cuda_gltf_test.gltf";
     const std::filesystem::path bin_path = "cuda_gltf_test.bin";
     {
