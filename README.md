@@ -104,15 +104,18 @@ cmake --build build-wsl --target cuda_pathtracer
 ./build-wsl/cuda_pathtracer --gltf model.gltf cuda_model.bmp 64 environment.hdr
 ```
 
-The `--gltf` path converts imported scene triangles and base-color,
-metallic, and roughness factors into compact CUDA buffers and rebuilds the
-flattened GPU BVH. Radiance RGBE environments retain linear HDR energy during
+The `--gltf` path converts imported scene triangles, base-color and normal maps,
+and glTF's packed metallic-roughness texture into compact CUDA buffers and
+rebuilds the flattened GPU BVH. Base color is decoded from sRGB while normal and
+material data remain linear; the packed texture's green and blue channels
+modulate roughness and metallic factors respectively. Radiance RGBE environments retain linear HDR energy during
 upload and use device-side latitude-longitude bilinear filtering. A CPU-built
 `luminance * sin(theta)` PMF/CDF concentrates CUDA samples on bright texels;
 solid-angle environment PDFs and the power heuristic combine environment NEE
-with cosine-weighted BSDF paths. Metallic paths use the same GGX distribution
-for half-vector sampling, Cook-Torrance BRDF evaluation, reflection PDFs, and
-`BRDF * cos / PDF` throughput. Their area-light and HDR samples participate in
+with cosine-weighted BSDF paths. Opaque paths continuously blend
+energy-conserving Lambert diffuse and GGX Cook-Torrance specular lobes using the
+metallic value, with a matching mixture PDF and `BRDF * cos / PDF` throughput.
+Their area-light and HDR samples participate in
 the same MIS framework. Rough dielectric transmission uses the Walter
 transmission Jacobian, matched microfacet BTDF/PDF, and
 `BTDF * abs(cos) / PDF` throughput.

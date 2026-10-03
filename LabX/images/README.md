@@ -28,6 +28,7 @@ visually inspected. Tests never overwrite a reviewed image automatically.
 | BoxTextured base color | [`gltf_boxtextured_base_color_cuda.png`](gltf_boxtextured_base_color_cuda.png) | GLB embedded PNG, `TEXCOORD_0`, repeat wrapping, bilinear sampling, and sRGB-to-linear conversion |
 | Duck base color | [`gltf_duck_base_color_cuda.png`](gltf_duck_base_color_cuda.png) | 4,212 smooth triangles with the official yellow/orange/black base-color texture at 256 spp |
 | DamagedHelmet normal map | [`gltf_damaged_helmet_normal_map_cuda.png`](gltf_damaged_helmet_normal_map_cuda.png) | 15,452 triangles at 192 spp; tangent frame reconstructed from position/UV derivatives and tangent-space normal map applied in CUDA |
+| DamagedHelmet metallic-roughness PBR | [`gltf_damaged_helmet_metallic_roughness_cuda.png`](gltf_damaged_helmet_metallic_roughness_cuda.png) | 15,452 triangles at 192 spp; glTF packed G/B roughness-metallic channels drive a continuous Lambert/GGX BSDF mixture |
 
 The converted assets deliberately use different PBR factors so material import
 errors are visible in the rendered result. Legacy meshes do not contain usable

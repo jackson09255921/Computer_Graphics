@@ -53,6 +53,7 @@ struct Triangle {
     float3 first_normal; float3 second_normal; float3 third_normal; bool smooth;
     float2 first_uv; float2 second_uv; float2 third_uv; int texture_index{-1};
     float3 tangent; float tangent_handedness{1.0f}; int normal_texture_index{-1}; float normal_scale{1.0f};
+    int metallic_roughness_texture_index{-1};
 };
 struct TextureDescriptor { int offset; int width; int height; };
 struct ImportedAssets {
@@ -75,6 +76,7 @@ struct Hit {
     float transmission; float index_of_refraction; bool front_face; bool found;
     float2 uv; int texture_index;
     float3 tangent; float tangent_handedness; int normal_texture_index; float normal_scale;
+    int metallic_roughness_texture_index;
 };
 
 struct Rng {
@@ -161,6 +163,7 @@ __device__ void intersect_triangles(const Ray& ray, const Triangle* triangles, c
                 closest.tangent_handedness = triangle.tangent_handedness;
                 closest.normal_texture_index = triangle.normal_texture_index;
                 closest.normal_scale = triangle.normal_scale;
+                closest.metallic_roughness_texture_index = triangle.metallic_roughness_texture_index;
                 closest.found = true;
             }
         } else {
@@ -199,6 +202,7 @@ __device__ bool intersect_scene(const Ray& ray, const Sphere* spheres, int spher
         closest.index_of_refraction = sphere.index_of_refraction;
         closest.texture_index = -1;
         closest.normal_texture_index = -1;
+        closest.metallic_roughness_texture_index = -1;
         closest.found = true;
     }
     intersect_triangles(ray, triangles, nodes, node_count, closest);
@@ -286,6 +290,35 @@ __device__ float ggx_reflection_pdf(float3 normal, float3 view, float3 light, fl
     const float n_dot_h = fmaxf(0.0f, dot3(normal, half_vector));
     const float v_dot_h = fabsf(dot3(view, half_vector));
     return v_dot_h > 0.0f ? ggx_distribution(n_dot_h, roughness) * n_dot_h / (4.0f * v_dot_h) : 0.0f;
+}
+
+__device__ float specular_probability(float metallic) {
+    return 0.5f + 0.5f * fminf(1.0f, fmaxf(0.0f, metallic));
+}
+
+__device__ float3 evaluate_metallic_roughness(float3 normal, float3 view, float3 light,
+                                               float3 base_color, float metallic, float roughness) {
+    const float n_dot_v = fmaxf(0.0f, dot3(normal, view));
+    const float n_dot_l = fmaxf(0.0f, dot3(normal, light));
+    if (n_dot_v <= 0.0f || n_dot_l <= 0.0f) return make_float3(0, 0, 0);
+    const float3 half_vector = normalize3(add(view, light));
+    const float v_dot_h = fmaxf(0.0f, dot3(view, half_vector));
+    const float3 f0 = add(mul(make_float3(0.04f, 0.04f, 0.04f), 1.0f - metallic),
+                          mul(base_color, metallic));
+    const float3 fresnel = fresnel_schlick(v_dot_h, f0);
+    const float distribution = ggx_distribution(fmaxf(0.0f, dot3(normal, half_vector)), roughness);
+    const float geometry = smith_schlick(n_dot_v, roughness) * smith_schlick(n_dot_l, roughness);
+    const float3 specular = mul(fresnel,
+        distribution * geometry / fmaxf(4.0f * n_dot_v * n_dot_l, 1.0e-8f));
+    const float3 diffuse_weight = mul(sub(make_float3(1, 1, 1), fresnel), 1.0f - metallic);
+    return add(specular, mul(mul(diffuse_weight, base_color), 1.0f / kPi));
+}
+
+__device__ float metallic_roughness_pdf(float3 normal, float3 view, float3 light,
+                                         float metallic, float roughness) {
+    const float specular = specular_probability(metallic);
+    return specular * ggx_reflection_pdf(normal, view, light, roughness) +
+           (1.0f - specular) * fmaxf(0.0f, dot3(normal, light)) / kPi;
 }
 
 __device__ float fresnel_dielectric(float cosine, float eta_incident, float eta_transmitted) {
@@ -485,6 +518,11 @@ __device__ float3 radiance(Ray ray, const Sphere* spheres, int sphere_count,
             break;
         }
         hit.albedo = mul(hit.albedo, sample_texture(textures, hit.texture_index, hit.uv));
+        if (hit.metallic_roughness_texture_index >= 0) {
+            const float3 packed = sample_texture(textures, hit.metallic_roughness_texture_index, hit.uv);
+            hit.roughness = fminf(1.0f, fmaxf(0.04f, hit.roughness * packed.y));
+            hit.metallic = fminf(1.0f, fmaxf(0.0f, hit.metallic * packed.z));
+        }
         if (hit.normal_texture_index >= 0) {
             const float3 encoded = sample_texture(textures, hit.normal_texture_index, hit.uv);
             const float3 tangent_normal = normalize3(make_float3(
@@ -517,13 +555,11 @@ __device__ float3 radiance(Ray ray, const Sphere* spheres, int sphere_count,
                                                      node_count, blocker) && blocker.distance < distance - 1.0e-4f;
                 if (!blocked) {
                     const float light_pdf = distance_squared / (light_cosine * light_area(light));
-                    const float3 brdf = hit.metallic > 0.5f
-                        ? evaluate_ggx_metal(hit.normal, view_direction, direction_to_light,
-                                             hit.albedo, hit.roughness)
-                        : mul(hit.albedo, 1.0f / kPi);
-                    const float bsdf_pdf = hit.metallic > 0.5f
-                        ? ggx_reflection_pdf(hit.normal, view_direction, direction_to_light, hit.roughness)
-                        : surface_cosine / kPi;
+                    const float3 brdf = evaluate_metallic_roughness(
+                        hit.normal, view_direction, direction_to_light,
+                        hit.albedo, hit.metallic, hit.roughness);
+                    const float bsdf_pdf = metallic_roughness_pdf(
+                        hit.normal, view_direction, direction_to_light, hit.metallic, hit.roughness);
                     const float weight = power_heuristic(light_pdf, bsdf_pdf);
                     result = add(result, mul(mul(mul(throughput, brdf), light.emission),
                                              surface_cosine * weight / light_pdf));
@@ -541,13 +577,11 @@ __device__ float3 radiance(Ray ray, const Sphere* spheres, int sphere_count,
                     const bool blocked = intersect_scene(shadow, spheres, sphere_count, triangles, nodes,
                                                          node_count, blocker);
                     if (!blocked) {
-                        const float3 brdf = hit.metallic > 0.5f
-                            ? evaluate_ggx_metal(hit.normal, view_direction, environment_direction,
-                                                 hit.albedo, hit.roughness)
-                            : mul(hit.albedo, 1.0f / kPi);
-                        const float bsdf_pdf = hit.metallic > 0.5f
-                            ? ggx_reflection_pdf(hit.normal, view_direction, environment_direction, hit.roughness)
-                            : environment_cosine / kPi;
+                        const float3 brdf = evaluate_metallic_roughness(
+                            hit.normal, view_direction, environment_direction,
+                            hit.albedo, hit.metallic, hit.roughness);
+                        const float bsdf_pdf = metallic_roughness_pdf(
+                            hit.normal, view_direction, environment_direction, hit.metallic, hit.roughness);
                         const float weight = power_heuristic(environment_sample_pdf, bsdf_pdf);
                         result = add(result, mul(mul(mul(throughput, brdf), environment_value),
                                                  environment_cosine * weight / environment_sample_pdf));
@@ -594,21 +628,21 @@ __device__ float3 radiance(Ray ray, const Sphere* spheres, int sphere_count,
                 throughput = mul(throughput, mul(btdf, cosine / pdf));
             }
             previous_uses_mis = false;
-        } else if (hit.metallic > 0.5f) {
-            const float3 microfacet = sample_ggx_normal(hit.normal, hit.roughness, rng);
-            direction = normalize3(reflect3(ray.direction, microfacet));
-            const float pdf = ggx_reflection_pdf(hit.normal, view_direction, direction, hit.roughness);
+        } else {
+            if (rng.next() < specular_probability(hit.metallic)) {
+                const float3 microfacet = sample_ggx_normal(hit.normal, hit.roughness, rng);
+                direction = normalize3(reflect3(ray.direction, microfacet));
+            } else {
+                direction = cosine_direction(hit.normal, rng);
+            }
             const float cosine = fmaxf(0.0f, dot3(hit.normal, direction));
+            const float pdf = metallic_roughness_pdf(
+                hit.normal, view_direction, direction, hit.metallic, hit.roughness);
             if (pdf <= 0.0f || cosine <= 0.0f) break;
-            const float3 brdf = evaluate_ggx_metal(hit.normal, view_direction, direction,
-                                                    hit.albedo, hit.roughness);
+            const float3 brdf = evaluate_metallic_roughness(
+                hit.normal, view_direction, direction, hit.albedo, hit.metallic, hit.roughness);
             throughput = mul(throughput, mul(brdf, cosine / pdf));
             previous_bsdf_pdf = pdf;
-            previous_uses_mis = true;
-        } else {
-            direction = cosine_direction(hit.normal, rng);
-            throughput = mul(throughput, hit.albedo);
-            previous_bsdf_pdf = fmaxf(0.0f, dot3(hit.normal, direction)) / kPi;
             previous_uses_mis = true;
         }
         const float bias = dot3(direction, hit.normal) >= 0.0f ? 1.0e-4f : -1.0e-4f;
@@ -931,6 +965,8 @@ ImportedAssets load_gltf_triangles(const std::filesystem::path& path) {
     for (const cg::assets::GltfTriangle& triangle : asset.triangles()) {
         const int texture_index = register_texture(triangle.base_color_texture, true);
         const int normal_texture_index = register_texture(triangle.normal_texture, false);
+        const int metallic_roughness_texture_index =
+            register_texture(triangle.metallic_roughness_texture, false);
         const float3 first = convert(triangle.first), second = convert(triangle.second), third = convert(triangle.third);
         const float2 uv0 = make_float2(static_cast<float>(triangle.first_uv.x), static_cast<float>(triangle.first_uv.y));
         const float2 uv1 = make_float2(static_cast<float>(triangle.second_uv.x), static_cast<float>(triangle.second_uv.y));
@@ -955,7 +991,7 @@ ImportedAssets load_gltf_triangles(const std::filesystem::path& path) {
                           convert(triangle.first_normal), convert(triangle.second_normal),
                           convert(triangle.third_normal), triangle.has_normals,
                           uv0, uv1, uv2, texture_index, tangent, handedness, normal_texture_index,
-                          static_cast<float>(triangle.normal_scale)});
+                          static_cast<float>(triangle.normal_scale), metallic_roughness_texture_index});
     }
     return result;
 }
@@ -972,6 +1008,8 @@ void append_imported(ImportedAssets& destination, ImportedAssets source) {
     for (Triangle& triangle : source.triangles) {
         if (triangle.texture_index >= 0) triangle.texture_index += texture_base;
         if (triangle.normal_texture_index >= 0) triangle.normal_texture_index += texture_base;
+        if (triangle.metallic_roughness_texture_index >= 0)
+            triangle.metallic_roughness_texture_index += texture_base;
         destination.triangles.push_back(triangle);
     }
 }

@@ -435,15 +435,19 @@ GltfAsset GltfAsset::load(const std::filesystem::path& path) {
             rt::Material material;
             std::shared_ptr<const GltfTexture> base_color_texture;
             std::shared_ptr<const GltfTexture> normal_texture;
+            std::shared_ptr<const GltfTexture> metallic_roughness_texture;
             double normal_scale = 1.0;
             if (const Json* material_index = primitive.find("material")) {
                 const std::size_t index = integer(*material_index);
                 material = material_at(root, index);
                 const Json& material_source = root.find("materials")->array().at(index);
                 const Json* pbr = material_source.find("pbrMetallicRoughness");
-                if (pbr)
+                if (pbr) {
                     if (const Json* texture = pbr->find("baseColorTexture"))
                         base_color_texture = textures.at(member_integer(*texture, "index"));
+                    if (const Json* texture = pbr->find("metallicRoughnessTexture"))
+                        metallic_roughness_texture = textures.at(member_integer(*texture, "index"));
+                }
                 if (const Json* texture = material_source.find("normalTexture")) {
                     normal_texture = textures.at(member_integer(*texture, "index"));
                     if (const Json* scale = texture->find("scale")) normal_scale = scale->number();
@@ -458,7 +462,7 @@ GltfAsset GltfAsset::load(const std::filesystem::path& path) {
                         vertex_uvs.empty() ? Vec2{} : vertex_uvs.at(element_indices[i]),
                         vertex_uvs.empty() ? Vec2{} : vertex_uvs.at(element_indices[i + 1]),
                         vertex_uvs.empty() ? Vec2{} : vertex_uvs.at(element_indices[i + 2]),
-                        base_color_texture, normal_texture, normal_scale, material});
+                        base_color_texture, normal_texture, metallic_roughness_texture, normal_scale, material});
                 } else {
                     result.triangles_.push_back({a, b, c,
                         transform_normal(world, vertex_normals.at(element_indices[i])),
@@ -467,7 +471,7 @@ GltfAsset GltfAsset::load(const std::filesystem::path& path) {
                         vertex_uvs.empty() ? Vec2{} : vertex_uvs.at(element_indices[i]),
                         vertex_uvs.empty() ? Vec2{} : vertex_uvs.at(element_indices[i + 1]),
                         vertex_uvs.empty() ? Vec2{} : vertex_uvs.at(element_indices[i + 2]),
-                        base_color_texture, normal_texture, normal_scale, material});
+                        base_color_texture, normal_texture, metallic_roughness_texture, normal_scale, material});
                 }
             }
         }
