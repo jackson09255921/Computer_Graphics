@@ -3,12 +3,15 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
+#include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <stdexcept>
 #include <string>
 #include <type_traits>
 #include <vector>
+
+#include "assets/gltf_loader.hpp"
 
 namespace {
 
@@ -38,10 +41,10 @@ __host__ __device__ float3 reflect3(float3 direction, float3 normal) {
 }
 
 struct Ray { float3 origin; float3 direction; };
-struct Sphere { float3 center; float radius; float3 albedo; float metallic; };
-struct Triangle { float3 first; float3 second; float3 third; float3 albedo; float metallic; };
+struct Sphere { float3 center; float radius; float3 albedo; float metallic; float roughness; };
+struct Triangle { float3 first; float3 second; float3 third; float3 albedo; float metallic; float roughness; };
 struct BvhNode { float3 minimum; float3 maximum; int left; int right; int first; int count; };
-struct Hit { float distance; float3 position; float3 normal; float3 albedo; float metallic; bool found; };
+struct Hit { float distance; float3 position; float3 normal; float3 albedo; float metallic; float roughness; bool found; };
 
 struct Rng {
     std::uint32_t state;
@@ -109,6 +112,7 @@ __device__ void intersect_triangles(const Ray& ray, const Triangle* triangles, c
                 if (dot3(closest.normal, ray.direction) > 0.0f) closest.normal = mul(closest.normal, -1.0f);
                 closest.albedo = triangle.albedo;
                 closest.metallic = triangle.metallic;
+                closest.roughness = triangle.roughness;
                 closest.found = true;
             }
         } else {
@@ -141,6 +145,7 @@ __device__ bool intersect_scene(const Ray& ray, const Sphere* spheres, int spher
         if (dot3(closest.normal, ray.direction) > 0.0f) closest.normal = mul(closest.normal, -1.0f);
         closest.albedo = sphere.albedo;
         closest.metallic = sphere.metallic;
+        closest.roughness = sphere.roughness;
         closest.found = true;
     }
     intersect_triangles(ray, triangles, nodes, node_count, closest);
@@ -176,7 +181,8 @@ __device__ float3 radiance(Ray ray, const Sphere* spheres, int sphere_count,
         float3 direction;
         if (hit.metallic > 0.5f) {
             direction = reflect3(ray.direction, hit.normal);
-            direction = normalize3(add(direction, mul(cosine_direction(hit.normal, rng), 0.06f)));
+            direction = normalize3(add(direction, mul(cosine_direction(hit.normal, rng),
+                                                       0.2f * hit.roughness)));
         } else {
             direction = cosine_direction(hit.normal, rng);
         }
@@ -281,7 +287,7 @@ std::vector<BvhNode> build_bvh(std::vector<Triangle>& triangles) {
 void validate_bvh_on_gpu() {
     std::vector<Triangle> triangles{
         {make_float3(-1, 0, -1), make_float3(1, 0, -1), make_float3(0, 0, 1),
-         make_float3(1, 1, 1), 0.0f},
+         make_float3(1, 1, 1), 0.0f, 0.5f},
     };
     const std::vector<BvhNode> nodes = build_bvh(triangles);
     Triangle* device_triangles = nullptr;
@@ -314,33 +320,54 @@ void validate_bvh_on_gpu() {
     }
 }
 
-std::vector<float3> render(int width, int height, int samples, std::uint32_t seed) {
-    const std::vector<Sphere> spheres{
-        {make_float3(-1.15f, -0.05f, -4.2f), 0.95f, make_float3(0.85f, 0.12f, 0.06f), 0.0f},
-        {make_float3(1.05f, -0.15f, -3.8f), 0.85f, make_float3(0.88f, 0.9f, 0.95f), 1.0f},
+std::vector<Triangle> load_gltf_triangles(const std::filesystem::path& path) {
+    const cg::assets::GltfAsset asset = cg::assets::GltfAsset::load(path);
+    std::vector<Triangle> result;
+    result.reserve(asset.triangles().size());
+    const auto convert = [](const cg::Vec3& value) {
+        return make_float3(static_cast<float>(value.x), static_cast<float>(value.y), static_cast<float>(value.z));
     };
+    for (const cg::assets::GltfTriangle& triangle : asset.triangles()) {
+        result.push_back({convert(triangle.first), convert(triangle.second), convert(triangle.third),
+                          convert(triangle.material.albedo), static_cast<float>(triangle.material.metallic),
+                          static_cast<float>(triangle.material.roughness)});
+    }
+    return result;
+}
+
+std::vector<float3> render(int width, int height, int samples, std::uint32_t seed,
+                           const std::vector<Triangle>& imported = {}, bool show_demo_spheres = true) {
+    std::vector<Sphere> spheres;
+    if (show_demo_spheres) {
+        spheres = {
+            {make_float3(-1.15f, -0.05f, -4.2f), 0.95f, make_float3(0.85f, 0.12f, 0.06f), 0.0f, 0.5f},
+            {make_float3(1.05f, -0.15f, -3.8f), 0.85f, make_float3(0.88f, 0.9f, 0.95f), 1.0f, 0.3f},
+        };
+    }
     std::vector<Triangle> triangles{
         {make_float3(-7, -1, 2), make_float3(7, -1, 2), make_float3(7, -1, -12),
-         make_float3(0.65f, 0.68f, 0.72f), 0.0f},
+         make_float3(0.65f, 0.68f, 0.72f), 0.0f, 0.8f},
         {make_float3(-7, -1, 2), make_float3(7, -1, -12), make_float3(-7, -1, -12),
-         make_float3(0.65f, 0.68f, 0.72f), 0.0f},
+         make_float3(0.65f, 0.68f, 0.72f), 0.0f, 0.8f},
         {make_float3(-7, -1, -9), make_float3(7, -1, -9), make_float3(7, 6, -9),
-         make_float3(0.3f, 0.38f, 0.5f), 0.0f},
+         make_float3(0.3f, 0.38f, 0.5f), 0.0f, 0.7f},
         {make_float3(-7, -1, -9), make_float3(7, 6, -9), make_float3(-7, 6, -9),
-         make_float3(0.3f, 0.38f, 0.5f), 0.0f},
+         make_float3(0.3f, 0.38f, 0.5f), 0.0f, 0.7f},
     };
+    triangles.insert(triangles.end(), imported.begin(), imported.end());
     const std::vector<BvhNode> nodes = build_bvh(triangles);
     Sphere* device_spheres = nullptr;
     Triangle* device_triangles = nullptr;
     BvhNode* device_nodes = nullptr;
     float3* device_tile = nullptr;
-    check(cudaMalloc(&device_spheres, spheres.size() * sizeof(Sphere)), "cudaMalloc spheres");
     try {
+        if (!spheres.empty()) check(cudaMalloc(&device_spheres, spheres.size() * sizeof(Sphere)), "cudaMalloc spheres");
         check(cudaMalloc(&device_triangles, triangles.size() * sizeof(Triangle)), "cudaMalloc triangles");
         check(cudaMalloc(&device_nodes, nodes.size() * sizeof(BvhNode)), "cudaMalloc BVH nodes");
         check(cudaMalloc(&device_tile, kTileWidth * kTileHeight * sizeof(float3)), "cudaMalloc tile");
-        check(cudaMemcpy(device_spheres, spheres.data(), spheres.size() * sizeof(Sphere), cudaMemcpyHostToDevice),
-              "copy spheres");
+        if (!spheres.empty())
+            check(cudaMemcpy(device_spheres, spheres.data(), spheres.size() * sizeof(Sphere), cudaMemcpyHostToDevice),
+                  "copy spheres");
         check(cudaMemcpy(device_triangles, triangles.data(), triangles.size() * sizeof(Triangle), cudaMemcpyHostToDevice),
               "copy triangles");
         check(cudaMemcpy(device_nodes, nodes.data(), nodes.size() * sizeof(BvhNode), cudaMemcpyHostToDevice),
@@ -369,13 +396,13 @@ std::vector<float3> render(int width, int height, int samples, std::uint32_t see
         check(cudaFree(device_tile), "cudaFree tile");
         check(cudaFree(device_nodes), "cudaFree BVH nodes");
         check(cudaFree(device_triangles), "cudaFree triangles");
-        check(cudaFree(device_spheres), "cudaFree spheres");
+        if (device_spheres) check(cudaFree(device_spheres), "cudaFree spheres");
         return image;
     } catch (...) {
         if (device_tile) cudaFree(device_tile);
         if (device_nodes) cudaFree(device_nodes);
         if (device_triangles) cudaFree(device_triangles);
-        cudaFree(device_spheres);
+        if (device_spheres) cudaFree(device_spheres);
         throw;
     }
 }
@@ -442,8 +469,37 @@ void write_image(const std::string& path, int width, int height, const std::vect
 
 void self_test() {
     validate_bvh_on_gpu();
-    const std::vector<float3> first = render(64, 36, 4, 0xC0FFEEu);
-    const std::vector<float3> second = render(64, 36, 4, 0xC0FFEEu);
+    const std::filesystem::path gltf_path = "cuda_gltf_test.gltf";
+    const std::filesystem::path bin_path = "cuda_gltf_test.bin";
+    {
+        std::ofstream binary(bin_path, std::ios::binary);
+        const float positions[]{-0.7f, -0.8f, -2.8f, 0.7f, -0.8f, -2.8f, 0.0f, 0.7f, -2.8f};
+        binary.write(reinterpret_cast<const char*>(positions), sizeof(positions));
+    }
+    {
+        std::ofstream gltf(gltf_path);
+        gltf << R"({"asset":{"version":"2.0"},"buffers":[{"uri":"cuda_gltf_test.bin","byteLength":36}],
+"bufferViews":[{"buffer":0,"byteLength":36}],
+"accessors":[{"bufferView":0,"componentType":5126,"count":3,"type":"VEC3"}],
+"materials":[{"pbrMetallicRoughness":{"baseColorFactor":[0.1,0.8,0.2,1],"metallicFactor":0.7,"roughnessFactor":0.35}}],
+"meshes":[{"primitives":[{"attributes":{"POSITION":0},"material":0}]}],
+"nodes":[{"mesh":0}],"scenes":[{"nodes":[0]}],"scene":0})";
+    }
+    std::vector<Triangle> imported;
+    try {
+        imported = load_gltf_triangles(gltf_path);
+        std::filesystem::remove(gltf_path);
+        std::filesystem::remove(bin_path);
+    } catch (...) {
+        std::filesystem::remove(gltf_path);
+        std::filesystem::remove(bin_path);
+        throw;
+    }
+    if (imported.size() != 1 || fabsf(imported[0].metallic - 0.7f) > 1.0e-6f ||
+        fabsf(imported[0].roughness - 0.35f) > 1.0e-6f)
+        throw std::runtime_error("glTF triangles or PBR factors did not reach the CUDA upload format");
+    const std::vector<float3> first = render(64, 36, 4, 0xC0FFEEu, imported, false);
+    const std::vector<float3> second = render(64, 36, 4, 0xC0FFEEu, imported, false);
     if (first.size() != second.size()) throw std::runtime_error("CUDA image size mismatch");
     float minimum = kInfinity;
     float maximum = 0.0f;
@@ -455,7 +511,7 @@ void self_test() {
     }
     if (!std::isfinite(minimum) || !std::isfinite(maximum) || maximum - minimum < 0.1f)
         throw std::runtime_error("CUDA render lacks finite image variation");
-    std::cout << "CUDA tiled path tracer self-test passed (64x36, 4 spp, deterministic)\n";
+    std::cout << "CUDA tiled path tracer self-test passed (glTF upload, BVH, 64x36, 4 spp, deterministic)\n";
 }
 
 }  // namespace
@@ -466,13 +522,24 @@ int main(int argc, char** argv) {
             self_test();
             return 0;
         }
-        const std::string output = argc > 1 ? argv[1] : "cuda_pathtracer.bmp";
-        const int samples = argc > 2 ? std::stoi(argv[2]) : 64;
+        std::vector<Triangle> imported;
+        std::string output;
+        int samples = 64;
+        const bool gltf_mode = argc > 1 && std::string(argv[1]) == "--gltf";
+        if (gltf_mode) {
+            if (argc < 3) throw std::invalid_argument("usage: cuda_pathtracer --gltf model.gltf [output.bmp] [spp]");
+            imported = load_gltf_triangles(argv[2]);
+            output = argc > 3 ? argv[3] : "cuda_gltf_pathtracer.bmp";
+            samples = argc > 4 ? std::stoi(argv[4]) : 64;
+        } else {
+            output = argc > 1 ? argv[1] : "cuda_pathtracer.bmp";
+            samples = argc > 2 ? std::stoi(argv[2]) : 64;
+        }
         const int width = 640;
         const int height = 360;
-        write_image(output, width, height, render(width, height, samples, 0xC0FFEEu));
+        write_image(output, width, height, render(width, height, samples, 0xC0FFEEu, imported, !gltf_mode));
         std::cout << "CUDA path traced " << width << 'x' << height << " at " << samples
-                  << " spp to " << output << '\n';
+                  << " spp with " << imported.size() << " imported triangles to " << output << '\n';
         return 0;
     } catch (const std::exception& error) {
         std::cerr << "CUDA path tracer failed: " << error.what() << '\n';

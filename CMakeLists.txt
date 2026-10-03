@@ -96,6 +96,7 @@ if(BUILD_CUDA_DEMOS)
     enable_language(CUDA)
     add_executable(cuda_capability LabX/gpu/cuda_capability.cu)
     add_executable(cuda_pathtracer LabX/gpu/cuda_pathtracer.cu)
+    target_link_libraries(cuda_pathtracer PRIVATE cg_core)
     set_target_properties(cuda_capability PROPERTIES
         CUDA_ARCHITECTURES "${CG_CUDA_ARCHITECTURES}"
         CUDA_STANDARD 17

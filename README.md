@@ -95,10 +95,13 @@ cmake -S . -B build-wsl -G Ninja -DBUILD_LEGACY_LABS=OFF -DBUILD_CUDA_DEMOS=ON
 cmake --build build-wsl --target cuda_pathtracer
 ./build-wsl/cuda_pathtracer cuda_pathtracer.bmp 64
 ./build-wsl/cuda_pathtracer --self-test
+./build-wsl/cuda_pathtracer --gltf model.gltf cuda_model.bmp 64
 ```
 
-This GPU baseline does not yet have CPU feature parity: glTF upload, GGX glass,
-MIS, and HDR environments are the next staged migrations.
+The `--gltf` path converts imported scene triangles and base-color,
+metallic, and roughness factors into compact CUDA buffers and rebuilds the
+flattened GPU BVH. The GPU baseline does not yet have CPU feature parity:
+GGX glass, MIS, and HDR environments are the next staged migrations.
 
 The dependency-free `LabX/assets` loader imports glTF 2.x triangle primitives
 from external binary buffers, including indexed or non-indexed geometry, scene
