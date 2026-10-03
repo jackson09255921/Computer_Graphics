@@ -1,5 +1,7 @@
 # CPU Rasterization & Shading Labs
 
+[![Build and test](https://github.com/jackson09255921/Computer_Graphics/actions/workflows/ci.yml/badge.svg)](https://github.com/jackson09255921/Computer_Graphics/actions/workflows/ci.yml)
+
 A from-scratch computer graphics learning project written in C++ and visualized
 with OpenGL/GLUT. OpenGL is used only to display points; rasterization,
 transformations, clipping, visibility, and shading are implemented on the CPU.
@@ -53,6 +55,18 @@ The deterministic 800×450 demo scene renders in well under a second in a
 Release build on the development machine.
 
 ![Ray-traced demo scene](images/raytracer_demo.png)
+
+## Keyframe animation
+
+The animation module interpolates translation and scale linearly, rotation with
+Quaternion SLERP, and timing with configurable cubic Bézier easing. The demo
+exports 60 deterministic frames plus a contact sheet:
+
+```bash
+./build/Release/animation_demo animation_frames
+```
+
+![Keyframe animation contact sheet](images/animation_contact_sheet.png)
 
 ## Labs
 
@@ -151,6 +165,7 @@ the selected input file. Some inherited drawing controls are also available:
 ├── 2022CG_Lab4/       # lighting, shading, and Z-buffering
 ├── images/            # diagrams and rendered results
 ├── apps/              # headless and interactive demos
+├── src/animation/     # keyframes, SLERP, and Bézier easing
 ├── src/core/          # API-agnostic math and image primitives
 ├── src/curves/        # De Casteljau Bézier implementation
 ├── src/raytracer/     # rays, primitives, BVH, lighting, and rendering
@@ -163,7 +178,8 @@ the selected input file. Some inherited drawing controls are also available:
 The original labs are preserved as legacy OpenGL presentation targets. New
 renderer features build on `cg_core`, which has no OpenGL or DirectX dependency
 and writes to an owned CPU framebuffer. This keeps the rendering algorithms
-portable while allowing different presentation backends later.
+portable while allowing different presentation backends later. See the
+[architecture overview](docs/architecture.md) for the module boundaries.
 
 For a headless build of only the portable core and its tests:
 

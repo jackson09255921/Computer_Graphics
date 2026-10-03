@@ -12,6 +12,7 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 option(BUILD_LEGACY_LABS "Build the original OpenGL/GLUT lab applications" ON)
 
 add_library(cg_core
+    src/animation/animation.cpp
     src/core/draw.cpp
     src/core/image.cpp
     src/curves/bezier.cpp
@@ -38,6 +39,10 @@ if(BUILD_TESTING)
     add_executable(raytracer_tests tests/raytracer_tests.cpp)
     target_link_libraries(raytracer_tests PRIVATE cg_core)
     add_test(NAME raytracer_tests COMMAND raytracer_tests)
+
+    add_executable(animation_tests tests/animation_tests.cpp)
+    target_link_libraries(animation_tests PRIVATE cg_core)
+    add_test(NAME animation_tests COMMAND animation_tests)
 endif()
 
 add_executable(bezier_demo apps/bezier_demo.cpp)
@@ -45,6 +50,9 @@ target_link_libraries(bezier_demo PRIVATE cg_core)
 
 add_executable(raytracer_demo apps/raytracer_demo.cpp)
 target_link_libraries(raytracer_demo PRIVATE cg_core)
+
+add_executable(animation_demo apps/animation_demo.cpp)
+target_link_libraries(animation_demo PRIVATE cg_core)
 
 if(BUILD_LEGACY_LABS)
 find_package(OpenGL REQUIRED)
@@ -58,6 +66,7 @@ else()
     FetchContent_Declare(
         freeglut
         URL https://github.com/freeglut/freeglut/archive/refs/tags/v3.8.0.zip
+        URL_HASH SHA256=66c12fbf41ef5da34a386d59dbd389e30b601124937f8edb81a30a5006247f93
         DOWNLOAD_EXTRACT_TIMESTAMP TRUE
     )
     FetchContent_MakeAvailable(freeglut)

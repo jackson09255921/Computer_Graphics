@@ -1,6 +1,7 @@
 # Build output
 /build/
 /out/
+/animation_frames/
 /cmake-build-*/
 CMakeUserPresets.json
 

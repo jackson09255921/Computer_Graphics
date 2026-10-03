@@ -1,0 +1,46 @@
+name: Build and test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  portable-core:
+    name: Portable core (Linux)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure
+        run: cmake -S . -B build -DBUILD_LEGACY_LABS=OFF -DCMAKE_BUILD_TYPE=Release
+      - name: Build
+        run: cmake --build build --parallel
+      - name: Test
+        run: ctest --test-dir build --output-on-failure
+      - name: Render demos
+        run: |
+          ./build/bezier_demo bezier_demo.bmp
+          ./build/raytracer_demo raytracer_demo.bmp
+          ./build/animation_demo animation_frames
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux-rendered-demos
+          path: |
+            bezier_demo.bmp
+            raytracer_demo.bmp
+            animation_frames/contact_sheet.bmp
+
+  windows:
+    name: Full build (Windows)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure
+        run: cmake -S . -B build -A x64
+      - name: Build
+        run: cmake --build build --config Release --parallel
+      - name: Test
+        run: ctest --test-dir build -C Release --output-on-failure
