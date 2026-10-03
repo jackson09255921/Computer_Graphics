@@ -119,7 +119,7 @@ interpolation frequencies:
 ### Requirements
 
 - A C++17 compiler
-- CMake 3.16+
+- CMake 3.18+
 - OpenGL development libraries
 
 If GLUT/freeglut is not installed, CMake downloads and builds a pinned freeglut
@@ -182,7 +182,7 @@ the selected input file. Some inherited drawing controls are also available:
 ├── 2022CG_Lab3/       # 3D rendering pipeline and OBJ meshes
 ├── 2022CG_Lab4/       # lighting, shading, and Z-buffering
 ├── images/            # diagrams and rendered results
-├── LabX/              # extended headless and interactive demos
+├── LabX/              # categorized extensions and GPU roadmap
 ├── src/animation/     # keyframes, SLERP, and Bézier easing
 ├── src/core/          # API-agnostic math and image primitives
 ├── src/curves/        # De Casteljau Bézier implementation
@@ -198,6 +198,9 @@ renderer features build on `cg_core`, which has no OpenGL or DirectX dependency
 and writes to an owned CPU framebuffer. This keeps the rendering algorithms
 portable while allowing different presentation backends later. See the
 [architecture overview](docs/architecture.md) for the module boundaries.
+
+The categorized experiments, detected RTX 4060 constraints, and staged GPU
+roadmap are documented in [`LabX/README.md`](LabX/README.md).
 
 For a headless build of only the portable core and its tests:
 

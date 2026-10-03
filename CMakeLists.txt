@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.16)
+cmake_minimum_required(VERSION 3.18)
 
 project(cpu_rasterization_labs LANGUAGES CXX)
 
@@ -10,6 +10,8 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
 option(BUILD_LEGACY_LABS "Build the original OpenGL/GLUT lab applications" ON)
+option(BUILD_CUDA_DEMOS "Build CUDA experiments under LabX/gpu" OFF)
+set(CG_CUDA_ARCHITECTURES "89" CACHE STRING "CUDA architectures for LabX GPU experiments")
 
 add_library(cg_core
     src/animation/animation.cpp
@@ -45,17 +47,38 @@ if(BUILD_TESTING)
     add_test(NAME animation_tests COMMAND animation_tests)
 endif()
 
-add_executable(bezier_demo LabX/bezier_demo.cpp)
+add_executable(bezier_demo LabX/curves/bezier_demo.cpp)
 target_link_libraries(bezier_demo PRIVATE cg_core)
 
-add_executable(raytracer_demo LabX/raytracer_demo.cpp)
+add_executable(raytracer_demo LabX/raytracing/raytracer_demo.cpp)
 target_link_libraries(raytracer_demo PRIVATE cg_core)
 
-add_executable(pathtracer_demo LabX/pathtracer_demo.cpp)
+add_executable(pathtracer_demo LabX/raytracing/pathtracer_demo.cpp)
 target_link_libraries(pathtracer_demo PRIVATE cg_core)
 
-add_executable(animation_demo LabX/animation_demo.cpp)
+add_executable(animation_demo LabX/animation/animation_demo.cpp)
 target_link_libraries(animation_demo PRIVATE cg_core)
+
+if(BUILD_CUDA_DEMOS)
+    include(CheckLanguage)
+    check_language(CUDA)
+    if(NOT CMAKE_CUDA_COMPILER)
+        message(FATAL_ERROR "BUILD_CUDA_DEMOS=ON, but no CUDA compiler was found")
+    endif()
+    enable_language(CUDA)
+    add_executable(cuda_capability LabX/gpu/cuda_capability.cu)
+    set_target_properties(cuda_capability PROPERTIES
+        CUDA_ARCHITECTURES "${CG_CUDA_ARCHITECTURES}"
+        CUDA_STANDARD 17
+        CUDA_STANDARD_REQUIRED ON
+    )
+    if(MSVC AND CMAKE_CUDA_COMPILER_VERSION VERSION_LESS 12.0)
+        target_compile_options(cuda_capability PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:-allow-unsupported-compiler>)
+    endif()
+    if(BUILD_TESTING)
+        add_test(NAME cuda_capability COMMAND cuda_capability)
+    endif()
+endif()
 
 if(BUILD_LEGACY_LABS)
 find_package(OpenGL REQUIRED)
@@ -96,7 +119,7 @@ endfunction()
 add_graphics_lab(lab2 2022CG_Lab2/2022CG_Lab2.cpp)
 add_graphics_lab(lab3 2022CG_Lab3/2022CG_Lab3.cpp)
 add_graphics_lab(lab4 2022CG_Lab4/2022CG_Lab4.cpp)
-add_graphics_lab(bezier_interactive LabX/bezier_interactive.cpp)
+add_graphics_lab(bezier_interactive LabX/curves/bezier_interactive.cpp)
 target_link_libraries(bezier_interactive PRIVATE cg_core)
 
 set_target_properties(lab2 PROPERTIES
