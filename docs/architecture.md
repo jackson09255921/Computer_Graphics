@@ -29,7 +29,7 @@ flowchart TD
 | `raytracer` | Rays, primitives, BVH, lights, shadows, reflections | None |
 | `animation` | Keyframes, transforms, cubic Bézier easing | None |
 | `bezier_interactive` | Mouse input and presentation | OpenGL/freeglut |
-| `2022CG_Lab*` | Preserved coursework implementations | OpenGL/freeglut |
+| `legacy/2022CG_Lab*` | Preserved coursework implementations | OpenGL/freeglut |
 
 `BUILD_LEGACY_LABS=OFF` produces a headless build suitable for Linux CI,
 servers, and environments where no windowing system is available.

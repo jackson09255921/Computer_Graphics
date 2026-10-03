@@ -6,13 +6,17 @@ entry points into the legacy labs.
 
 ```text
 LabX/
-├── animation/    # keyframe and quaternion animation demos
-├── curves/       # headless and interactive Bézier tools
-├── gpu/          # optional CUDA/GPU capability and rendering work
-├── pbr/          # GGX, Fresnel, and metallic/roughness material model
-├── progressive/  # deterministic multi-threaded tile rendering
-├── sampling/     # importance sampling, PDFs, and MIS heuristics
-└── raytracing/   # Whitted ray tracing and Monte Carlo path tracing demos
+├── animation/     # keyframe and quaternion animation demos
+├── assets/        # glTF loading and asset tests
+├── curves/        # headless and interactive Bézier tools
+├── environment/   # HDR environment loading and sampling
+├── gpu/
+│   ├── cuda/      # CUDA capability, path tracer, and ReSTIR
+│   └── optix/     # native Windows OptiX pipelines
+├── pbr/           # GGX, Fresnel, and metallic/roughness model
+├── progressive/   # deterministic multi-threaded tile rendering
+├── sampling/      # importance sampling, PDFs, and MIS
+└── raytracing/    # Whitted and Monte Carlo path tracing demos
 ```
 
 ## GPU profile and constraints

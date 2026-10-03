@@ -164,9 +164,9 @@ exports 60 deterministic frames plus a contact sheet:
 | Lab | Focus | Source | Example |
 | --- | --- | --- | --- |
 | 1 | Interactive drawing primitives | Incorporated into later labs; the standalone source was not preserved | [`image28.png`](images/image28.png) |
-| 2 | Polygon filling, viewport transforms, and 2D clipping | [`2022CG_Lab2.cpp`](2022CG_Lab2/2022CG_Lab2.cpp) | [`image35.png`](images/image35.png) |
-| 3 | Complete 3D transformation and rasterization pipeline | [`2022CG_Lab3.cpp`](2022CG_Lab3/2022CG_Lab3.cpp) | [`image37.png`](images/image37.png) |
-| 4 | Z-buffering and Flat/Gouraud/Phong shading | [`2022CG_Lab4.cpp`](2022CG_Lab4/2022CG_Lab4.cpp) | [`image37.png`](images/image37.png) |
+| 2 | Polygon filling, viewport transforms, and 2D clipping | [`2022CG_Lab2.cpp`](legacy/2022CG_Lab2/2022CG_Lab2.cpp) | [`image35.png`](images/image35.png) |
+| 3 | Complete 3D transformation and rasterization pipeline | [`2022CG_Lab3.cpp`](legacy/2022CG_Lab3/2022CG_Lab3.cpp) | [`image37.png`](images/image37.png) |
+| 4 | Z-buffering and Flat/Gouraud/Phong shading | [`2022CG_Lab4.cpp`](legacy/2022CG_Lab4/2022CG_Lab4.cpp) | [`image37.png`](images/image37.png) |
 
 ### Pipeline
 
@@ -217,14 +217,14 @@ The programs resolve `Data/` and `Mesh/` relative to their corresponding lab
 directory. Run each executable with that directory as the working directory.
 
 ```bash
-cd 2022CG_Lab2
-../build/lab2 lab2D.in
+cd legacy/2022CG_Lab2
+../../build/lab2 lab2D.in
 
 cd ../2022CG_Lab3
-../build/lab3 Lab3B.in
+../../build/lab3 Lab3B.in
 
 cd ../2022CG_Lab4
-../build/lab4 lab4A.in phong
+../../build/lab4 lab4A.in phong
 ```
 
 On multi-config generators such as Visual Studio, executables may be under
@@ -251,17 +251,13 @@ the selected input file. Some inherited drawing controls are also available:
 
 ```text
 .
-├── 2022CG_Lab2/       # 2D rasterization and clipping
-├── 2022CG_Lab3/       # 3D rendering pipeline and OBJ meshes
-├── 2022CG_Lab4/       # lighting, shading, and Z-buffering
-├── images/            # diagrams and rendered results
-├── LabX/              # categorized extensions and GPU roadmap
-├── src/animation/     # keyframes, SLERP, and Bézier easing
-├── src/core/          # API-agnostic math and image primitives
-├── src/curves/        # De Casteljau Bézier implementation
-├── src/raytracer/     # BVH ray tracing, soft shadows, and path tracing
+├── legacy/            # preserved 2022 OpenGL coursework
+├── LabX/              # categorized rendering experiments
+├── src/               # reusable API-independent core library
 ├── tests/             # portable core tests
-└── CMakeLists.txt      # reproducible build configuration
+├── docs/              # architecture and technology timeline
+├── images/            # diagrams and rendered results
+└── CMakeLists.txt     # reproducible build configuration
 ```
 
 ## Architecture
