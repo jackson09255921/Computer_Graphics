@@ -74,6 +74,12 @@ extern "C" __global__ void __raygen__triangle() {
                                          raw_direction.y * inverse_length,
                                          raw_direction.z * inverse_length);
 
+    const unsigned int pixel = index.y * params.width + index.x;
+    params.gbuffer_normal[pixel] = make_float3(0.0f, 0.0f, 0.0f);
+    params.gbuffer_depth[pixel] = 0.0f;
+    params.gbuffer_albedo[pixel] = make_float3(0.0f, 0.0f, 0.0f);
+    params.gbuffer_motion[pixel] = make_float2(0.0f, 0.0f);
+
     unsigned int red = 0;
     unsigned int green = 0;
     unsigned int blue = 0;
@@ -86,7 +92,6 @@ extern "C" __global__ void __raygen__triangle() {
     const float r = __uint_as_float(red);
     const float g = __uint_as_float(green);
     const float b = __uint_as_float(blue);
-    const unsigned int pixel = index.y * params.width + index.x;
     float4 accumulated = params.accumulation[pixel];
     accumulated.x += r;
     accumulated.y += g;
@@ -152,6 +157,13 @@ extern "C" __global__ void __closesthit__lit() {
                                       normal.z * light_direction.z);
     const float lighting = 0.10f + (visible ? 0.90f * diffuse : 0.0f);
     const float3 base_color = params.primitive_colors[primitive];
+    if (optixGetPayload_3() == 0u) {
+        const uint3 launch_index = optixGetLaunchIndex();
+        const unsigned int pixel = launch_index.y * params.width + launch_index.x;
+        params.gbuffer_normal[pixel] = normal;
+        params.gbuffer_depth[pixel] = distance;
+        params.gbuffer_albedo[pixel] = base_color;
+    }
     const float reflectivity = params.primitive_reflectivity[primitive];
     const float roughness = params.primitive_roughness[primitive];
     float3 reflection_color = make_float3(0.0f, 0.0f, 0.0f);

@@ -10,6 +10,7 @@ implementation of an engineering technique.
 | 1980 | Hierarchical bounding volumes for complex scenes | Implemented on CPU and CUDA |
 | 1982 | Cook–Torrance physically based reflectance | Implemented |
 | 1986 | Kajiya rendering equation and path tracing | Implemented |
+| 1988 | Hardware deferred shading and per-pixel attribute buffers | OptiX primary-hit normal, depth, albedo, and motion G-buffers implemented |
 | 1991 | Progressive multi-pass global illumination (representative publication) | Implemented on CPU and as 32-spp persistent GPU accumulation in OptiX |
 | 1995 | Veach–Guibas multiple importance sampling | Implemented on CPU and CUDA |
 | 1998 | High-dynamic-range image-based lighting | Implemented on CPU and CUDA |
@@ -29,6 +30,7 @@ invention date.
 - Rubin and Whitted, *A 3-Dimensional Representation for Fast Rendering of Complex Scenes*, 1980, DOI 10.1145/965105.807479.
 - Cook and Torrance, *A Reflectance Model for Computer Graphics*, 1982.
 - Kajiya, *The Rendering Equation*, SIGGRAPH 1986.
+- Deering et al., *The Triangle Processor and Normal Vector Shader*, SIGGRAPH 1988, DOI 10.1145/378456.378468.
 - Chen et al., *A Progressive Multi-Pass Method for Global Illumination*, SIGGRAPH 1991.
 - Veach and Guibas, *Optimally Combining Sampling Techniques for Monte Carlo Rendering*, SIGGRAPH 1995.
 - Debevec, *Rendering Synthetic Objects into Real Scenes*, SIGGRAPH 1998.

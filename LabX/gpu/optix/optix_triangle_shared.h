@@ -6,6 +6,10 @@
 struct OptixTriangleParams {
     uchar4* image;
     float4* accumulation;
+    float3* gbuffer_normal;
+    float* gbuffer_depth;
+    float3* gbuffer_albedo;
+    float2* gbuffer_motion;
     unsigned int width;
     unsigned int height;
     unsigned int sample_index;

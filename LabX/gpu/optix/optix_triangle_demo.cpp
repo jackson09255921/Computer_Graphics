@@ -125,6 +125,7 @@ int main(int argc, char** argv) {
     CUdeviceptr device_image = 0, device_accumulation = 0, device_params = 0;
     CUdeviceptr device_colors = 0, device_reflectivity = 0;
     CUdeviceptr device_roughness = 0;
+    CUdeviceptr gbuffer_normal = 0, gbuffer_depth = 0, gbuffer_albedo = 0, gbuffer_motion = 0;
     CUdeviceptr device_vertices = 0, device_indices = 0;
 
     try {
@@ -267,6 +268,14 @@ int main(int argc, char** argv) {
                    "cudaMalloc accumulation");
         check_cuda(cudaMemset(reinterpret_cast<void*>(device_accumulation), 0,
                               width * height * sizeof(float4)), "cudaMemset accumulation");
+        check_cuda(cudaMalloc(reinterpret_cast<void**>(&gbuffer_normal), width * height * sizeof(float3)),
+                   "cudaMalloc G-buffer normal");
+        check_cuda(cudaMalloc(reinterpret_cast<void**>(&gbuffer_depth), width * height * sizeof(float)),
+                   "cudaMalloc G-buffer depth");
+        check_cuda(cudaMalloc(reinterpret_cast<void**>(&gbuffer_albedo), width * height * sizeof(float3)),
+                   "cudaMalloc G-buffer albedo");
+        check_cuda(cudaMalloc(reinterpret_cast<void**>(&gbuffer_motion), width * height * sizeof(float2)),
+                   "cudaMalloc G-buffer motion");
         check_cuda(cudaMalloc(reinterpret_cast<void**>(&device_colors), mesh.colors.size() * sizeof(float3)),
                    "cudaMalloc primitive colors");
         check_cuda(cudaMemcpy(reinterpret_cast<void*>(device_colors), mesh.colors.data(),
@@ -304,7 +313,11 @@ int main(int argc, char** argv) {
                                                   scene_center.y + 1.75f * view_scale,
                                                   maximum.z + 2.0f * view_scale);
         OptixTriangleParams params{reinterpret_cast<uchar4*>(device_image),
-                                         reinterpret_cast<float4*>(device_accumulation), width, height, 0,
+                                         reinterpret_cast<float4*>(device_accumulation),
+                                         reinterpret_cast<float3*>(gbuffer_normal),
+                                         reinterpret_cast<float*>(gbuffer_depth),
+                                         reinterpret_cast<float3*>(gbuffer_albedo),
+                                         reinterpret_cast<float2*>(gbuffer_motion), width, height, 0,
                                          gas_handle,
                                          reinterpret_cast<float3*>(device_vertices),
                                          reinterpret_cast<uint3*>(device_indices),
@@ -329,6 +342,29 @@ int main(int argc, char** argv) {
                    "cudaMemcpy center accumulation");
         if (center_accumulation.w != static_cast<float>(samples_per_pixel))
             throw std::runtime_error("progressive accumulation sample count mismatch");
+        float3 center_normal{};
+        float center_depth = 0.0f;
+        float3 center_albedo{};
+        float2 center_motion{};
+        const std::size_t center_pixel_index = (height / 2) * width + width / 2;
+        check_cuda(cudaMemcpy(&center_normal,
+                              reinterpret_cast<void*>(gbuffer_normal + center_pixel_index * sizeof(float3)),
+                              sizeof(center_normal), cudaMemcpyDeviceToHost), "cudaMemcpy G-buffer normal");
+        check_cuda(cudaMemcpy(&center_depth,
+                              reinterpret_cast<void*>(gbuffer_depth + center_pixel_index * sizeof(float)),
+                              sizeof(center_depth), cudaMemcpyDeviceToHost), "cudaMemcpy G-buffer depth");
+        check_cuda(cudaMemcpy(&center_albedo,
+                              reinterpret_cast<void*>(gbuffer_albedo + center_pixel_index * sizeof(float3)),
+                              sizeof(center_albedo), cudaMemcpyDeviceToHost), "cudaMemcpy G-buffer albedo");
+        check_cuda(cudaMemcpy(&center_motion,
+                              reinterpret_cast<void*>(gbuffer_motion + center_pixel_index * sizeof(float2)),
+                              sizeof(center_motion), cudaMemcpyDeviceToHost), "cudaMemcpy G-buffer motion");
+        const float normal_length_squared = center_normal.x * center_normal.x +
+                                            center_normal.y * center_normal.y +
+                                            center_normal.z * center_normal.z;
+        if (center_depth <= 0.0f || normal_length_squared < 0.9f || normal_length_squared > 1.1f ||
+            center_albedo.x <= 0.0f || center_motion.x != 0.0f || center_motion.y != 0.0f)
+            throw std::runtime_error("primary-hit G-buffer invariant failed");
         std::vector<uchar4> image(width * height);
         check_cuda(cudaMemcpy(image.data(), reinterpret_cast<void*>(device_image), image.size() * sizeof(uchar4),
                               cudaMemcpyDeviceToHost), "cudaMemcpy image");
@@ -352,9 +388,14 @@ int main(int argc, char** argv) {
                   << " hit pixels, " << shadow_pixels
                   << " verified shadow pixels, center RGB "
                   << static_cast<int>(center_pixel.x) << ", " << static_cast<int>(center_pixel.y) << ", "
-                  << static_cast<int>(center_pixel.z) << ")\n";
+                  << static_cast<int>(center_pixel.z) << ", depth " << center_depth << ", normal "
+                  << center_normal.x << ", " << center_normal.y << ", " << center_normal.z << ")\n";
 
         cudaFree(reinterpret_cast<void*>(device_params));
+        cudaFree(reinterpret_cast<void*>(gbuffer_motion));
+        cudaFree(reinterpret_cast<void*>(gbuffer_albedo));
+        cudaFree(reinterpret_cast<void*>(gbuffer_depth));
+        cudaFree(reinterpret_cast<void*>(gbuffer_normal));
         cudaFree(reinterpret_cast<void*>(device_roughness));
         cudaFree(reinterpret_cast<void*>(device_accumulation));
         cudaFree(reinterpret_cast<void*>(device_reflectivity));
