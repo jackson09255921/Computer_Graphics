@@ -1,0 +1,190 @@
+#!/usr/bin/env python3
+"""Run every non-interactive Computer Graphics lab validation from one entry point."""
+
+from __future__ import annotations
+
+import argparse
+import hashlib
+import json
+import os
+import pathlib
+import struct
+import subprocess
+import sys
+import time
+import xml.etree.ElementTree as ET
+
+
+ROOT = pathlib.Path(__file__).resolve().parents[1]
+
+
+def executable(build: pathlib.Path, name: str, config: str) -> pathlib.Path:
+    suffix = ".exe" if os.name == "nt" else ""
+    candidates = (build / config / f"{name}{suffix}", build / f"{name}{suffix}")
+    for candidate in candidates:
+        if candidate.is_file():
+            return candidate
+    raise FileNotFoundError(f"cannot find {name} in {build}")
+
+
+def run(command: list[str], cwd: pathlib.Path = ROOT) -> str:
+    print("+", " ".join(command), flush=True)
+    completed = subprocess.run(command, cwd=cwd, text=True, capture_output=True)
+    if completed.stdout:
+        print(completed.stdout, end="")
+    if completed.stderr:
+        print(completed.stderr, end="", file=sys.stderr)
+    if completed.returncode:
+        raise RuntimeError(f"command exited with {completed.returncode}: {' '.join(command)}")
+    return completed.stdout
+
+
+def image_info(path: pathlib.Path) -> tuple[int, int, bytes]:
+    payload = path.read_bytes()
+    if payload[:2] == b"BM" and len(payload) >= 54:
+        width, height = struct.unpack_from("<ii", payload, 18)
+        offset = struct.unpack_from("<I", payload, 10)[0]
+        pixels = payload[offset:]
+        return abs(width), abs(height), pixels
+    if payload[:2] in (b"P6", b"P3"):
+        tokens: list[bytes] = []
+        index = 2
+        while len(tokens) < 3:
+            while index < len(payload) and payload[index:index + 1].isspace():
+                index += 1
+            if payload[index:index + 1] == b"#":
+                index = payload.find(b"\n", index) + 1
+                continue
+            end = index
+            while end < len(payload) and not payload[end:end + 1].isspace():
+                end += 1
+            tokens.append(payload[index:end])
+            index = end
+        while index < len(payload) and payload[index:index + 1].isspace():
+            index += 1
+        return int(tokens[0]), int(tokens[1]), payload[index:]
+    raise ValueError(f"unsupported image format: {path}")
+
+
+def validate_image(path: pathlib.Path, expected: tuple[int, int]) -> dict[str, object]:
+    width, height, pixels = image_info(path)
+    if (width, height) != expected:
+        raise ValueError(f"{path.name}: expected {expected[0]}x{expected[1]}, got {width}x{height}")
+    if len(pixels) < width * height:
+        raise ValueError(f"{path.name}: truncated pixel data")
+    values = set(pixels)
+    if len(values) < 4 or max(values) - min(values) < 16:
+        raise ValueError(f"{path.name}: image has insufficient visual variation")
+    return {"file": str(path.relative_to(ROOT)), "width": width, "height": height,
+            "bytes": path.stat().st_size, "sha256": hashlib.sha256(path.read_bytes()).hexdigest()}
+
+
+def write_reports(output: pathlib.Path, records: list[dict[str, object]], elapsed: float) -> None:
+    report = {"status": "passed", "elapsed_seconds": round(elapsed, 3), "validations": records}
+    (output / "validation-report.json").write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
+    suite = ET.Element("testsuite", name="computer-graphics-pipeline",
+                       tests=str(len(records)), failures="0", time=f"{elapsed:.3f}")
+    for record in records:
+        ET.SubElement(suite, "testcase", classname="pipeline", name=str(record["name"]),
+                      time=f"{float(record['seconds']):.3f}")
+    ET.ElementTree(suite).write(output / "validation-report.xml", encoding="utf-8", xml_declaration=True)
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--build-dir", default="build-jenkins")
+    parser.add_argument("--config", default="Release")
+    parser.add_argument("--gpu-build-dir")
+    parser.add_argument("--spp", type=int, default=8)
+    args = parser.parse_args()
+    build = (ROOT / args.build_dir).resolve()
+    output = build / "validation-artifacts"
+    output.mkdir(parents=True, exist_ok=True)
+    records: list[dict[str, object]] = []
+    started = time.monotonic()
+
+    def stage(name: str, action) -> None:
+        begin = time.monotonic()
+        details = action() or {}
+        records.append({"name": name, "seconds": round(time.monotonic() - begin, 3), **details})
+
+    ctest = ["ctest", "--test-dir", str(build), "--output-on-failure"]
+    if os.name == "nt":
+        ctest[3:3] = ["-C", args.config]
+    stage("cpu-ctest", lambda: {"output": run(ctest).strip().splitlines()[-1]})
+
+    renders = [
+        ("bezier", "bezier_demo", [str(output / "bezier.bmp")], (960, 540)),
+        ("raytracer", "raytracer_demo", [str(output / "raytracer.bmp")], (800, 450)),
+        ("pathtracer", "pathtracer_demo", [str(output / "pathtracer.bmp"), str(args.spp)], (640, 360)),
+    ]
+    for name, program, command_args, dimensions in renders:
+        def render(program=program, command_args=command_args, dimensions=dimensions):
+            run([str(executable(build, program, args.config)), *command_args])
+            return validate_image(pathlib.Path(command_args[0]), dimensions)
+        stage(f"render-{name}", render)
+
+    animation_dir = output / "animation"
+    def animation() -> dict[str, object]:
+        run([str(executable(build, "animation_demo", args.config)), str(animation_dir)])
+        frames = sorted(animation_dir.glob("frame_*.bmp"))
+        if len(frames) != 60:
+            raise ValueError(f"animation: expected 60 frames, got {len(frames)}")
+        first = validate_image(frames[0], (640, 360))
+        last = validate_image(frames[-1], (640, 360))
+        sheet = validate_image(animation_dir / "contact_sheet.bmp", (960, 540))
+        if first["sha256"] == last["sha256"]:
+            raise ValueError("animation: first and last frames are identical")
+        return {"frames": len(frames), "contact_sheet": sheet}
+    stage("render-animation", animation)
+
+    legacy = ROOT / "legacy" / "2022CG_Lab3" / "Mesh"
+    for model in ("bench", "drop", "glass", "skull"):
+        def render_legacy(model=model):
+            target = output / f"legacy_{model}.bmp"
+            run([str(executable(build, "legacy_asc_demo", args.config)), str(legacy / f"{model}.asc"), str(target)])
+            return validate_image(target, (512, 512))
+        stage(f"legacy-{model}", render_legacy)
+
+    def external_assets() -> dict[str, object]:
+        manifest = json.loads((ROOT / "LabX" / "data" / "external" / "gltf_samples" /
+                               "manifest.json").read_text(encoding="utf-8-sig"))
+        for entry in manifest:
+            model = str(entry["name"])
+            run([sys.executable, str(ROOT / "tools" / "fetch_gltf_sample.py"), model])
+        return {"output": run(
+            [sys.executable, str(ROOT / "tools" / "validate_gltf_samples.py")]).strip()}
+    stage("external-assets", external_assets)
+    samples = ROOT / "LabX" / "data" / "external" / "gltf_samples"
+    for model in ("BoxTextured", "Duck", "DamagedHelmet"):
+        def load_gltf(model=model):
+            text = run([str(executable(build, "gltf_demo", args.config)),
+                        str(samples / model / f"{model}.glb")])
+            return {"output": text.strip()}
+        stage(f"gltf-{model}", load_gltf)
+
+    if args.gpu_build_dir:
+        gpu = (ROOT / args.gpu_build_dir).resolve()
+        command = ["ctest", "--test-dir", str(gpu), "-E", "optix", "--output-on-failure"]
+        if os.name == "nt":
+            command[3:3] = ["-C", args.config]
+        stage("gpu-ctest", lambda: {"output": run(command).strip().splitlines()[-1]})
+        target = output / "cuda_multi_asset.ppm"
+        models = ROOT / "LabX" / "data" / "legacy_converted" / "meshes"
+        def cuda_render():
+            run([str(executable(gpu, "cuda_pathtracer", args.config)), "--scene", str(target), str(args.spp),
+                 str(models / "bunny_from_obj.gltf"), str(models / "teapot_from_obj.gltf")])
+            return validate_image(target, (1280, 720))
+        stage("render-cuda-multi-asset", cuda_render)
+
+    write_reports(output, records, time.monotonic() - started)
+    print(f"pipeline passed: {len(records)} validations; reports in {output}")
+    return 0
+
+
+if __name__ == "__main__":
+    try:
+        raise SystemExit(main())
+    except Exception as error:
+        print(f"validation pipeline failed: {error}", file=sys.stderr)
+        raise SystemExit(1)

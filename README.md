@@ -331,6 +331,24 @@ cmake --build build-core
 ctest --test-dir build-core --output-on-failure
 ```
 
+## Full validation pipeline
+
+After configuring and building, one command validates every non-interactive
+experiment and its generated images:
+
+```bash
+python tools/run_validation_pipeline.py --build-dir build-jenkins
+python tools/run_validation_pipeline.py --build-dir build-jenkins \
+  --gpu-build-dir build-wsl-gpu
+```
+
+The pipeline runs the CTest suite, Bezier, CPU ray/path tracing, all 60 animation
+frames, four legacy ASC meshes, manifest-pinned Khronos glTF assets, and the
+optional CUDA suite plus multi-asset render. It rejects missing, truncated,
+blank, or incorrectly sized images and writes both JSON and JUnit reports under
+`<build-dir>/validation-artifacts`. Jenkins invokes this same entry point and
+archives the reports and render outputs.
+
 ## Current limitations
 
 - The renderer is educational and intentionally CPU-bound.

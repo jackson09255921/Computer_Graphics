@@ -25,71 +25,19 @@ pipeline {
             }
         }
 
-        stage('Build and test') {
+        stage('Build CPU') {
             steps {
                 script {
                     if (isUnix()) {
                         sh 'cmake --build build-jenkins --parallel'
-                        sh 'ctest --test-dir build-jenkins --output-on-failure'
                     } else {
                         bat 'cmake --build build-jenkins --config Release --parallel'
-                        bat 'ctest --test-dir build-jenkins -C Release --output-on-failure'
                     }
                 }
             }
         }
 
-        stage('Render smoke tests') {
-            steps {
-                script {
-                    if (isUnix()) {
-                        sh './build-jenkins/bezier_demo bezier_demo.bmp'
-                        sh './build-jenkins/raytracer_demo raytracer_demo.bmp'
-                        sh './build-jenkins/pathtracer_demo pathtracer_demo.bmp 8'
-                    } else {
-                        bat 'build-jenkins\\Release\\bezier_demo.exe bezier_demo.bmp'
-                        bat 'build-jenkins\\Release\\raytracer_demo.exe raytracer_demo.bmp'
-                        bat 'build-jenkins\\Release\\pathtracer_demo.exe pathtracer_demo.bmp 8'
-                    }
-                }
-            }
-        }
-
-        stage('Visual regression') {
-            steps {
-                script {
-                    if (isUnix()) {
-                        sh 'ctest --test-dir build-jenkins -R "visual_regression_tests|bezier_visual|legacy_asc_.*_visual" --output-on-failure'
-                    } else {
-                        bat 'ctest --test-dir build-jenkins -C Release -R "visual_regression_tests|bezier_visual|legacy_asc_.*_visual" --output-on-failure'
-                    }
-                }
-            }
-        }
-
-        stage('External GLB validation') {
-            steps {
-                script {
-                    if (isUnix()) {
-                        sh 'python3 tools/fetch_gltf_sample.py BoxTextured'
-                        sh 'python3 tools/fetch_gltf_sample.py Duck'
-                        sh 'python3 tools/fetch_gltf_sample.py DamagedHelmet'
-                        sh './build-jenkins/gltf_demo LabX/data/external/gltf_samples/BoxTextured/BoxTextured.glb'
-                        sh './build-jenkins/gltf_demo LabX/data/external/gltf_samples/Duck/Duck.glb'
-                        sh './build-jenkins/gltf_demo LabX/data/external/gltf_samples/DamagedHelmet/DamagedHelmet.glb'
-                    } else {
-                        bat 'python tools\\fetch_gltf_sample.py BoxTextured'
-                        bat 'python tools\\fetch_gltf_sample.py Duck'
-                        bat 'python tools\\fetch_gltf_sample.py DamagedHelmet'
-                        bat 'build-jenkins\\Release\\gltf_demo.exe LabX\\data\\external\\gltf_samples\\BoxTextured\\BoxTextured.glb'
-                        bat 'build-jenkins\\Release\\gltf_demo.exe LabX\\data\\external\\gltf_samples\\Duck\\Duck.glb'
-                        bat 'build-jenkins\\Release\\gltf_demo.exe LabX\\data\\external\\gltf_samples\\DamagedHelmet\\DamagedHelmet.glb'
-                    }
-                }
-            }
-        }
-
-        stage('CUDA capability') {
+        stage('Build CUDA') {
             when {
                 expression { return params.RUN_GPU_TESTS }
             }
@@ -97,13 +45,31 @@ pipeline {
                 script {
                     if (isUnix()) {
                         sh '/home/cgdev/miniconda3/bin/conda run -n computer-graphics cmake -S . -B build-jenkins-cuda -G Ninja -DBUILD_LEGACY_LABS=OFF -DBUILD_CUDA_DEMOS=ON -DCG_CUDA_ARCHITECTURES=89 -DCMAKE_BUILD_TYPE=Release'
-                        sh '/home/cgdev/miniconda3/bin/conda run -n computer-graphics cmake --build build-jenkins-cuda --target cuda_capability'
-                        sh '/home/cgdev/miniconda3/bin/conda run -n computer-graphics ctest --test-dir build-jenkins-cuda -R cuda_capability --output-on-failure'
+                        sh '/home/cgdev/miniconda3/bin/conda run -n computer-graphics cmake --build build-jenkins-cuda --parallel'
                     } else {
                         bat 'nvidia-smi'
                         bat 'cmake -S . -B build-jenkins-cuda -A x64 -DBUILD_LEGACY_LABS=OFF -DBUILD_CUDA_DEMOS=ON -DCG_CUDA_ARCHITECTURES=89'
-                        bat 'cmake --build build-jenkins-cuda --config Release --target cuda_capability'
-                        bat 'ctest --test-dir build-jenkins-cuda -C Release -R cuda_capability --output-on-failure'
+                        bat 'cmake --build build-jenkins-cuda --config Release --parallel'
+                    }
+                }
+            }
+        }
+
+        stage('Validation pipeline') {
+            steps {
+                script {
+                    if (isUnix()) {
+                        if (params.RUN_GPU_TESTS) {
+                            sh 'python3 tools/run_validation_pipeline.py --build-dir build-jenkins --gpu-build-dir build-jenkins-cuda'
+                        } else {
+                            sh 'python3 tools/run_validation_pipeline.py --build-dir build-jenkins'
+                        }
+                    } else {
+                        if (params.RUN_GPU_TESTS) {
+                            bat 'python tools\\run_validation_pipeline.py --build-dir build-jenkins --gpu-build-dir build-jenkins-cuda'
+                        } else {
+                            bat 'python tools\\run_validation_pipeline.py --build-dir build-jenkins'
+                        }
                     }
                 }
             }
@@ -112,8 +78,8 @@ pipeline {
 
     post {
         always {
-            archiveArtifacts artifacts: '*.bmp,build-jenkins/*visual*.ppm,build-jenkins/*diff*.ppm,LabX/images/*.png', allowEmptyArchive: true
-            junit testResults: 'build-jenkins/**/Test.xml', allowEmptyResults: true
+            archiveArtifacts artifacts: 'build-jenkins/validation-artifacts/**/*,build-jenkins/*visual*.ppm,build-jenkins/*diff*.ppm,LabX/images/*.png', allowEmptyArchive: true
+            junit testResults: 'build-jenkins/validation-artifacts/validation-report.xml', allowEmptyResults: true
         }
     }
 }
