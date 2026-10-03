@@ -45,13 +45,13 @@ if(BUILD_TESTING)
     add_test(NAME animation_tests COMMAND animation_tests)
 endif()
 
-add_executable(bezier_demo apps/bezier_demo.cpp)
+add_executable(bezier_demo LabX/bezier_demo.cpp)
 target_link_libraries(bezier_demo PRIVATE cg_core)
 
-add_executable(raytracer_demo apps/raytracer_demo.cpp)
+add_executable(raytracer_demo LabX/raytracer_demo.cpp)
 target_link_libraries(raytracer_demo PRIVATE cg_core)
 
-add_executable(animation_demo apps/animation_demo.cpp)
+add_executable(animation_demo LabX/animation_demo.cpp)
 target_link_libraries(animation_demo PRIVATE cg_core)
 
 if(BUILD_LEGACY_LABS)
@@ -93,7 +93,7 @@ endfunction()
 add_graphics_lab(lab2 2022CG_Lab2/2022CG_Lab2.cpp)
 add_graphics_lab(lab3 2022CG_Lab3/2022CG_Lab3.cpp)
 add_graphics_lab(lab4 2022CG_Lab4/2022CG_Lab4.cpp)
-add_graphics_lab(bezier_interactive apps/bezier_interactive.cpp)
+add_graphics_lab(bezier_interactive LabX/bezier_interactive.cpp)
 target_link_libraries(bezier_interactive PRIVATE cg_core)
 
 set_target_properties(lab2 PROPERTIES

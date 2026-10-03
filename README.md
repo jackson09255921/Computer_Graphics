@@ -164,7 +164,7 @@ the selected input file. Some inherited drawing controls are also available:
 ├── 2022CG_Lab3/       # 3D rendering pipeline and OBJ meshes
 ├── 2022CG_Lab4/       # lighting, shading, and Z-buffering
 ├── images/            # diagrams and rendered results
-├── apps/              # headless and interactive demos
+├── LabX/              # extended headless and interactive demos
 ├── src/animation/     # keyframes, SLERP, and Bézier easing
 ├── src/core/          # API-agnostic math and image primitives
 ├── src/curves/        # De Casteljau Bézier implementation
