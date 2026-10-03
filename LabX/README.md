@@ -19,6 +19,14 @@ LabX/
 └── raytracing/    # Whitted and Monte Carlo path tracing demos
 ```
 
+## Reviewed legacy-mesh renders
+
+Legacy Lab 3/4 ASC meshes are supported by `legacy_asc_demo`. It reads the
+course format, triangulates polygon faces, builds the current CPU BVH, frames
+the object automatically, and produces a deterministic ray-traced image. The
+reviewed bench, drop, glass, and skull PNGs are stored in `LabX/images/`; their
+lossless PPM references are exercised by CTest visual regressions.
+
 ## GPU profile and constraints
 
 The initial GPU target is an NVIDIA GeForce RTX 4060 Laptop GPU with 8 GiB

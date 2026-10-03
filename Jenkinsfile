@@ -59,9 +59,9 @@ pipeline {
             steps {
                 script {
                     if (isUnix()) {
-                        sh 'ctest --test-dir build-jenkins -R "visual_regression_tests|bezier_visual" --output-on-failure'
+                        sh 'ctest --test-dir build-jenkins -R "visual_regression_tests|bezier_visual|legacy_asc_.*_visual" --output-on-failure'
                     } else {
-                        bat 'ctest --test-dir build-jenkins -C Release -R "visual_regression_tests|bezier_visual" --output-on-failure'
+                        bat 'ctest --test-dir build-jenkins -C Release -R "visual_regression_tests|bezier_visual|legacy_asc_.*_visual" --output-on-failure'
                     }
                 }
             }

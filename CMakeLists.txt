@@ -15,6 +15,7 @@ option(BUILD_OPTIX_DEMOS "Build optional OptiX experiments (requires NVIDIA Opti
 set(CG_CUDA_ARCHITECTURES "89" CACHE STRING "CUDA architectures for LabX GPU experiments")
 
 add_library(cg_core
+    LabX/assets/asc_loader.cpp
     LabX/assets/gltf_loader.cpp
     LabX/environment/environment_map.cpp
     LabX/pbr/pbr.cpp
@@ -130,6 +131,10 @@ if(BUILD_TESTING)
     add_executable(gltf_tests LabX/assets/gltf_tests.cpp)
     target_link_libraries(gltf_tests PRIVATE cg_core)
     add_test(NAME gltf_tests COMMAND gltf_tests)
+
+    add_executable(asc_tests LabX/assets/asc_tests.cpp)
+    target_link_libraries(asc_tests PRIVATE cg_core)
+    add_test(NAME asc_tests COMMAND asc_tests)
 endif()
 
 add_executable(visual_compare LabX/visual/visual_compare.cpp)
@@ -158,6 +163,29 @@ target_link_libraries(pathtracer_demo PRIVATE cg_core)
 
 add_executable(gltf_demo LabX/assets/gltf_demo.cpp)
 target_link_libraries(gltf_demo PRIVATE cg_core)
+
+add_executable(legacy_asc_demo LabX/assets/legacy_asc_demo.cpp)
+target_link_libraries(legacy_asc_demo PRIVATE cg_core)
+
+if(BUILD_TESTING)
+    function(add_legacy_asc_visual_test model)
+        set(actual "${CMAKE_CURRENT_BINARY_DIR}/legacy_asc_${model}_raytracing_actual.ppm")
+        set(difference "${CMAKE_CURRENT_BINARY_DIR}/legacy_asc_${model}_raytracing_diff.ppm")
+        add_test(NAME legacy_asc_${model}_visual_render
+            COMMAND legacy_asc_demo
+                "${CMAKE_CURRENT_SOURCE_DIR}/legacy/2022CG_Lab3/Mesh/${model}.asc" "${actual}")
+        add_test(NAME legacy_asc_${model}_visual_compare
+            COMMAND visual_compare
+                "${CMAKE_CURRENT_SOURCE_DIR}/tests/visual/references/legacy_asc_${model}_raytracing.ppm"
+                "${actual}" "${difference}" 0.50 3.00)
+        set_tests_properties(legacy_asc_${model}_visual_compare PROPERTIES
+            DEPENDS legacy_asc_${model}_visual_render)
+    endfunction()
+    add_legacy_asc_visual_test(bench)
+    add_legacy_asc_visual_test(drop)
+    add_legacy_asc_visual_test(glass)
+    add_legacy_asc_visual_test(skull)
+endif()
 
 add_executable(animation_demo LabX/animation/animation_demo.cpp)
 target_link_libraries(animation_demo PRIVATE cg_core)
