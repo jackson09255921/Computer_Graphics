@@ -113,6 +113,7 @@ int main(int argc, char** argv) {
     constexpr unsigned int width = 256;
     constexpr unsigned int height = 192;
     constexpr unsigned int samples_per_pixel = 32;
+    constexpr unsigned int samples_per_frame = samples_per_pixel / 2;
     const std::string output_path = argc > 1 ? argv[1] : "optix_triangle.ppm";
     MeshData mesh;
 
@@ -126,6 +127,7 @@ int main(int argc, char** argv) {
     CUdeviceptr device_colors = 0, device_reflectivity = 0;
     CUdeviceptr device_roughness = 0;
     CUdeviceptr gbuffer_normal = 0, gbuffer_depth = 0, gbuffer_albedo = 0, gbuffer_motion = 0;
+    CUdeviceptr previous_normal = 0, previous_depth = 0, previous_albedo = 0, temporal_validity = 0;
     CUdeviceptr device_vertices = 0, device_indices = 0;
 
     try {
@@ -276,6 +278,16 @@ int main(int argc, char** argv) {
                    "cudaMalloc G-buffer albedo");
         check_cuda(cudaMalloc(reinterpret_cast<void**>(&gbuffer_motion), width * height * sizeof(float2)),
                    "cudaMalloc G-buffer motion");
+        check_cuda(cudaMalloc(reinterpret_cast<void**>(&previous_normal), width * height * sizeof(float3)),
+                   "cudaMalloc previous normal");
+        check_cuda(cudaMalloc(reinterpret_cast<void**>(&previous_depth), width * height * sizeof(float)),
+                   "cudaMalloc previous depth");
+        check_cuda(cudaMalloc(reinterpret_cast<void**>(&previous_albedo), width * height * sizeof(float3)),
+                   "cudaMalloc previous albedo");
+        check_cuda(cudaMalloc(reinterpret_cast<void**>(&temporal_validity), width * height * sizeof(unsigned int)),
+                   "cudaMalloc temporal validity");
+        check_cuda(cudaMemset(reinterpret_cast<void*>(temporal_validity), 0,
+                              width * height * sizeof(unsigned int)), "cudaMemset temporal validity");
         check_cuda(cudaMalloc(reinterpret_cast<void**>(&device_colors), mesh.colors.size() * sizeof(float3)),
                    "cudaMalloc primitive colors");
         check_cuda(cudaMemcpy(reinterpret_cast<void*>(device_colors), mesh.colors.data(),
@@ -317,7 +329,12 @@ int main(int argc, char** argv) {
                                          reinterpret_cast<float3*>(gbuffer_normal),
                                          reinterpret_cast<float*>(gbuffer_depth),
                                          reinterpret_cast<float3*>(gbuffer_albedo),
-                                         reinterpret_cast<float2*>(gbuffer_motion), width, height, 0,
+                                         reinterpret_cast<float2*>(gbuffer_motion),
+                                         reinterpret_cast<float3*>(previous_normal),
+                                         reinterpret_cast<float*>(previous_depth),
+                                         reinterpret_cast<float3*>(previous_albedo),
+                                         reinterpret_cast<unsigned int*>(temporal_validity),
+                                         width, height, 0, 0,
                                          gas_handle,
                                          reinterpret_cast<float3*>(device_vertices),
                                          reinterpret_cast<uint3*>(device_indices),
@@ -326,12 +343,29 @@ int main(int argc, char** argv) {
                                          reinterpret_cast<float*>(device_roughness), camera_origin, view_scale,
                                          light_position};
         check_cuda(cudaMalloc(reinterpret_cast<void**>(&device_params), sizeof(params)), "cudaMalloc params");
-        for (unsigned int sample = 0; sample < samples_per_pixel; ++sample) {
+        for (unsigned int sample = 0; sample < samples_per_frame; ++sample) {
             params.sample_index = sample;
             check_cuda(cudaMemcpy(reinterpret_cast<void*>(device_params), &params, sizeof(params),
                                   cudaMemcpyHostToDevice), "cudaMemcpy params");
             check_optix(optixLaunch(pipeline, nullptr, device_params, sizeof(params), &sbt,
                                     width, height, 1), "optixLaunch");
+        }
+        check_cuda(cudaMemcpy(reinterpret_cast<void*>(previous_normal),
+                              reinterpret_cast<void*>(gbuffer_normal), width * height * sizeof(float3),
+                              cudaMemcpyDeviceToDevice), "cudaMemcpy previous normal");
+        check_cuda(cudaMemcpy(reinterpret_cast<void*>(previous_depth),
+                              reinterpret_cast<void*>(gbuffer_depth), width * height * sizeof(float),
+                              cudaMemcpyDeviceToDevice), "cudaMemcpy previous depth");
+        check_cuda(cudaMemcpy(reinterpret_cast<void*>(previous_albedo),
+                              reinterpret_cast<void*>(gbuffer_albedo), width * height * sizeof(float3),
+                              cudaMemcpyDeviceToDevice), "cudaMemcpy previous albedo");
+        params.frame_index = 1;
+        for (unsigned int sample = samples_per_frame; sample < samples_per_pixel; ++sample) {
+            params.sample_index = sample;
+            check_cuda(cudaMemcpy(reinterpret_cast<void*>(device_params), &params, sizeof(params),
+                                  cudaMemcpyHostToDevice), "cudaMemcpy temporal params");
+            check_optix(optixLaunch(pipeline, nullptr, device_params, sizeof(params), &sbt,
+                                    width, height, 1), "optixLaunch temporal frame");
         }
         check_cuda(cudaDeviceSynchronize(), "cudaDeviceSynchronize");
         float4 center_accumulation{};
@@ -342,6 +376,14 @@ int main(int argc, char** argv) {
                    "cudaMemcpy center accumulation");
         if (center_accumulation.w != static_cast<float>(samples_per_pixel))
             throw std::runtime_error("progressive accumulation sample count mismatch");
+        unsigned int center_temporal_validity = 0;
+        check_cuda(cudaMemcpy(&center_temporal_validity,
+                              reinterpret_cast<void*>(temporal_validity +
+                                  ((height / 2) * width + width / 2) * sizeof(unsigned int)),
+                              sizeof(center_temporal_validity), cudaMemcpyDeviceToHost),
+                   "cudaMemcpy temporal validity");
+        if (center_temporal_validity != 1u)
+            throw std::runtime_error("static-frame temporal reprojection was rejected");
         float3 center_normal{};
         float center_depth = 0.0f;
         float3 center_albedo{};
@@ -389,9 +431,14 @@ int main(int argc, char** argv) {
                   << " verified shadow pixels, center RGB "
                   << static_cast<int>(center_pixel.x) << ", " << static_cast<int>(center_pixel.y) << ", "
                   << static_cast<int>(center_pixel.z) << ", depth " << center_depth << ", normal "
-                  << center_normal.x << ", " << center_normal.y << ", " << center_normal.z << ")\n";
+                  << center_normal.x << ", " << center_normal.y << ", " << center_normal.z
+                  << ", temporal history accepted)\n";
 
         cudaFree(reinterpret_cast<void*>(device_params));
+        cudaFree(reinterpret_cast<void*>(temporal_validity));
+        cudaFree(reinterpret_cast<void*>(previous_albedo));
+        cudaFree(reinterpret_cast<void*>(previous_depth));
+        cudaFree(reinterpret_cast<void*>(previous_normal));
         cudaFree(reinterpret_cast<void*>(gbuffer_motion));
         cudaFree(reinterpret_cast<void*>(gbuffer_albedo));
         cudaFree(reinterpret_cast<void*>(gbuffer_depth));

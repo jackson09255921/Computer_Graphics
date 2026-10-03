@@ -10,9 +10,14 @@ struct OptixTriangleParams {
     float* gbuffer_depth;
     float3* gbuffer_albedo;
     float2* gbuffer_motion;
+    const float3* previous_normal;
+    const float* previous_depth;
+    const float3* previous_albedo;
+    unsigned int* temporal_validity;
     unsigned int width;
     unsigned int height;
     unsigned int sample_index;
+    unsigned int frame_index;
     OptixTraversableHandle handle;
     const float3* vertices;
     const uint3* indices;

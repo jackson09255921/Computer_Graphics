@@ -92,6 +92,35 @@ extern "C" __global__ void __raygen__triangle() {
     const float r = __uint_as_float(red);
     const float g = __uint_as_float(green);
     const float b = __uint_as_float(blue);
+    if (params.frame_index > 0u && params.sample_index == 16u) {
+        const float2 motion = params.gbuffer_motion[pixel];
+        const int previous_x = static_cast<int>(static_cast<float>(index.x) - motion.x + 0.5f);
+        const int previous_y = static_cast<int>(static_cast<float>(index.y) - motion.y + 0.5f);
+        bool valid = previous_x >= 0 && previous_x < static_cast<int>(params.width) &&
+                     previous_y >= 0 && previous_y < static_cast<int>(params.height);
+        if (valid) {
+            const unsigned int previous_pixel = static_cast<unsigned int>(previous_y) * params.width +
+                                                static_cast<unsigned int>(previous_x);
+            const float current_depth = params.gbuffer_depth[pixel];
+            const float previous_depth = params.previous_depth[previous_pixel];
+            const float3 current_normal = params.gbuffer_normal[pixel];
+            const float3 previous_normal = params.previous_normal[previous_pixel];
+            const float3 current_albedo = params.gbuffer_albedo[pixel];
+            const float3 previous_albedo = params.previous_albedo[previous_pixel];
+            const float normal_similarity = current_normal.x * previous_normal.x +
+                                            current_normal.y * previous_normal.y +
+                                            current_normal.z * previous_normal.z;
+            const float depth_threshold = fmaxf(1.0e-3f, current_depth * 0.01f);
+            const float albedo_difference = fabsf(current_albedo.x - previous_albedo.x) +
+                                            fabsf(current_albedo.y - previous_albedo.y) +
+                                            fabsf(current_albedo.z - previous_albedo.z);
+            valid = current_depth > 0.0f && previous_depth > 0.0f &&
+                    fabsf(current_depth - previous_depth) <= depth_threshold &&
+                    normal_similarity >= 0.95f && albedo_difference <= 0.05f;
+        }
+        params.temporal_validity[pixel] = valid ? 1u : 0u;
+        if (!valid) params.accumulation[pixel] = make_float4(0.0f, 0.0f, 0.0f, 0.0f);
+    }
     float4 accumulated = params.accumulation[pixel];
     accumulated.x += r;
     accumulated.y += g;

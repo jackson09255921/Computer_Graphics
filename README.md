@@ -138,6 +138,8 @@ The native OptiX demo performs 32 progressive launches into a persistent GPU
 floating-point accumulation buffer before converting the running average to PPM.
 Primary rays also populate world-normal, linear-depth, albedo, and motion-vector
 G-buffer attachments; secondary reflection and shadow rays cannot overwrite them.
+Two simulated frames exercise motion-vector reprojection and reject history on
+depth, normal, or albedo discontinuities before carrying accumulation forward.
 
 The dependency-free `LabX/assets` loader imports glTF 2.x triangle primitives
 from external binary buffers, including indexed or non-indexed geometry, scene

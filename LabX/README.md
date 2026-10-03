@@ -102,5 +102,10 @@ motion-vector attachments. Reflection and shadow rays are excluded by payload
 depth. Motion is currently zero for the static camera and scene; the buffers
 are validated after launch and form the input contract for temporal reuse.
 
+The renderer splits its 32 samples across two simulated frames. Frame 1
+reprojects into frame 0 with motion vectors, then validates 1% relative depth,
+normal similarity, and albedo continuity. Rejected pixels clear their history;
+the static center pixel must retain all 32 samples for the test to pass.
+
 Without the SDK, configuration stops immediately with an actionable message;
 normal CPU and CUDA builds remain unaffected.
