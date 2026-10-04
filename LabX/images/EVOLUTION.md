@@ -73,7 +73,7 @@ and background through MASK/BLEND texels while OPAQUE remains solid.
 
 | Stage | Commit | Controlled change | Result |
 | --- | --- | --- | --- |
-| 10 — Texture transforms | pending | Enable per-texture texCoord, offset, rotation, scale and sampler wrapping | [`baseline`](evolution_texture_stage10_baseline_128spp.png) · [`transformed`](evolution_texture_stage10_transformed_128spp.png) |
+| 10 — Texture transforms | `3273175` | Enable per-texture texCoord, offset, rotation, scale and sampler wrapping | [`baseline`](evolution_texture_stage10_baseline_128spp.png) · [`transformed`](evolution_texture_stage10_transformed_128spp.png) |
 
 The official Khronos test uses six panels to expose offset, rotation, scale and
 combined mapping errors. Both 640x360 renders use the same camera, studio lights,

@@ -1,0 +1,6 @@
+*.gltf -text
+*.bin -text
+*.png -text
+*.glb -text
+*.ppm -text
+*.bmp -text
