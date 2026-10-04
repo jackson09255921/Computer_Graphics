@@ -85,7 +85,7 @@ three U/V/UV success panels and all green arrow targets.
 
 | Stage | Commit | Controlled change | Result |
 | --- | --- | --- | --- |
-| 11 — Clearcoat textures | pending | Enable factor (R), roughness (G), and independent coat-normal textures | [`baseline`](evolution_clearcoat_stage11_baseline_128spp.png) · [`textures`](evolution_clearcoat_stage11_textures_128spp.png) |
+| 11 — Clearcoat textures | `c59b535` | Enable factor (R), roughness (G), and independent coat-normal textures | [`baseline`](evolution_clearcoat_stage11_baseline_128spp.png) · [`textures`](evolution_clearcoat_stage11_textures_128spp.png) |
 
 The official Khronos ClearCoatTest contains 37,116 triangles and five labelled
 rows for partial coating, roughness variation, base normals, shared normals and
