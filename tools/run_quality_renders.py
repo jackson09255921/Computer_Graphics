@@ -114,6 +114,15 @@ def main() -> int:
         publish(source, f"evolution_sheen_stage12_{label}_{args.gpu_spp}spp.png",
                 (640, 360), f"sheen-texture-{label}")
 
+    transmission_test = samples / "TransmissionTest" / "TransmissionTest.glb"
+    for mode, label in (("--transmission-texture-baseline", "baseline"),
+                        ("--transmission-texture", "textures")):
+        source = artifacts / f"transmission_texture_{label}_{args.gpu_spp}spp.ppm"
+        run([str(executable(gpu, "cuda_pathtracer", args.config)), mode,
+             str(transmission_test), str(source), str(args.gpu_spp)])
+        publish(source, f"evolution_transmission_stage13_{label}_{args.gpu_spp}spp.png",
+                (640, 360), f"transmission-texture-{label}")
+
     models = ROOT / "LabX" / "data" / "legacy_converted" / "meshes"
     multi = artifacts / f"cuda_multi_asset_{args.gpu_spp}spp.ppm"
     run([str(executable(gpu, "cuda_pathtracer", args.config)), "--scene", str(multi), str(args.gpu_spp),

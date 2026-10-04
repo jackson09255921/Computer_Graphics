@@ -62,6 +62,7 @@ struct Triangle {
     float clearcoat_normal_scale{1.0f};
     float3 sheen_color{}; float sheen_roughness{0.0f};
     int sheen_color_texture_index{-1}; int sheen_roughness_texture_index{-1};
+    int transmission_texture_index{-1};
     int occlusion_texture_index{-1}; float occlusion_strength{1.0f}; bool double_sided{false};
     int alpha_mode{0}; float alpha_cutoff{0.5f}; float alpha_factor{1.0f};
     float2 first_uv1{}; float2 second_uv1{}; float2 third_uv1{};
@@ -70,6 +71,7 @@ struct Triangle {
     UvMapping clearcoat_mapping{}; UvMapping clearcoat_roughness_mapping{};
     UvMapping clearcoat_normal_mapping{}; UvMapping occlusion_mapping{};
     UvMapping sheen_color_mapping{}; UvMapping sheen_roughness_mapping{};
+    UvMapping transmission_mapping{};
 };
 struct TextureDescriptor { int offset; int width; int height; int wrap_s; int wrap_t; };
 struct ImportedAssets {
@@ -101,11 +103,13 @@ struct Hit {
     float clearcoat_normal_scale; float3 clearcoat_normal;
     float3 sheen_color; float sheen_roughness;
     int sheen_color_texture_index; int sheen_roughness_texture_index;
+    int transmission_texture_index;
     int occlusion_texture_index; float occlusion_strength;
     float2 base_color_uv; float2 normal_uv; float2 metallic_roughness_uv;
     float2 emissive_uv; float2 clearcoat_uv; float2 clearcoat_roughness_uv;
     float2 clearcoat_normal_uv; float2 occlusion_uv;
     float2 sheen_color_uv; float2 sheen_roughness_uv;
+    float2 transmission_uv;
 };
 
 struct Rng {
@@ -229,6 +233,7 @@ __device__ void intersect_triangles(const Ray& ray, const Triangle* triangles, c
                 closest.occlusion_uv = mapped_uv(closest.uv, uv1, triangle.occlusion_mapping);
                 closest.sheen_color_uv = mapped_uv(closest.uv, uv1, triangle.sheen_color_mapping);
                 closest.sheen_roughness_uv = mapped_uv(closest.uv, uv1, triangle.sheen_roughness_mapping);
+                closest.transmission_uv = mapped_uv(closest.uv, uv1, triangle.transmission_mapping);
                 closest.texture_index = triangle.texture_index;
                 closest.tangent = triangle.tangent;
                 closest.tangent_handedness = triangle.tangent_handedness;
@@ -247,6 +252,7 @@ __device__ void intersect_triangles(const Ray& ray, const Triangle* triangles, c
                 closest.sheen_roughness = triangle.sheen_roughness;
                 closest.sheen_color_texture_index = triangle.sheen_color_texture_index;
                 closest.sheen_roughness_texture_index = triangle.sheen_roughness_texture_index;
+                closest.transmission_texture_index = triangle.transmission_texture_index;
                 closest.occlusion_texture_index = triangle.occlusion_texture_index;
                 closest.occlusion_strength = triangle.occlusion_strength;
                 closest.found = true;
@@ -299,6 +305,7 @@ __device__ bool intersect_scene(const Ray& ray, const Sphere* spheres, int spher
         closest.sheen_roughness = 0.0f;
         closest.sheen_color_texture_index = -1;
         closest.sheen_roughness_texture_index = -1;
+        closest.transmission_texture_index = -1;
         closest.occlusion_texture_index = -1;
         closest.occlusion_strength = 1.0f;
         closest.found = true;
@@ -699,6 +706,9 @@ __device__ float3 radiance(Ray ray, const Sphere* spheres, int sphere_count,
                                                       hit.sheen_roughness_uv).w;
             hit.sheen_roughness = fminf(1.0f, fmaxf(0.0f, hit.sheen_roughness * sampled));
         }
+        if (hit.transmission_texture_index >= 0)
+            hit.transmission *= sample_texture(textures, hit.transmission_texture_index,
+                                               hit.transmission_uv).x;
         float surface_occlusion = 1.0f;
         if (hit.occlusion_texture_index >= 0) {
             const float sampled = sample_texture(textures, hit.occlusion_texture_index, hit.occlusion_uv).x;
@@ -1206,6 +1216,7 @@ ImportedAssets load_gltf_triangles(const std::filesystem::path& path) {
         const int clearcoat_normal_texture_index = register_texture(triangle.clearcoat_normal_texture, false);
         const int sheen_color_texture_index = register_texture(triangle.sheen_color_texture, true);
         const int sheen_roughness_texture_index = register_texture(triangle.sheen_roughness_texture, false);
+        const int transmission_texture_index = register_texture(triangle.transmission_texture, false);
         const int occlusion_texture_index = register_texture(triangle.occlusion_texture, false);
         const float3 first = convert(triangle.first), second = convert(triangle.second), third = convert(triangle.third);
         const float2 uv0 = make_float2(static_cast<float>(triangle.first_uv.x), static_cast<float>(triangle.first_uv.y));
@@ -1249,7 +1260,8 @@ ImportedAssets load_gltf_triangles(const std::filesystem::path& path) {
                           clearcoat_normal_texture_index, static_cast<float>(triangle.clearcoat_normal_scale),
                           convert(triangle.sheen_color_factor),
                           static_cast<float>(triangle.sheen_roughness), sheen_color_texture_index,
-                          sheen_roughness_texture_index, occlusion_texture_index,
+                          sheen_roughness_texture_index, transmission_texture_index,
+                          occlusion_texture_index,
                           static_cast<float>(triangle.occlusion_strength), triangle.double_sided,
                           triangle.alpha_mode, static_cast<float>(triangle.alpha_cutoff),
                           static_cast<float>(triangle.base_color_alpha), uv10, uv11, uv12,
@@ -1261,7 +1273,8 @@ ImportedAssets load_gltf_triangles(const std::filesystem::path& path) {
                           convert_mapping(triangle.clearcoat_normal_mapping),
                           convert_mapping(triangle.occlusion_mapping),
                           convert_mapping(triangle.sheen_color_mapping),
-                          convert_mapping(triangle.sheen_roughness_mapping)});
+                          convert_mapping(triangle.sheen_roughness_mapping),
+                          convert_mapping(triangle.transmission_mapping)});
     }
     return result;
 }
@@ -1288,6 +1301,7 @@ void append_imported(ImportedAssets& destination, ImportedAssets source) {
             triangle.clearcoat_normal_texture_index += texture_base;
         if (triangle.sheen_color_texture_index >= 0) triangle.sheen_color_texture_index += texture_base;
         if (triangle.sheen_roughness_texture_index >= 0) triangle.sheen_roughness_texture_index += texture_base;
+        if (triangle.transmission_texture_index >= 0) triangle.transmission_texture_index += texture_base;
         if (triangle.occlusion_texture_index >= 0) triangle.occlusion_texture_index += texture_base;
         destination.triangles.push_back(triangle);
     }
@@ -1693,6 +1707,8 @@ int main(int argc, char** argv) {
         const bool clearcoat_texture_mode = argc > 1 && std::string(argv[1]) == "--clearcoat-texture";
         const bool sheen_texture_baseline_mode = argc > 1 && std::string(argv[1]) == "--sheen-texture-baseline";
         const bool sheen_texture_mode = argc > 1 && std::string(argv[1]) == "--sheen-texture";
+        const bool transmission_texture_baseline_mode = argc > 1 && std::string(argv[1]) == "--transmission-texture-baseline";
+        const bool transmission_texture_mode = argc > 1 && std::string(argv[1]) == "--transmission-texture";
         const bool scene_mode = argc > 1 && std::string(argv[1]) == "--scene";
         const bool hdr_mode = argc > 1 && std::string(argv[1]) == "--hdr";
         if (scene_mode) {
@@ -1715,7 +1731,8 @@ int main(int argc, char** argv) {
                    fabric_close_sheen_mode || occlusion_baseline_mode || occlusion_mode ||
                    alpha_baseline_mode || alpha_mode || texture_transform_baseline_mode ||
                    texture_transform_mode || clearcoat_texture_baseline_mode || clearcoat_texture_mode ||
-                   sheen_texture_baseline_mode || sheen_texture_mode) {
+                   sheen_texture_baseline_mode || sheen_texture_mode ||
+                   transmission_texture_baseline_mode || transmission_texture_mode) {
             if (argc < 3) throw std::invalid_argument(
                 "usage: cuda_pathtracer --gltf|--showcase|--showcase-angle|--showcase-studio|--fabric-baseline|--fabric-sheen|--fabric-close-baseline|--fabric-close-sheen|--occlusion-baseline|--occlusion|--alpha-baseline|--alpha|--texture-transform-baseline|--texture-transform model.gltf [output.bmp] [spp] [environment.hdr]");
             imported = load_gltf_triangles(argv[2]);
@@ -1761,6 +1778,11 @@ int main(int argc, char** argv) {
                 camera = {make_float3(0.45f, 0.45f, 1.6f),
                           make_float3(0.0f, 0.0f, -4.4f), 44.0f};
             }
+            else if (transmission_texture_baseline_mode || transmission_texture_mode) {
+                frame_imported_triangles(imported.triangles, 4.3f, 0.0f, -4.5f);
+                camera = {make_float3(0.55f, 0.5f, 1.6f),
+                          make_float3(0.0f, 0.0f, -4.4f), 44.0f};
+            }
             else frame_imported_triangles(imported.triangles);
             if (showcase_studio_mode || fabric_baseline_mode || fabric_close_baseline_mode)
                 for (Triangle& triangle : imported.triangles)
@@ -1791,6 +1813,9 @@ int main(int argc, char** argv) {
                     triangle.sheen_color_texture_index = -1;
                     triangle.sheen_roughness_texture_index = -1;
                 }
+            if (transmission_texture_baseline_mode)
+                for (Triangle& triangle : imported.triangles)
+                    triangle.transmission_texture_index = -1;
             output = argc > 3 ? argv[3] : "cuda_gltf_pathtracer.bmp";
             samples = argc > 4 ? std::stoi(argv[4]) : 64;
             if (argc > 5) environment = std::make_unique<cg::environment::EnvironmentMap>(
@@ -1815,14 +1840,16 @@ int main(int argc, char** argv) {
                                !occlusion_mode && !alpha_baseline_mode && !alpha_mode &&
                                !texture_transform_baseline_mode && !texture_transform_mode &&
                                !clearcoat_texture_baseline_mode && !clearcoat_texture_mode &&
-                               !sheen_texture_baseline_mode && !sheen_texture_mode && !scene_mode,
+                               !sheen_texture_baseline_mode && !sheen_texture_mode &&
+                               !transmission_texture_baseline_mode && !transmission_texture_mode && !scene_mode,
                            environment.get(), camera,
                            showcase_studio_mode || fabric_baseline_mode || fabric_sheen_mode ||
                                fabric_close_baseline_mode || fabric_close_sheen_mode ||
                                occlusion_baseline_mode || occlusion_mode || alpha_baseline_mode || alpha_mode ||
                                texture_transform_baseline_mode || texture_transform_mode ||
                                clearcoat_texture_baseline_mode || clearcoat_texture_mode ||
-                               sheen_texture_baseline_mode || sheen_texture_mode));
+                               sheen_texture_baseline_mode || sheen_texture_mode ||
+                               transmission_texture_baseline_mode || transmission_texture_mode));
         std::cout << "CUDA path traced " << width << 'x' << height << " at " << samples
                   << " spp with " << imported.triangles.size() << " imported triangles"
                   << (environment ? " and HDR environment" : "") << " to " << output << '\n';

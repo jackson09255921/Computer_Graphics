@@ -96,6 +96,14 @@
         "sha256":  "01a60862de55cd4b9f3acfab0b0def86451800f9c42467fcd61052c16cb9838c"
     },
     {
+        "name":  "TransmissionTest",
+        "file":  "TransmissionTest/TransmissionTest.glb",
+        "source":  "https://github.com/KhronosGroup/glTF-Sample-Assets/tree/main/Models/TransmissionTest",
+        "license":  "TransmissionTest/README.md",
+        "bytes":  1473792,
+        "sha256":  "dd9732dae5517f8605ad4324d78b077b969c3e8357c056280d0a4e4b67797d15"
+    },
+    {
         "name":  "WaterBottle",
         "file":  "WaterBottle/WaterBottle.glb",
         "source":  "https://github.com/KhronosGroup/glTF-Sample-Assets/tree/main/Models/WaterBottle",

@@ -109,6 +109,20 @@ channel MAE and maximum channel delta of 90. Both PNGs were read back and
 inspected at native resolution. The material lobe uses the Charlie microfiber
 distribution published by Conty and Kulla in 2017.
 
+## TransmissionTest: per-pixel dielectric evolution
+
+| Stage | Commit | Controlled change | Result |
+| --- | --- | --- | --- |
+| 13 — Transmission texture | pending | Multiply dielectric transmission by the texture red channel | [`baseline`](evolution_transmission_stage13_baseline_128spp.png) · [`textures`](evolution_transmission_stage13_textures_128spp.png) |
+
+The official CC0 Khronos TransmissionTest contains 128,775 triangles and mixes
+uniform, rough, metallic and textured transmission. Both 640x360 renders use
+the same camera, studio lights, 128 spp and seed `0xC0FFEE`. Texture lookup
+changes 48,355 pixels with a 0.601 channel MAE and maximum channel delta of
+162. Native PNG review confirms the authored red/black stripes and blue masks
+while the checkerboard remains visible through refracted regions. The glTF
+`KHR_materials_transmission` workflow dates to 2020.
+
 ## Rules for future stages
 
 1. Use a new descriptive filename; never replace a reviewed image.

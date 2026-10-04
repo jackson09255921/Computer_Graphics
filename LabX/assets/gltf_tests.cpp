@@ -73,6 +73,8 @@ int main() {
         require(near(triangle.material.transmission, 0.7) &&
                     near(triangle.material.index_of_refraction, 1.4),
                 "transmission and IOR extensions must be imported");
+        require(triangle.transmission_texture == nullptr,
+                "transmission texture slot must retain a safe default when omitted");
         require(near(triangle.clearcoat_factor, 0.8) && near(triangle.clearcoat_roughness, 0.12),
                 "clearcoat extension factors must be imported");
         require(triangle.clearcoat_texture == nullptr &&

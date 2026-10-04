@@ -47,6 +47,7 @@ the reusable core and offline renderers are API-independent and headless.
   per-slot UV transforms and normal scale.
 - Sheen color (sRGB RGB) and roughness (linear alpha) textures with independent
   UV mappings.
+- Red-channel transmission textures layered over dielectric Fresnel/refraction.
 - RGBA textures with `OPAQUE`, cutoff `MASK` and stochastic `BLEND` traversal.
 - Correct glTF `doubleSided` handling and single-sided back-face culling.
 - External glTF image URIs, repeat/clamp/mirrored-repeat samplers and
@@ -82,6 +83,7 @@ possible.
 | Texture 10 | KHR texture transforms | [baseline](LabX/images/evolution_texture_stage10_baseline_128spp.png) / [transformed](LabX/images/evolution_texture_stage10_transformed_128spp.png) |
 | Clearcoat 11 | Factor, roughness and coat-normal textures | [baseline](LabX/images/evolution_clearcoat_stage11_baseline_128spp.png) / [textures](LabX/images/evolution_clearcoat_stage11_textures_128spp.png) |
 | Sheen 12 | Color and alpha-channel roughness textures | [baseline](LabX/images/evolution_sheen_stage12_baseline_128spp.png) / [textures](LabX/images/evolution_sheen_stage12_textures_128spp.png) |
+| Transmission 13 | Per-pixel dielectric transmission | [baseline](LabX/images/evolution_transmission_stage13_baseline_128spp.png) / [textures](LabX/images/evolution_transmission_stage13_textures_128spp.png) |
 
 See the complete [rendering evolution log](LabX/images/EVOLUTION.md) and
 [reviewed image gallery](LabX/images/README.md).
@@ -227,8 +229,7 @@ The renderer is already useful for deterministic PBR experiments, but full glTF
 and production rendering compatibility is not claimed. The next material stages
 are:
 
-1. Transmission texture variants not yet wired end-to-end.
-2. Specular, anisotropy, iridescence and volume/absorption extensions.
+1. Specular, anisotropy, iridescence and volume/absorption extensions.
 3. Emissive triangle sampling as mesh lights.
 4. Denoising after stable temporal buffers and motion validation.
 

@@ -37,7 +37,8 @@ LabX/
     `KHR_texture_transform` mappings.
 12. Clearcoat factor, roughness and normal textures with independent mappings.
 13. Sheen color and alpha-channel roughness textures with independent mappings.
-14. OptiX indexed geometry, recursive GGX, temporal reprojection and ReSTIR DI.
+14. Red-channel transmission textures over the rough dielectric path.
+15. OptiX indexed geometry, recursive GGX, temporal reprojection and ReSTIR DI.
 
 The reviewed progression is recorded in
 [`images/EVOLUTION.md`](images/EVOLUTION.md). Every comparison uses a new file
