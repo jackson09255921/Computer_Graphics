@@ -64,6 +64,7 @@ struct ImportedAssets {
     std::vector<TextureDescriptor> textures;
 };
 struct AreaLight { float3 center; float3 half_u; float3 half_v; float3 emission; };
+struct LightSet { AreaLight lights[3]; int count; };
 struct Camera { float3 origin; float3 target; float vertical_fov; };
 struct GpuEnvironment {
     const float3* pixels;
@@ -500,7 +501,7 @@ __device__ float3 sample_environment(const GpuEnvironment& environment, float3 d
 
 __device__ float3 radiance(Ray ray, const Sphere* spheres, int sphere_count,
                            const Triangle* triangles, const BvhNode* nodes, int node_count,
-                           const AreaLight& light, const GpuEnvironment& environment,
+                           const LightSet& lights, const GpuEnvironment& environment,
                            const GpuTextures& textures, Rng& rng) {
     float3 result = make_float3(0, 0, 0);
     float3 throughput = make_float3(1, 1, 1);
@@ -509,12 +510,23 @@ __device__ float3 radiance(Ray ray, const Sphere* spheres, int sphere_count,
     for (int depth = 0; depth < 6; ++depth) {
         Hit hit{};
         const bool hit_scene = intersect_scene(ray, spheres, sphere_count, triangles, nodes, node_count, hit);
-        float light_distance = 0.0f;
-        const bool hit_light = intersect_light(light, ray, light_distance);
+        float light_distance = kInfinity;
+        int hit_light_index = -1;
+        for (int index = 0; index < lights.count; ++index) {
+            float candidate_distance = 0.0f;
+            if (intersect_light(lights.lights[index], ray, candidate_distance) &&
+                candidate_distance < light_distance) {
+                light_distance = candidate_distance;
+                hit_light_index = index;
+            }
+        }
+        const bool hit_light = hit_light_index >= 0;
         if (hit_light && (!hit_scene || light_distance < hit.distance)) {
+            const AreaLight light = lights.lights[hit_light_index];
             float weight = 1.0f;
             if (previous_uses_mis)
-                weight = power_heuristic(previous_bsdf_pdf, area_light_pdf(light, ray, light_distance));
+                weight = power_heuristic(previous_bsdf_pdf,
+                    area_light_pdf(light, ray, light_distance) / static_cast<float>(lights.count));
             result = add(result, mul(mul(throughput, light.emission), weight));
             break;
         }
@@ -550,6 +562,8 @@ __device__ float3 radiance(Ray ray, const Sphere* spheres, int sphere_count,
         const float3 view_direction = mul(ray.direction, -1.0f);
         const bool non_transmissive_surface = hit.transmission <= 0.0f;
         if (non_transmissive_surface) {
+            const int light_index = min(static_cast<int>(rng.next() * lights.count), lights.count - 1);
+            const AreaLight light = lights.lights[light_index];
             const float3 light_point = add(light.center, add(mul(light.half_u, 2.0f * rng.next() - 1.0f),
                                                                mul(light.half_v, 2.0f * rng.next() - 1.0f)));
             const float3 offset = sub(light_point, hit.position);
@@ -565,7 +579,8 @@ __device__ float3 radiance(Ray ray, const Sphere* spheres, int sphere_count,
                 const bool blocked = intersect_scene(shadow, spheres, sphere_count, triangles, nodes,
                                                      node_count, blocker) && blocker.distance < distance - 1.0e-4f;
                 if (!blocked) {
-                    const float light_pdf = distance_squared / (light_cosine * light_area(light));
+                    const float light_pdf = distance_squared /
+                        (light_cosine * light_area(light) * static_cast<float>(lights.count));
                     const float3 brdf = evaluate_metallic_roughness(
                         hit.normal, view_direction, direction_to_light,
                         hit.albedo, hit.metallic, hit.roughness);
@@ -670,7 +685,7 @@ __device__ float3 radiance(Ray ray, const Sphere* spheres, int sphere_count,
 __global__ void render_tile(float3* tile, int tile_x, int tile_y, int tile_width, int tile_height,
                             int image_width, int image_height, int samples, std::uint32_t seed,
                             const Sphere* spheres, int sphere_count, const Triangle* triangles,
-                            const BvhNode* nodes, int node_count, AreaLight light,
+                            const BvhNode* nodes, int node_count, LightSet lights,
                             GpuEnvironment environment, GpuTextures textures, Camera camera) {
     const int local_x = static_cast<int>(blockIdx.x * blockDim.x + threadIdx.x);
     const int local_y = static_cast<int>(blockIdx.y * blockDim.y + threadIdx.y);
@@ -693,7 +708,7 @@ __global__ void render_tile(float3* tile, int tile_x, int tile_y, int tile_width
         const float3 direction = normalize3(add(forward, add(mul(right, (u - 0.5f) * viewport * aspect),
                                                                mul(up, (0.5f - v) * viewport))));
         color = add(color, radiance({origin, direction}, spheres, sphere_count,
-                                    triangles, nodes, node_count, light, environment, textures, rng));
+                                    triangles, nodes, node_count, lights, environment, textures, rng));
     }
     tile[local_y * tile_width + local_x] = mul(color, 1.0f / static_cast<float>(samples));
 }
@@ -1118,9 +1133,23 @@ std::vector<float3> render(int width, int height, int samples, std::uint32_t see
                            const ImportedAssets& imported = {}, bool show_demo_spheres = true,
                            const cg::environment::EnvironmentMap* environment_map = nullptr,
                            Camera camera = {make_float3(0.0f, 0.65f, 2.8f),
-                                            make_float3(0.0f, -0.05f, -4.0f), 48.0f}) {
-    const AreaLight light{make_float3(-0.8f, 4.5f, -3.5f), make_float3(1.5f, 0, 0),
-                          make_float3(0, 0, 1.0f), make_float3(10.0f, 8.0f, 5.5f)};
+                                            make_float3(0.0f, -0.05f, -4.0f), 48.0f},
+                           bool studio_lighting = false) {
+    LightSet lights{{
+        {make_float3(-0.8f, 4.5f, -3.5f), make_float3(1.5f, 0, 0),
+         make_float3(0, 0, 1.0f), make_float3(10.0f, 8.0f, 5.5f)},
+        {}, {}
+    }, 1};
+    if (studio_lighting) {
+        lights = {{
+            {make_float3(-3.2f, 3.8f, -1.8f), make_float3(1.2f, 0, 0.35f),
+             make_float3(0.15f, 0, 1.0f), make_float3(15.0f, 9.0f, 5.0f)},
+            {make_float3(3.5f, 2.1f, -2.5f), make_float3(0.8f, 0, -0.25f),
+             make_float3(-0.1f, 0, 0.8f), make_float3(3.0f, 5.0f, 9.0f)},
+            {make_float3(2.5f, 5.8f, -7.5f), make_float3(1.0f, 0, 0),
+             make_float3(0, 0.65f, 0.35f), make_float3(8.0f, 10.0f, 14.0f)}
+        }, 3};
+    }
     std::vector<Sphere> spheres;
     if (show_demo_spheres) {
         spheres = {
@@ -1211,7 +1240,7 @@ std::vector<float3> render(int width, int height, int samples, std::uint32_t see
                 render_tile<<<blocks, threads>>>(device_tile, tile_x, tile_y, tile_width, tile_height,
                                                   width, height, samples, seed, device_spheres,
                                                   static_cast<int>(spheres.size()), device_triangles,
-                                                  device_nodes, static_cast<int>(nodes.size()), light, environment,
+                                                  device_nodes, static_cast<int>(nodes.size()), lights, environment,
                                                   textures, camera);
                 check(cudaGetLastError(), "render tile launch");
                 check(cudaMemcpy(tile.data(), device_tile, tile_width * tile_height * sizeof(float3),
@@ -1400,6 +1429,7 @@ int main(int argc, char** argv) {
         const bool gltf_mode = argc > 1 && std::string(argv[1]) == "--gltf";
         const bool showcase_mode = argc > 1 && std::string(argv[1]) == "--showcase";
         const bool showcase_angle_mode = argc > 1 && std::string(argv[1]) == "--showcase-angle";
+        const bool showcase_studio_mode = argc > 1 && std::string(argv[1]) == "--showcase-studio";
         const bool scene_mode = argc > 1 && std::string(argv[1]) == "--scene";
         const bool hdr_mode = argc > 1 && std::string(argv[1]) == "--hdr";
         if (scene_mode) {
@@ -1417,14 +1447,14 @@ int main(int argc, char** argv) {
                 frame_imported_triangles(mesh.triangles, 1.3f, x, z);
                 append_imported(imported, std::move(mesh));
             }
-        } else if (gltf_mode || showcase_mode || showcase_angle_mode) {
+        } else if (gltf_mode || showcase_mode || showcase_angle_mode || showcase_studio_mode) {
             if (argc < 3) throw std::invalid_argument(
-                "usage: cuda_pathtracer --gltf|--showcase|--showcase-angle model.gltf [output.bmp] [spp] [environment.hdr]");
+                "usage: cuda_pathtracer --gltf|--showcase|--showcase-angle|--showcase-studio model.gltf [output.bmp] [spp] [environment.hdr]");
             imported = load_gltf_triangles(argv[2]);
-            if (showcase_mode || showcase_angle_mode) {
+            if (showcase_mode || showcase_angle_mode || showcase_studio_mode) {
                 frame_imported_triangles(imported.triangles, 3.8f, 0.0f, -4.5f, 1);
             }
-            if (showcase_angle_mode) {
+            if (showcase_angle_mode || showcase_studio_mode) {
                 camera = {make_float3(2.5f, 0.35f, 1.8f),
                           make_float3(0.0f, -0.15f, -4.35f), 43.0f};
             }
@@ -1446,8 +1476,9 @@ int main(int argc, char** argv) {
         }
         write_image(output, width, height,
                     render(width, height, samples, 0xC0FFEEu, imported,
-                           !gltf_mode && !showcase_mode && !showcase_angle_mode && !scene_mode,
-                           environment.get(), camera));
+                           !gltf_mode && !showcase_mode && !showcase_angle_mode &&
+                               !showcase_studio_mode && !scene_mode,
+                           environment.get(), camera, showcase_studio_mode));
         std::cout << "CUDA path traced " << width << 'x' << height << " at " << samples
                   << " spp with " << imported.triangles.size() << " imported triangles"
                   << (environment ? " and HDR environment" : "") << " to " << output << '\n';
