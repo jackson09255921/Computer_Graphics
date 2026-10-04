@@ -50,7 +50,7 @@ clipping. At 128 spp, the paired renders differ across 98,431 pixels with a
 
 | Stage | Commit | Controlled change | Result |
 | --- | --- | --- | --- |
-| 8 — Occlusion map | pending | Import the glTF occlusion texture/strength and apply it to environment plus later-bounce energy | [`baseline`](evolution_helmet_stage8_baseline_128spp.png) · [`occlusion`](evolution_helmet_stage8_occlusion_128spp.png) |
+| 8 — Occlusion map | `4b28a7f` | Import the glTF occlusion texture/strength and apply it to environment plus later-bounce energy | [`baseline`](evolution_helmet_stage8_baseline_128spp.png) · [`occlusion`](evolution_helmet_stage8_occlusion_128spp.png) |
 
 Both 640x360 images use the same close camera, three-light studio, 128 spp, and
 seed `0xC0FFEE`. Occlusion changes 45,111 pixels with a 0.359 channel MAE and a
