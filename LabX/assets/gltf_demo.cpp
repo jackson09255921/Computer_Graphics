@@ -36,12 +36,15 @@ int main(int argc, char** argv) {
                 return triangle.sheen_color_factor.x > 0.0 || triangle.sheen_color_factor.y > 0.0 ||
                        triangle.sheen_color_factor.z > 0.0;
             }));
+        const std::size_t occluded = static_cast<std::size_t>(std::count_if(
+            asset.triangles().begin(), asset.triangles().end(),
+            [](const cg::assets::GltfTriangle& triangle) { return triangle.occlusion_texture != nullptr; }));
         std::cout << "loaded " << asset.triangles().size() << " triangles (" << smooth
                   << " with vertex normals, " << textured << " with base-color textures, "
                   << normal_mapped << " with normal maps, " << pbr_mapped
                   << " with metallic-roughness maps, " << emissive_mapped
                   << " with emissive maps, " << clearcoated << " with clearcoat, " << sheen
-                  << " with sheen) from " << argv[1] << '\n';
+                  << " with sheen, " << occluded << " with occlusion maps) from " << argv[1] << '\n';
         return 0;
     } catch (const std::exception& error) {
         std::cerr << "glTF load failed: " << error.what() << '\n';

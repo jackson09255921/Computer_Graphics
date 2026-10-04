@@ -67,6 +67,14 @@ def main() -> int:
         publish(source, f"evolution_toycar_stage7_close_{label}_{args.gpu_spp}spp.png",
                 (640, 360), f"toycar-fabric-close-{label}")
 
+    helmet = samples / "DamagedHelmet" / "DamagedHelmet.glb"
+    for mode, label in (("--occlusion-baseline", "baseline"), ("--occlusion", "occlusion")):
+        source = artifacts / f"damaged_helmet_{label}_{args.gpu_spp}spp.ppm"
+        run([str(executable(gpu, "cuda_pathtracer", args.config)), mode,
+             str(helmet), str(source), str(args.gpu_spp)])
+        publish(source, f"evolution_helmet_stage8_{label}_{args.gpu_spp}spp.png",
+                (640, 360), f"damaged-helmet-{label}")
+
     models = ROOT / "LabX" / "data" / "legacy_converted" / "meshes"
     multi = artifacts / f"cuda_multi_asset_{args.gpu_spp}spp.ppm"
     run([str(executable(gpu, "cuda_pathtracer", args.config)), "--scene", str(multi), str(args.gpu_spp),

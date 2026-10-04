@@ -46,6 +46,17 @@ the car body, cloth perimeter, and primary folds occupy most of the frame withou
 clipping. At 128 spp, the paired renders differ across 98,431 pixels with a
 2.760 channel MAE and a maximum channel delta of 177.
 
+## DamagedHelmet: occlusion evolution
+
+| Stage | Commit | Controlled change | Result |
+| --- | --- | --- | --- |
+| 8 — Occlusion map | pending | Import the glTF occlusion texture/strength and apply it to environment plus later-bounce energy | [`baseline`](evolution_helmet_stage8_baseline_128spp.png) · [`occlusion`](evolution_helmet_stage8_occlusion_128spp.png) |
+
+Both 640x360 images use the same close camera, three-light studio, 128 spp, and
+seed `0xC0FFEE`. Occlusion changes 45,111 pixels with a 0.359 channel MAE and a
+maximum channel delta of 58; native-resolution review shows the intended subtle
+darkening in seams, panel gaps, and recessed parts rather than a global color shift.
+
 ## Rules for future stages
 
 1. Use a new descriptive filename; never replace a reviewed image.

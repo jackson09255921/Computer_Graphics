@@ -50,7 +50,7 @@ int main() {
     {"bufferView":1,"componentType":5123,"count":3,"type":"SCALAR"},
     {"bufferView":2,"componentType":5126,"count":3,"type":"VEC3"}
   ],
-  "materials":[{"emissiveFactor":[0.1,0.2,0.3],"extensions":{"KHR_materials_transmission":{"transmissionFactor":0.7},"KHR_materials_ior":{"ior":1.4},"KHR_materials_clearcoat":{"clearcoatFactor":0.8,"clearcoatRoughnessFactor":0.12},"KHR_materials_sheen":{"sheenColorFactor":[0.9,0.2,0.1],"sheenRoughnessFactor":0.45}},"pbrMetallicRoughness":{"baseColorFactor":[0.2,0.4,0.8,1],"metallicFactor":0.6,"roughnessFactor":0.25}}],
+  "materials":[{"doubleSided":true,"emissiveFactor":[0.1,0.2,0.3],"extensions":{"KHR_materials_transmission":{"transmissionFactor":0.7},"KHR_materials_ior":{"ior":1.4},"KHR_materials_clearcoat":{"clearcoatFactor":0.8,"clearcoatRoughnessFactor":0.12},"KHR_materials_sheen":{"sheenColorFactor":[0.9,0.2,0.1],"sheenRoughnessFactor":0.45}},"pbrMetallicRoughness":{"baseColorFactor":[0.2,0.4,0.8,1],"metallicFactor":0.6,"roughnessFactor":0.25}}],
   "meshes":[{"primitives":[{"attributes":{"POSITION":0,"NORMAL":2},"indices":1,"material":0}]}],
   "nodes":[{"mesh":0,"translation":[2,3,4],"scale":[2,2,2]}],
   "scenes":[{"nodes":[0]}],"scene":0
@@ -79,6 +79,9 @@ int main() {
                     near(triangle.sheen_color_factor.y, 0.2) &&
                     near(triangle.sheen_color_factor.z, 0.1) && near(triangle.sheen_roughness, 0.45),
                 "sheen extension factors must be imported");
+        require(triangle.occlusion_texture == nullptr && near(triangle.occlusion_strength, 1.0),
+                "missing occlusion texture must retain the neutral defaults");
+        require(triangle.double_sided, "double-sided material state must be imported");
         require(triangle.material_index == 0, "primitive material index must be retained for scene framing");
         require(triangle.has_normals && near(triangle.first_normal.z, 1.0) &&
                     near(triangle.second_normal.y, 1.0) && near(triangle.third_normal.x, 1.0),

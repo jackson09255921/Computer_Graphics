@@ -445,6 +445,7 @@ GltfAsset GltfAsset::load(const std::filesystem::path& path) {
             std::shared_ptr<const GltfTexture> metallic_roughness_texture;
             std::shared_ptr<const GltfTexture> emissive_texture;
             std::shared_ptr<const GltfTexture> clearcoat_texture;
+            std::shared_ptr<const GltfTexture> occlusion_texture;
             Color emissive_factor{};
             Color sheen_color_factor{};
             double sheen_roughness = 0.0;
@@ -452,6 +453,8 @@ GltfAsset GltfAsset::load(const std::filesystem::path& path) {
             double clearcoat_roughness = 0.0;
             double normal_scale = 1.0;
             int primitive_material_index = -1;
+            double occlusion_strength = 1.0;
+            bool double_sided = false;
             if (const Json* material_index = primitive.find("material")) {
                 const std::size_t index = integer(*material_index);
                 primitive_material_index = static_cast<int>(index);
@@ -470,6 +473,13 @@ GltfAsset GltfAsset::load(const std::filesystem::path& path) {
                 }
                 if (const Json* texture = material_source.find("emissiveTexture"))
                     emissive_texture = textures.at(member_integer(*texture, "index"));
+                if (const Json* texture = material_source.find("occlusionTexture")) {
+                    occlusion_texture = textures.at(member_integer(*texture, "index"));
+                    if (const Json* strength = texture->find("strength"))
+                        occlusion_strength = strength->number();
+                }
+                if (const Json* sided = material_source.find("doubleSided"))
+                    double_sided = std::get<bool>(sided->value);
                 if (const Json* factor = material_source.find("emissiveFactor"))
                     emissive_factor = {factor->array()[0].number(), factor->array()[1].number(),
                                        factor->array()[2].number()};
@@ -503,10 +513,10 @@ GltfAsset GltfAsset::load(const std::filesystem::path& path) {
                         vertex_uvs.empty() ? Vec2{} : vertex_uvs.at(element_indices[i + 1]),
                         vertex_uvs.empty() ? Vec2{} : vertex_uvs.at(element_indices[i + 2]),
                         base_color_texture, normal_texture, metallic_roughness_texture,
-                        emissive_texture, clearcoat_texture, emissive_factor,
+                        emissive_texture, clearcoat_texture, occlusion_texture, emissive_factor,
                         sheen_color_factor, sheen_roughness,
                         clearcoat_factor, clearcoat_roughness, normal_scale, material,
-                        primitive_material_index});
+                        primitive_material_index, occlusion_strength, double_sided});
                 } else {
                     const auto normal_or_face = [&](std::uint32_t vertex) {
                         const Vec3 transformed = transform_normal(world, vertex_normals.at(vertex));
@@ -519,10 +529,10 @@ GltfAsset GltfAsset::load(const std::filesystem::path& path) {
                         vertex_uvs.empty() ? Vec2{} : vertex_uvs.at(element_indices[i + 1]),
                         vertex_uvs.empty() ? Vec2{} : vertex_uvs.at(element_indices[i + 2]),
                         base_color_texture, normal_texture, metallic_roughness_texture,
-                        emissive_texture, clearcoat_texture, emissive_factor,
+                        emissive_texture, clearcoat_texture, occlusion_texture, emissive_factor,
                         sheen_color_factor, sheen_roughness,
                         clearcoat_factor, clearcoat_roughness, normal_scale, material,
-                        primitive_material_index});
+                        primitive_material_index, occlusion_strength, double_sided});
                 }
             }
         }

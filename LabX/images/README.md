@@ -48,6 +48,8 @@ visually inspected at native resolution after automated image validation.
 | ToyCar fabric sheen | [`evolution_toycar_stage6_fabric_sheen_128spp.png`](evolution_toycar_stage6_fabric_sheen_128spp.png) | KHR_materials_sheen color/roughness evaluated with Charlie distribution and Neubelt visibility |
 | ToyCar close fabric baseline | [`evolution_toycar_stage7_close_baseline_128spp.png`](evolution_toycar_stage7_close_baseline_128spp.png) | Tighter full-scene framing with the complete car and cloth silhouette retained |
 | ToyCar close fabric sheen | [`evolution_toycar_stage7_close_sheen_128spp.png`](evolution_toycar_stage7_close_sheen_128spp.png) | Same close camera with fabric sheen enabled for clearer fold and contour inspection |
+| DamagedHelmet occlusion baseline | [`evolution_helmet_stage8_baseline_128spp.png`](evolution_helmet_stage8_baseline_128spp.png) | Controlled close-camera reference with the occlusion map disabled |
+| DamagedHelmet occlusion | [`evolution_helmet_stage8_occlusion_128spp.png`](evolution_helmet_stage8_occlusion_128spp.png) | Occlusion texture and strength darken seams and recessed indirect-light regions |
 | WaterBottle | [`quality_gltf_waterbottle_128spp.png`](quality_gltf_waterbottle_128spp.png) | 4,510 textured PBR triangles at 128 spp |
 | CUDA multi-asset | [`quality_cuda_multi_asset_128spp.png`](quality_cuda_multi_asset_128spp.png) | Bunny and teapot, 11,288 triangles at 1280x720 and 128 spp |
 

@@ -58,6 +58,7 @@ struct Triangle {
     int material_index{-1};
     float clearcoat{0.0f}; float clearcoat_roughness{0.04f}; int clearcoat_texture_index{-1};
     float3 sheen_color{}; float sheen_roughness{0.0f};
+    int occlusion_texture_index{-1}; float occlusion_strength{1.0f}; bool double_sided{false};
 };
 struct TextureDescriptor { int offset; int width; int height; };
 struct ImportedAssets {
@@ -86,6 +87,7 @@ struct Hit {
     float3 emissive; int emissive_texture_index;
     float clearcoat; float clearcoat_roughness; int clearcoat_texture_index;
     float3 sheen_color; float sheen_roughness;
+    int occlusion_texture_index; float occlusion_strength;
 };
 
 struct Rng {
@@ -138,7 +140,7 @@ __device__ void intersect_triangles(const Ray& ray, const Triangle* triangles, c
                 const float3 edge2 = sub(triangle.third, triangle.first);
                 const float3 p = cross3(ray.direction, edge2);
                 const float determinant = dot3(edge1, p);
-                if (fabsf(determinant) < 1.0e-8f) continue;
+                if (triangle.double_sided ? fabsf(determinant) < 1.0e-8f : determinant <= 1.0e-8f) continue;
                 const float inverse = 1.0f / determinant;
                 const float3 offset = sub(ray.origin, triangle.first);
                 const float u = dot3(offset, p) * inverse;
@@ -180,6 +182,8 @@ __device__ void intersect_triangles(const Ray& ray, const Triangle* triangles, c
                 closest.clearcoat_texture_index = triangle.clearcoat_texture_index;
                 closest.sheen_color = triangle.sheen_color;
                 closest.sheen_roughness = triangle.sheen_roughness;
+                closest.occlusion_texture_index = triangle.occlusion_texture_index;
+                closest.occlusion_strength = triangle.occlusion_strength;
                 closest.found = true;
             }
         } else {
@@ -225,6 +229,8 @@ __device__ bool intersect_scene(const Ray& ray, const Sphere* spheres, int spher
         closest.clearcoat_texture_index = -1;
         closest.sheen_color = make_float3(0, 0, 0);
         closest.sheen_roughness = 0.0f;
+        closest.occlusion_texture_index = -1;
+        closest.occlusion_strength = 1.0f;
         closest.found = true;
     }
     intersect_triangles(ray, triangles, nodes, node_count, closest);
@@ -589,6 +595,11 @@ __device__ float3 radiance(Ray ray, const Sphere* spheres, int sphere_count,
         result = add(result, mul(throughput, hit.emissive));
         if (hit.clearcoat_texture_index >= 0)
             hit.clearcoat *= sample_texture(textures, hit.clearcoat_texture_index, hit.uv).x;
+        float surface_occlusion = 1.0f;
+        if (hit.occlusion_texture_index >= 0) {
+            const float sampled = sample_texture(textures, hit.occlusion_texture_index, hit.uv).x;
+            surface_occlusion = 1.0f + hit.occlusion_strength * (sampled - 1.0f);
+        }
         if (hit.metallic_roughness_texture_index >= 0) {
             const float3 packed = sample_texture(textures, hit.metallic_roughness_texture_index, hit.uv);
             hit.roughness = fminf(1.0f, fmaxf(0.04f, hit.roughness * packed.y));
@@ -662,10 +673,12 @@ __device__ float3 radiance(Ray ray, const Sphere* spheres, int sphere_count,
                             hit.clearcoat, hit.clearcoat_roughness);
                         const float weight = power_heuristic(environment_sample_pdf, bsdf_pdf);
                         result = add(result, mul(mul(mul(throughput, brdf), environment_value),
+                                                 surface_occlusion *
                                                  environment_cosine * weight / environment_sample_pdf));
                     }
                 }
             }
+            throughput = mul(throughput, surface_occlusion);
         }
         float3 direction;
         if (hit.transmission > 0.0f && rng.next() < hit.transmission) {
@@ -898,6 +911,7 @@ void validate_bvh_on_gpu() {
         {make_float3(-1, 0, -1), make_float3(1, 0, -1), make_float3(0, 0, 1),
          make_float3(1, 1, 1), 0.0f, 0.5f, 0.0f, 1.5f},
     };
+    triangles[0].double_sided = true;
     const std::vector<BvhNode> nodes = build_bvh(triangles);
     Triangle* device_triangles = nullptr;
     BvhNode* device_nodes = nullptr;
@@ -1056,6 +1070,7 @@ ImportedAssets load_gltf_triangles(const std::filesystem::path& path) {
             register_texture(triangle.metallic_roughness_texture, false);
         const int emissive_texture_index = register_texture(triangle.emissive_texture, true);
         const int clearcoat_texture_index = register_texture(triangle.clearcoat_texture, false);
+        const int occlusion_texture_index = register_texture(triangle.occlusion_texture, false);
         const float3 first = convert(triangle.first), second = convert(triangle.second), third = convert(triangle.third);
         const float2 uv0 = make_float2(static_cast<float>(triangle.first_uv.x), static_cast<float>(triangle.first_uv.y));
         const float2 uv1 = make_float2(static_cast<float>(triangle.second_uv.x), static_cast<float>(triangle.second_uv.y));
@@ -1085,7 +1100,8 @@ ImportedAssets load_gltf_triangles(const std::filesystem::path& path) {
                           triangle.material_index, static_cast<float>(triangle.clearcoat_factor),
                           fmaxf(0.04f, static_cast<float>(triangle.clearcoat_roughness)),
                           clearcoat_texture_index, convert(triangle.sheen_color_factor),
-                          static_cast<float>(triangle.sheen_roughness)});
+                          static_cast<float>(triangle.sheen_roughness), occlusion_texture_index,
+                          static_cast<float>(triangle.occlusion_strength), triangle.double_sided});
     }
     return result;
 }
@@ -1106,6 +1122,7 @@ void append_imported(ImportedAssets& destination, ImportedAssets source) {
             triangle.metallic_roughness_texture_index += texture_base;
         if (triangle.emissive_texture_index >= 0) triangle.emissive_texture_index += texture_base;
         if (triangle.clearcoat_texture_index >= 0) triangle.clearcoat_texture_index += texture_base;
+        if (triangle.occlusion_texture_index >= 0) triangle.occlusion_texture_index += texture_base;
         destination.triangles.push_back(triangle);
     }
 }
@@ -1500,6 +1517,8 @@ int main(int argc, char** argv) {
         const bool fabric_sheen_mode = argc > 1 && std::string(argv[1]) == "--fabric-sheen";
         const bool fabric_close_baseline_mode = argc > 1 && std::string(argv[1]) == "--fabric-close-baseline";
         const bool fabric_close_sheen_mode = argc > 1 && std::string(argv[1]) == "--fabric-close-sheen";
+        const bool occlusion_baseline_mode = argc > 1 && std::string(argv[1]) == "--occlusion-baseline";
+        const bool occlusion_mode = argc > 1 && std::string(argv[1]) == "--occlusion";
         const bool scene_mode = argc > 1 && std::string(argv[1]) == "--scene";
         const bool hdr_mode = argc > 1 && std::string(argv[1]) == "--hdr";
         if (scene_mode) {
@@ -1519,9 +1538,9 @@ int main(int argc, char** argv) {
             }
         } else if (gltf_mode || showcase_mode || showcase_angle_mode || showcase_studio_mode ||
                    fabric_baseline_mode || fabric_sheen_mode || fabric_close_baseline_mode ||
-                   fabric_close_sheen_mode) {
+                   fabric_close_sheen_mode || occlusion_baseline_mode || occlusion_mode) {
             if (argc < 3) throw std::invalid_argument(
-                "usage: cuda_pathtracer --gltf|--showcase|--showcase-angle|--showcase-studio|--fabric-baseline|--fabric-sheen|--fabric-close-baseline|--fabric-close-sheen model.gltf [output.bmp] [spp] [environment.hdr]");
+                "usage: cuda_pathtracer --gltf|--showcase|--showcase-angle|--showcase-studio|--fabric-baseline|--fabric-sheen|--fabric-close-baseline|--fabric-close-sheen|--occlusion-baseline|--occlusion model.gltf [output.bmp] [spp] [environment.hdr]");
             imported = load_gltf_triangles(argv[2]);
             if (showcase_mode || showcase_angle_mode || showcase_studio_mode) {
                 frame_imported_triangles(imported.triangles, 3.8f, 0.0f, -4.5f, 1);
@@ -1540,10 +1559,18 @@ int main(int argc, char** argv) {
                 camera = {make_float3(2.0f, 0.45f, 1.5f),
                           make_float3(0.0f, -0.05f, -4.4f), 41.0f};
             }
+            else if (occlusion_baseline_mode || occlusion_mode) {
+                frame_imported_triangles(imported.triangles, 3.8f, 0.0f, -4.5f);
+                camera = {make_float3(1.15f, 0.65f, 1.5f),
+                          make_float3(0.0f, 0.2f, -4.4f), 43.0f};
+            }
             else frame_imported_triangles(imported.triangles);
             if (showcase_studio_mode || fabric_baseline_mode || fabric_close_baseline_mode)
                 for (Triangle& triangle : imported.triangles)
                     triangle.sheen_color = make_float3(0, 0, 0);
+            if (occlusion_baseline_mode)
+                for (Triangle& triangle : imported.triangles)
+                    triangle.occlusion_texture_index = -1;
             output = argc > 3 ? argv[3] : "cuda_gltf_pathtracer.bmp";
             samples = argc > 4 ? std::stoi(argv[4]) : 64;
             if (argc > 5) environment = std::make_unique<cg::environment::EnvironmentMap>(
@@ -1564,10 +1591,12 @@ int main(int argc, char** argv) {
                            !gltf_mode && !showcase_mode && !showcase_angle_mode &&
                                !showcase_studio_mode && !fabric_baseline_mode &&
                                !fabric_sheen_mode && !fabric_close_baseline_mode &&
-                               !fabric_close_sheen_mode && !scene_mode,
+                               !fabric_close_sheen_mode && !occlusion_baseline_mode &&
+                               !occlusion_mode && !scene_mode,
                            environment.get(), camera,
                            showcase_studio_mode || fabric_baseline_mode || fabric_sheen_mode ||
-                               fabric_close_baseline_mode || fabric_close_sheen_mode));
+                               fabric_close_baseline_mode || fabric_close_sheen_mode ||
+                               occlusion_baseline_mode || occlusion_mode));
         std::cout << "CUDA path traced " << width << 'x' << height << " at " << samples
                   << " spp with " << imported.triangles.size() << " imported triangles"
                   << (environment ? " and HDR environment" : "") << " to " << output << '\n';

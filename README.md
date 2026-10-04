@@ -133,7 +133,9 @@ with a matching coat/base-specular/diffuse sampling mixture. The
 distribution with Neubelt visibility for broad, grazing-angle cloth highlights.
 The paired fabric modes preserve camera, lights, samples, and seed while
 disabling or enabling sheen, which makes the material change independently
-verifiable.
+verifiable. Occlusion textures modulate environment and later-bounce energy
+using the glTF strength factor, while `doubleSided` controls triangle back-face
+culling instead of treating every imported surface as two-sided.
 
 The optional `restir_di` CUDA target contains the 2020 ReSTIR DI reservoir
 foundation: weighted candidate streaming, temporal reuse, spatial reuse, and
