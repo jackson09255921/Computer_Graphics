@@ -340,6 +340,8 @@ experiment and its generated images:
 python tools/run_validation_pipeline.py --build-dir build-jenkins
 python tools/run_validation_pipeline.py --build-dir build-jenkins \
   --gpu-build-dir build-wsl-gpu
+python tools/run_quality_renders.py --cpu-build-dir build-jenkins \
+  --gpu-build-dir build-wsl-gpu
 ```
 
 The pipeline runs the CTest suite, Bezier, CPU ray/path tracing, all 60 animation
@@ -348,7 +350,9 @@ optional CUDA suite plus multi-asset render. It rejects missing, truncated,
 blank, or incorrectly sized images and writes both JSON and JUnit reports under
 `<build-dir>/validation-artifacts`. Validated representative renders are also
 published as `pipeline_*.png` files in `LabX/images`. Jenkins invokes this same
-entry point and archives the reports and render outputs.
+entry point and archives the reports and render outputs. The separate quality
+command publishes 512 spp CPU and 128 spp CUDA references; Jenkins exposes it
+through `RUN_QUALITY_RENDERS` when `RUN_GPU_TESTS` is also enabled.
 
 ## Current limitations
 

@@ -202,7 +202,8 @@ def main() -> int:
             [sys.executable, str(ROOT / "tools" / "validate_gltf_samples.py")]).strip()}
     stage("external-assets", external_assets)
     samples = ROOT / "LabX" / "data" / "external" / "gltf_samples"
-    for model in ("BoxTextured", "Duck", "DamagedHelmet"):
+    for model in ("Avocado", "BoomBox", "BoxTextured", "DamagedHelmet", "Duck",
+                  "Lantern", "ToyCar", "WaterBottle"):
         def load_gltf(model=model):
             text = run([str(executable(build, "gltf_demo", args.config)),
                         str(samples / model / f"{model}.glb")])

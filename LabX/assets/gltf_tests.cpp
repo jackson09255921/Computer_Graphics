@@ -84,6 +84,22 @@ int main() {
 
         {
             std::ofstream output(gltf_path, std::ios::trunc);
+            output << R"({"asset":{"version":"2.0"},"buffers":[{"uri":"gltf_test.bin","byteLength":78}],
+"bufferViews":[{"buffer":0,"byteLength":36},{"buffer":0,"byteOffset":36,"byteLength":6},
+{"buffer":0,"byteOffset":42,"byteLength":36}],
+"accessors":[{"bufferView":0,"componentType":5126,"count":3,"type":"VEC3"},
+{"bufferView":1,"componentType":5123,"count":3,"type":"SCALAR"},
+{"bufferView":2,"componentType":5126,"count":3,"type":"VEC3"}],
+"meshes":[{"primitives":[{"attributes":{"POSITION":0,"NORMAL":2},"indices":1}]}],
+"nodes":[{"mesh":0,"scale":[1,1,0]}]})";
+        }
+        const cg::assets::GltfAsset singular_asset = cg::assets::GltfAsset::load(gltf_path);
+        require(singular_asset.triangles().size() == 1 &&
+                    near(singular_asset.triangles()[0].first_normal.z, 1.0),
+                "singular node transforms must fall back to the geometric normal");
+
+        {
+            std::ofstream output(gltf_path, std::ios::trunc);
             output << R"({"asset":{"version":"2.0"},"buffers":[{"uri":"gltf_test.bin","byteLength":42}],
 "bufferViews":[{"buffer":0,"byteLength":36},{"buffer":0,"byteOffset":36,"byteLength":6}],
 "accessors":[{"bufferView":0,"componentType":5126,"count":3,"type":"VEC3"},

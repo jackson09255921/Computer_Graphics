@@ -4,6 +4,8 @@ pipeline {
     parameters {
         booleanParam(name: 'RUN_GPU_TESTS', defaultValue: false,
             description: 'Run the optional CUDA test on a Windows NVIDIA GPU agent')
+        booleanParam(name: 'RUN_QUALITY_RENDERS', defaultValue: false,
+            description: 'Publish slower 512 spp CPU and 128 spp CUDA gallery images (requires RUN_GPU_TESTS)')
     }
 
     options {
@@ -70,6 +72,21 @@ pipeline {
                         } else {
                             bat 'python tools\\run_validation_pipeline.py --build-dir build-jenkins'
                         }
+                    }
+                }
+            }
+        }
+
+        stage('Quality renders') {
+            when {
+                expression { return params.RUN_GPU_TESTS && params.RUN_QUALITY_RENDERS }
+            }
+            steps {
+                script {
+                    if (isUnix()) {
+                        sh 'python3 tools/run_quality_renders.py --cpu-build-dir build-jenkins --gpu-build-dir build-jenkins-cuda'
+                    } else {
+                        bat 'python tools\\run_quality_renders.py --cpu-build-dir build-jenkins --gpu-build-dir build-jenkins-cuda'
                     }
                 }
             }

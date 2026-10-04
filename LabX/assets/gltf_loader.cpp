@@ -216,7 +216,7 @@ Vec3 transform_normal(const Matrix& matrix, const Vec3& value) {
     const double c10 = a02*a21 - a01*a22, c11 = a00*a22 - a02*a20, c12 = a01*a20 - a00*a21;
     const double c20 = a01*a12 - a02*a11, c21 = a02*a10 - a00*a12, c22 = a00*a11 - a01*a10;
     const double determinant = a00*c00 + a01*c01 + a02*c02;
-    if (std::abs(determinant) <= kEpsilon) throw std::runtime_error("glTF node transform is singular");
+    if (std::abs(determinant) <= kEpsilon) return {};
     return normalized(Vec3{c00*value.x + c01*value.y + c02*value.z,
                            c10*value.x + c11*value.y + c12*value.z,
                            c20*value.x + c21*value.y + c22*value.z} / determinant);
@@ -457,6 +457,8 @@ GltfAsset GltfAsset::load(const std::filesystem::path& path) {
                 const Vec3 a = transform(world, vertices.at(element_indices[i]));
                 const Vec3 b = transform(world, vertices.at(element_indices[i + 1]));
                 const Vec3 c = transform(world, vertices.at(element_indices[i + 2]));
+                const Vec3 face_normal = normalized(cross(b - a, c - a));
+                if (length(face_normal) <= kEpsilon) continue;
                 if (vertex_normals.empty()) {
                     result.triangles_.push_back({a, b, c, {}, {}, {}, false,
                         vertex_uvs.empty() ? Vec2{} : vertex_uvs.at(element_indices[i]),
@@ -464,10 +466,13 @@ GltfAsset GltfAsset::load(const std::filesystem::path& path) {
                         vertex_uvs.empty() ? Vec2{} : vertex_uvs.at(element_indices[i + 2]),
                         base_color_texture, normal_texture, metallic_roughness_texture, normal_scale, material});
                 } else {
+                    const auto normal_or_face = [&](std::uint32_t vertex) {
+                        const Vec3 transformed = transform_normal(world, vertex_normals.at(vertex));
+                        return length(transformed) <= kEpsilon ? face_normal : transformed;
+                    };
                     result.triangles_.push_back({a, b, c,
-                        transform_normal(world, vertex_normals.at(element_indices[i])),
-                        transform_normal(world, vertex_normals.at(element_indices[i + 1])),
-                        transform_normal(world, vertex_normals.at(element_indices[i + 2])), true,
+                        normal_or_face(element_indices[i]), normal_or_face(element_indices[i + 1]),
+                        normal_or_face(element_indices[i + 2]), true,
                         vertex_uvs.empty() ? Vec2{} : vertex_uvs.at(element_indices[i]),
                         vertex_uvs.empty() ? Vec2{} : vertex_uvs.at(element_indices[i + 1]),
                         vertex_uvs.empty() ? Vec2{} : vertex_uvs.at(element_indices[i + 2]),
