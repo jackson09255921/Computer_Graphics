@@ -530,6 +530,8 @@ GltfAsset GltfAsset::load(const std::filesystem::path& path) {
             std::shared_ptr<const GltfTexture> clearcoat_texture;
             std::shared_ptr<const GltfTexture> clearcoat_roughness_texture;
             std::shared_ptr<const GltfTexture> clearcoat_normal_texture;
+            std::shared_ptr<const GltfTexture> sheen_color_texture;
+            std::shared_ptr<const GltfTexture> sheen_roughness_texture;
             std::shared_ptr<const GltfTexture> occlusion_texture;
             Color emissive_factor{};
             Color sheen_color_factor{};
@@ -547,6 +549,7 @@ GltfAsset GltfAsset::load(const std::filesystem::path& path) {
             GltfTextureMapping base_color_mapping, normal_mapping, metallic_roughness_mapping;
             GltfTextureMapping emissive_mapping, clearcoat_mapping, occlusion_mapping;
             GltfTextureMapping clearcoat_roughness_mapping, clearcoat_normal_mapping;
+            GltfTextureMapping sheen_color_mapping, sheen_roughness_mapping;
             if (const Json* material_index = primitive.find("material")) {
                 const std::size_t index = integer(*material_index);
                 primitive_material_index = static_cast<int>(index);
@@ -618,6 +621,14 @@ GltfAsset GltfAsset::load(const std::filesystem::path& path) {
                                                   color->array()[2].number()};
                         if (const Json* roughness = sheen->find("sheenRoughnessFactor"))
                             sheen_roughness = roughness->number();
+                        if (const Json* texture = sheen->find("sheenColorTexture")) {
+                            sheen_color_texture = textures.at(member_integer(*texture, "index"));
+                            sheen_color_mapping = texture_mapping(*texture);
+                        }
+                        if (const Json* texture = sheen->find("sheenRoughnessTexture")) {
+                            sheen_roughness_texture = textures.at(member_integer(*texture, "index"));
+                            sheen_roughness_mapping = texture_mapping(*texture);
+                        }
                     }
                 }
             }
@@ -634,7 +645,8 @@ GltfAsset GltfAsset::load(const std::filesystem::path& path) {
                         vertex_uvs.empty() ? Vec2{} : vertex_uvs.at(element_indices[i + 2]),
                         base_color_texture, normal_texture, metallic_roughness_texture,
                         emissive_texture, clearcoat_texture, clearcoat_roughness_texture,
-                        clearcoat_normal_texture, occlusion_texture, emissive_factor,
+                        clearcoat_normal_texture, sheen_color_texture, sheen_roughness_texture,
+                        occlusion_texture, emissive_factor,
                         sheen_color_factor, sheen_roughness,
                         clearcoat_factor, clearcoat_roughness, clearcoat_normal_scale,
                         normal_scale, material,
@@ -645,7 +657,8 @@ GltfAsset GltfAsset::load(const std::filesystem::path& path) {
                         vertex_uvs1.empty() ? Vec2{} : vertex_uvs1.at(element_indices[i + 2]),
                         base_color_mapping, normal_mapping, metallic_roughness_mapping,
                         emissive_mapping, clearcoat_mapping, clearcoat_roughness_mapping,
-                        clearcoat_normal_mapping, occlusion_mapping});
+                        clearcoat_normal_mapping, sheen_color_mapping, sheen_roughness_mapping,
+                        occlusion_mapping});
                 } else {
                     const auto normal_or_face = [&](std::uint32_t vertex) {
                         const Vec3 transformed = transform_normal(world, vertex_normals.at(vertex));
@@ -659,7 +672,8 @@ GltfAsset GltfAsset::load(const std::filesystem::path& path) {
                         vertex_uvs.empty() ? Vec2{} : vertex_uvs.at(element_indices[i + 2]),
                         base_color_texture, normal_texture, metallic_roughness_texture,
                         emissive_texture, clearcoat_texture, clearcoat_roughness_texture,
-                        clearcoat_normal_texture, occlusion_texture, emissive_factor,
+                        clearcoat_normal_texture, sheen_color_texture, sheen_roughness_texture,
+                        occlusion_texture, emissive_factor,
                         sheen_color_factor, sheen_roughness,
                         clearcoat_factor, clearcoat_roughness, clearcoat_normal_scale,
                         normal_scale, material,
@@ -670,7 +684,8 @@ GltfAsset GltfAsset::load(const std::filesystem::path& path) {
                         vertex_uvs1.empty() ? Vec2{} : vertex_uvs1.at(element_indices[i + 2]),
                         base_color_mapping, normal_mapping, metallic_roughness_mapping,
                         emissive_mapping, clearcoat_mapping, clearcoat_roughness_mapping,
-                        clearcoat_normal_mapping, occlusion_mapping});
+                        clearcoat_normal_mapping, sheen_color_mapping, sheen_roughness_mapping,
+                        occlusion_mapping});
                 }
             }
         }

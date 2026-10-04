@@ -44,6 +44,8 @@ struct GltfTriangle {
     std::shared_ptr<const GltfTexture> clearcoat_texture;
     std::shared_ptr<const GltfTexture> clearcoat_roughness_texture;
     std::shared_ptr<const GltfTexture> clearcoat_normal_texture;
+    std::shared_ptr<const GltfTexture> sheen_color_texture;
+    std::shared_ptr<const GltfTexture> sheen_roughness_texture;
     std::shared_ptr<const GltfTexture> occlusion_texture;
     Color emissive_factor{};
     Color sheen_color_factor{};
@@ -69,6 +71,8 @@ struct GltfTriangle {
     GltfTextureMapping clearcoat_mapping;
     GltfTextureMapping clearcoat_roughness_mapping;
     GltfTextureMapping clearcoat_normal_mapping;
+    GltfTextureMapping sheen_color_mapping;
+    GltfTextureMapping sheen_roughness_mapping;
     GltfTextureMapping occlusion_mapping;
 };
 

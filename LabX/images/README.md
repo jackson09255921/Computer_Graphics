@@ -56,6 +56,8 @@ visually inspected at native resolution after automated image validation.
 | Texture transforms | [`evolution_texture_stage10_transformed_128spp.png`](evolution_texture_stage10_transformed_128spp.png) | Independent texCoord, offset, rotation, scale and sampler wrapping reach the authored success markers |
 | Clearcoat texture baseline | [`evolution_clearcoat_stage11_baseline_128spp.png`](evolution_clearcoat_stage11_baseline_128spp.png) | Khronos ClearCoatTest with factor, roughness and coat-normal texture slots disabled |
 | Clearcoat textures | [`evolution_clearcoat_stage11_textures_128spp.png`](evolution_clearcoat_stage11_textures_128spp.png) | Red-channel coat weight, green-channel coat roughness and independent coat normals visibly alter the authored panels |
+| Sheen texture baseline | [`evolution_sheen_stage12_baseline_128spp.png`](evolution_sheen_stage12_baseline_128spp.png) | Khronos SheenTestGrid-derived validation asset with both sheen texture slots disabled |
+| Sheen textures | [`evolution_sheen_stage12_textures_128spp.png`](evolution_sheen_stage12_textures_128spp.png) | sRGB color checker and alpha-channel roughness gradient modulate the Charlie fabric lobe |
 | WaterBottle | [`quality_gltf_waterbottle_128spp.png`](quality_gltf_waterbottle_128spp.png) | 4,510 textured PBR triangles at 128 spp |
 | CUDA multi-asset | [`quality_cuda_multi_asset_128spp.png`](quality_cuda_multi_asset_128spp.png) | Bunny and teapot, 11,288 triangles at 1280x720 and 128 spp |
 

@@ -84,6 +84,9 @@ int main() {
                     near(triangle.sheen_color_factor.y, 0.2) &&
                     near(triangle.sheen_color_factor.z, 0.1) && near(triangle.sheen_roughness, 0.45),
                 "sheen extension factors must be imported");
+        require(triangle.sheen_color_texture == nullptr &&
+                    triangle.sheen_roughness_texture == nullptr,
+                "sheen texture slots must retain safe defaults when omitted");
         require(triangle.occlusion_texture == nullptr && near(triangle.occlusion_strength, 1.0),
                 "missing occlusion texture must retain the neutral defaults");
         require(triangle.double_sided, "double-sided material state must be imported");

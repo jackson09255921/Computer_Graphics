@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import json
 import pathlib
+import sys
 import time
 
 from run_validation_pipeline import ROOT, executable, publish_png, run, validate_image
@@ -100,6 +101,18 @@ def main() -> int:
              str(clearcoat_test), str(source), str(args.gpu_spp)])
         publish(source, f"evolution_clearcoat_stage11_{label}_{args.gpu_spp}spp.png",
                 (640, 360), f"clearcoat-texture-{label}")
+
+    sheen_source = samples / "SheenTestGrid" / "SheenTestGrid.glb"
+    sheen_test = ROOT / "LabX" / "data" / "generated" / "SheenTextureTest.glb"
+    run([sys.executable, str(ROOT / "tools" / "generate_sheen_texture_test.py"),
+         str(sheen_source), str(sheen_test)])
+    for mode, label in (("--sheen-texture-baseline", "baseline"),
+                        ("--sheen-texture", "textures")):
+        source = artifacts / f"sheen_texture_{label}_{args.gpu_spp}spp.ppm"
+        run([str(executable(gpu, "cuda_pathtracer", args.config)), mode,
+             str(sheen_test), str(source), str(args.gpu_spp)])
+        publish(source, f"evolution_sheen_stage12_{label}_{args.gpu_spp}spp.png",
+                (640, 360), f"sheen-texture-{label}")
 
     models = ROOT / "LabX" / "data" / "legacy_converted" / "meshes"
     multi = artifacts / f"cuda_multi_asset_{args.gpu_spp}spp.ppm"

@@ -29,3 +29,4 @@ Thumbs.db
 
 # Reproducible third-party validation assets (use the download script)
 /LabX/data/external/gltf_samples/**/*.glb
+/LabX/data/generated/*.glb

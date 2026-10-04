@@ -95,6 +95,20 @@ lights, 128 spp and seed `0xC0FFEE`. Enabling the three texture slots changes
 PNGs were read back and inspected at native resolution. The layered model follows
 the clearcoat lineage popularized by the 2012 Disney principled BRDF.
 
+## SheenTestGrid: texture-layer evolution
+
+| Stage | Commit | Controlled change | Result |
+| --- | --- | --- | --- |
+| 12 — Sheen textures | pending | Enable sRGB color (RGB) and linear roughness (alpha) textures | [`baseline`](evolution_sheen_stage12_baseline_128spp.png) · [`textures`](evolution_sheen_stage12_textures_128spp.png) |
+
+The reproducible validator derives from Khronos SheenTestGrid and injects two
+procedural PNGs without changing its 21,646 triangles or 4×4 factor grid. Both
+640x360 renders use the same camera, studio lights, 128 spp and seed
+`0xC0FFEE`. Enabling the texture slots changes 50,913 pixels with a 0.702
+channel MAE and maximum channel delta of 90. Both PNGs were read back and
+inspected at native resolution. The material lobe uses the Charlie microfiber
+distribution published by Conty and Kulla in 2017.
+
 ## Rules for future stages
 
 1. Use a new descriptive filename; never replace a reviewed image.

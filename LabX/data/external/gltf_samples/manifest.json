@@ -80,6 +80,14 @@
         "sha256":  "a79458c4b02d695187a952f23a63b8bf278e7bc3d316a3c2a314f2d6974181f1"
     },
     {
+        "name":  "SheenTestGrid",
+        "file":  "SheenTestGrid/SheenTestGrid.glb",
+        "source":  "https://github.com/KhronosGroup/glTF-Sample-Assets/tree/main/Models/SheenTestGrid",
+        "license":  "SheenTestGrid/README.md",
+        "bytes":  1841064,
+        "sha256":  "b3d82dde0ae6b93bef1a8085ec05540b21139f9917bfe771135c5aed9ba1c101"
+    },
+    {
         "name":  "ToyCar",
         "file":  "ToyCar/ToyCar.glb",
         "source":  "https://github.com/KhronosGroup/glTF-Sample-Assets/tree/main/Models/ToyCar",

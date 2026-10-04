@@ -13,6 +13,7 @@ $models = @(
     "DamagedHelmet",
     "Duck",
     "Lantern",
+    "SheenTestGrid",
     "ToyCar",
     "WaterBottle"
 )
