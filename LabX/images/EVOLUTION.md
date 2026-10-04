@@ -81,6 +81,20 @@ combined mapping errors. Both 640x360 renders use the same camera, studio lights
 16.287 channel MAE and maximum channel delta of 202. Native review confirms the
 three U/V/UV success panels and all green arrow targets.
 
+## ClearCoatTest: layered texture evolution
+
+| Stage | Commit | Controlled change | Result |
+| --- | --- | --- | --- |
+| 11 — Clearcoat textures | pending | Enable factor (R), roughness (G), and independent coat-normal textures | [`baseline`](evolution_clearcoat_stage11_baseline_128spp.png) · [`textures`](evolution_clearcoat_stage11_textures_128spp.png) |
+
+The official Khronos ClearCoatTest contains 37,116 triangles and five labelled
+rows for partial coating, roughness variation, base normals, shared normals and
+independent coat normals. Both 640x360 renders use the same camera, studio
+lights, 128 spp and seed `0xC0FFEE`. Enabling the three texture slots changes
+19,676 pixels with a 0.249 channel MAE and maximum channel delta of 135. Both
+PNGs were read back and inspected at native resolution. The layered model follows
+the clearcoat lineage popularized by the 2012 Disney principled BRDF.
+
 ## Rules for future stages
 
 1. Use a new descriptive filename; never replace a reviewed image.

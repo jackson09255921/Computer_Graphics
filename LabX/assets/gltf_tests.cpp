@@ -75,6 +75,11 @@ int main() {
                 "transmission and IOR extensions must be imported");
         require(near(triangle.clearcoat_factor, 0.8) && near(triangle.clearcoat_roughness, 0.12),
                 "clearcoat extension factors must be imported");
+        require(triangle.clearcoat_texture == nullptr &&
+                    triangle.clearcoat_roughness_texture == nullptr &&
+                    triangle.clearcoat_normal_texture == nullptr &&
+                    near(triangle.clearcoat_normal_scale, 1.0),
+                "clearcoat texture slots must retain safe defaults when omitted");
         require(near(triangle.sheen_color_factor.x, 0.9) &&
                     near(triangle.sheen_color_factor.y, 0.2) &&
                     near(triangle.sheen_color_factor.z, 0.1) && near(triangle.sheen_roughness, 0.45),

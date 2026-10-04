@@ -92,6 +92,15 @@ def main() -> int:
         publish(source, f"evolution_texture_stage10_{label}_{args.gpu_spp}spp.png",
                 (640, 360), f"texture-transform-{label}")
 
+    clearcoat_test = samples / "ClearCoatTest" / "ClearCoatTest.glb"
+    for mode, label in (("--clearcoat-texture-baseline", "baseline"),
+                        ("--clearcoat-texture", "textures")):
+        source = artifacts / f"clearcoat_texture_{label}_{args.gpu_spp}spp.ppm"
+        run([str(executable(gpu, "cuda_pathtracer", args.config)), mode,
+             str(clearcoat_test), str(source), str(args.gpu_spp)])
+        publish(source, f"evolution_clearcoat_stage11_{label}_{args.gpu_spp}spp.png",
+                (640, 360), f"clearcoat-texture-{label}")
+
     models = ROOT / "LabX" / "data" / "legacy_converted" / "meshes"
     multi = artifacts / f"cuda_multi_asset_{args.gpu_spp}spp.ppm"
     run([str(executable(gpu, "cuda_pathtracer", args.config)), "--scene", str(multi), str(args.gpu_spp),

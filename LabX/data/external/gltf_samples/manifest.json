@@ -48,6 +48,14 @@
         "sha256":  "b510eca2e2ef33f62f9ed57d6e7ce2d10ebb2bdebc4a8e59d347719ba81abdf4"
     },
     {
+        "name":  "ClearCoatTest",
+        "file":  "ClearCoatTest/ClearCoatTest.glb",
+        "source":  "https://github.com/KhronosGroup/glTF-Sample-Assets/tree/main/Models/ClearCoatTest",
+        "license":  "ClearCoatTest/README.md",
+        "bytes":  258048,
+        "sha256":  "c3a1cbe318cd043b937130af4eb83ec2ea0b03613387b1b7d769dfab4ac15948"
+    },
+    {
         "name":  "DamagedHelmet",
         "file":  "DamagedHelmet/DamagedHelmet.glb",
         "source":  "https://github.com/KhronosGroup/glTF-Sample-Assets/tree/main/Models/DamagedHelmet",

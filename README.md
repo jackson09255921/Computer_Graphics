@@ -43,6 +43,8 @@ the reusable core and offline renderers are API-independent and headless.
 - `KHR_materials_transmission`, `KHR_materials_ior`, `KHR_materials_clearcoat` and
   `KHR_materials_sheen`.
 - Energy-compensated clearcoat and Charlie/Neubelt fabric sheen.
+- Clearcoat factor (R), roughness (G), and independent normal textures with
+  per-slot UV transforms and normal scale.
 - RGBA textures with `OPAQUE`, cutoff `MASK` and stochastic `BLEND` traversal.
 - Correct glTF `doubleSided` handling and single-sided back-face culling.
 - External glTF image URIs, repeat/clamp/mirrored-repeat samplers and
@@ -76,6 +78,7 @@ possible.
 | Helmet 8 | Occlusion map | [baseline](LabX/images/evolution_helmet_stage8_baseline_128spp.png) / [occlusion](LabX/images/evolution_helmet_stage8_occlusion_128spp.png) |
 | Alpha 9 | MASK and BLEND | [opaque](LabX/images/evolution_alpha_stage9_opaque_128spp.png) / [alpha](LabX/images/evolution_alpha_stage9_alpha_128spp.png) |
 | Texture 10 | KHR texture transforms | [baseline](LabX/images/evolution_texture_stage10_baseline_128spp.png) / [transformed](LabX/images/evolution_texture_stage10_transformed_128spp.png) |
+| Clearcoat 11 | Factor, roughness and coat-normal textures | [baseline](LabX/images/evolution_clearcoat_stage11_baseline_128spp.png) / [textures](LabX/images/evolution_clearcoat_stage11_textures_128spp.png) |
 
 See the complete [rendering evolution log](LabX/images/EVOLUTION.md) and
 [reviewed image gallery](LabX/images/README.md).
@@ -221,7 +224,7 @@ The renderer is already useful for deterministic PBR experiments, but full glTF
 and production rendering compatibility is not claimed. The next material stages
 are:
 
-1. Clearcoat, sheen and transmission texture variants not yet wired end-to-end.
+1. Sheen and transmission texture variants not yet wired end-to-end.
 2. Specular, anisotropy, iridescence and volume/absorption extensions.
 3. Emissive triangle sampling as mesh lights.
 4. Denoising after stable temporal buffers and motion validation.

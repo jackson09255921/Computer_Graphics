@@ -58,13 +58,16 @@ struct Triangle {
     float3 emissive; int emissive_texture_index{-1};
     int material_index{-1};
     float clearcoat{0.0f}; float clearcoat_roughness{0.04f}; int clearcoat_texture_index{-1};
+    int clearcoat_roughness_texture_index{-1}; int clearcoat_normal_texture_index{-1};
+    float clearcoat_normal_scale{1.0f};
     float3 sheen_color{}; float sheen_roughness{0.0f};
     int occlusion_texture_index{-1}; float occlusion_strength{1.0f}; bool double_sided{false};
     int alpha_mode{0}; float alpha_cutoff{0.5f}; float alpha_factor{1.0f};
     float2 first_uv1{}; float2 second_uv1{}; float2 third_uv1{};
     UvMapping base_color_mapping{}; UvMapping normal_mapping{};
     UvMapping metallic_roughness_mapping{}; UvMapping emissive_mapping{};
-    UvMapping clearcoat_mapping{}; UvMapping occlusion_mapping{};
+    UvMapping clearcoat_mapping{}; UvMapping clearcoat_roughness_mapping{};
+    UvMapping clearcoat_normal_mapping{}; UvMapping occlusion_mapping{};
 };
 struct TextureDescriptor { int offset; int width; int height; int wrap_s; int wrap_t; };
 struct ImportedAssets {
@@ -92,10 +95,13 @@ struct Hit {
     int metallic_roughness_texture_index;
     float3 emissive; int emissive_texture_index;
     float clearcoat; float clearcoat_roughness; int clearcoat_texture_index;
+    int clearcoat_roughness_texture_index; int clearcoat_normal_texture_index;
+    float clearcoat_normal_scale; float3 clearcoat_normal;
     float3 sheen_color; float sheen_roughness;
     int occlusion_texture_index; float occlusion_strength;
     float2 base_color_uv; float2 normal_uv; float2 metallic_roughness_uv;
-    float2 emissive_uv; float2 clearcoat_uv; float2 occlusion_uv;
+    float2 emissive_uv; float2 clearcoat_uv; float2 clearcoat_roughness_uv;
+    float2 clearcoat_normal_uv; float2 occlusion_uv;
 };
 
 struct Rng {
@@ -214,6 +220,8 @@ __device__ void intersect_triangles(const Ray& ray, const Triangle* triangles, c
                 closest.metallic_roughness_uv = mapped_uv(closest.uv, uv1, triangle.metallic_roughness_mapping);
                 closest.emissive_uv = mapped_uv(closest.uv, uv1, triangle.emissive_mapping);
                 closest.clearcoat_uv = mapped_uv(closest.uv, uv1, triangle.clearcoat_mapping);
+                closest.clearcoat_roughness_uv = mapped_uv(closest.uv, uv1, triangle.clearcoat_roughness_mapping);
+                closest.clearcoat_normal_uv = mapped_uv(closest.uv, uv1, triangle.clearcoat_normal_mapping);
                 closest.occlusion_uv = mapped_uv(closest.uv, uv1, triangle.occlusion_mapping);
                 closest.texture_index = triangle.texture_index;
                 closest.tangent = triangle.tangent;
@@ -226,6 +234,9 @@ __device__ void intersect_triangles(const Ray& ray, const Triangle* triangles, c
                 closest.clearcoat = triangle.clearcoat;
                 closest.clearcoat_roughness = triangle.clearcoat_roughness;
                 closest.clearcoat_texture_index = triangle.clearcoat_texture_index;
+                closest.clearcoat_roughness_texture_index = triangle.clearcoat_roughness_texture_index;
+                closest.clearcoat_normal_texture_index = triangle.clearcoat_normal_texture_index;
+                closest.clearcoat_normal_scale = triangle.clearcoat_normal_scale;
                 closest.sheen_color = triangle.sheen_color;
                 closest.sheen_roughness = triangle.sheen_roughness;
                 closest.occlusion_texture_index = triangle.occlusion_texture_index;
@@ -273,6 +284,9 @@ __device__ bool intersect_scene(const Ray& ray, const Sphere* spheres, int spher
         closest.emissive_texture_index = -1;
         closest.clearcoat = 0.0f;
         closest.clearcoat_texture_index = -1;
+        closest.clearcoat_roughness_texture_index = -1;
+        closest.clearcoat_normal_texture_index = -1;
+        closest.clearcoat_normal_scale = 1.0f;
         closest.sheen_color = make_float3(0, 0, 0);
         closest.sheen_roughness = 0.0f;
         closest.occlusion_texture_index = -1;
@@ -392,7 +406,7 @@ __device__ float clearcoat_probability(float clearcoat) {
     return 0.25f * fminf(1.0f, fmaxf(0.0f, clearcoat));
 }
 
-__device__ float3 evaluate_metallic_roughness(float3 normal, float3 view, float3 light,
+__device__ float3 evaluate_metallic_roughness(float3 normal, float3 coat_normal, float3 view, float3 light,
                                                float3 base_color, float metallic, float roughness,
                                                float clearcoat = 0.0f, float clearcoat_roughness = 0.04f,
                                                float3 sheen_color = {}, float sheen_roughness = 0.0f) {
@@ -426,22 +440,24 @@ __device__ float3 evaluate_metallic_roughness(float3 normal, float3 view, float3
     const float coat = fminf(1.0f, fmaxf(0.0f, clearcoat));
     if (coat <= 0.0f) return base;
     const float3 coat_fresnel = fresnel_schlick(v_dot_h, make_float3(0.04f, 0.04f, 0.04f));
+    const float coat_n_dot_v = fmaxf(0.0f, dot3(coat_normal, view));
+    const float coat_n_dot_l = fmaxf(0.0f, dot3(coat_normal, light));
     const float coat_distribution = ggx_distribution(
-        fmaxf(0.0f, dot3(normal, half_vector)), clearcoat_roughness);
-    const float coat_geometry = smith_schlick(n_dot_v, clearcoat_roughness) *
-                                smith_schlick(n_dot_l, clearcoat_roughness);
+        fmaxf(0.0f, dot3(coat_normal, half_vector)), clearcoat_roughness);
+    const float coat_geometry = smith_schlick(coat_n_dot_v, clearcoat_roughness) *
+                                smith_schlick(coat_n_dot_l, clearcoat_roughness);
     const float3 coat_specular = mul(coat_fresnel, coat * coat_distribution * coat_geometry /
-        fmaxf(4.0f * n_dot_v * n_dot_l, 1.0e-8f));
+        fmaxf(4.0f * coat_n_dot_v * coat_n_dot_l, 1.0e-8f));
     return add(mul(base, 1.0f - coat * coat_fresnel.x), coat_specular);
 }
 
-__device__ float metallic_roughness_pdf(float3 normal, float3 view, float3 light,
+__device__ float metallic_roughness_pdf(float3 normal, float3 coat_normal, float3 view, float3 light,
                                          float metallic, float roughness,
                                          float clearcoat = 0.0f, float clearcoat_roughness = 0.04f) {
     const float coat = clearcoat_probability(clearcoat);
     const float base_specular = (1.0f - coat) * specular_probability(metallic);
     const float diffuse = 1.0f - coat - base_specular;
-    return coat * ggx_reflection_pdf(normal, view, light, clearcoat_roughness) +
+    return coat * ggx_reflection_pdf(coat_normal, view, light, clearcoat_roughness) +
            base_specular * ggx_reflection_pdf(normal, view, light, roughness) +
            diffuse * fmaxf(0.0f, dot3(normal, light)) / kPi;
 }
@@ -660,6 +676,11 @@ __device__ float3 radiance(Ray ray, const Sphere* spheres, int sphere_count,
         result = add(result, mul(throughput, hit.emissive));
         if (hit.clearcoat_texture_index >= 0)
             hit.clearcoat *= sample_texture(textures, hit.clearcoat_texture_index, hit.clearcoat_uv).x;
+        if (hit.clearcoat_roughness_texture_index >= 0) {
+            const float sampled = sample_texture(textures, hit.clearcoat_roughness_texture_index,
+                                                 hit.clearcoat_roughness_uv).y;
+            hit.clearcoat_roughness = fminf(1.0f, fmaxf(0.04f, hit.clearcoat_roughness * sampled));
+        }
         float surface_occlusion = 1.0f;
         if (hit.occlusion_texture_index >= 0) {
             const float sampled = sample_texture(textures, hit.occlusion_texture_index, hit.occlusion_uv).x;
@@ -683,6 +704,21 @@ __device__ float3 radiance(Ray ray, const Sphere* spheres, int sphere_count,
                                                       mul(bitangent, tangent_normal.y)),
                                                   mul(hit.normal, tangent_normal.z)));
             hit.normal = dot3(mapped, ray.direction) < 0.0f ? mapped : mul(mapped, -1.0f);
+        }
+        hit.clearcoat_normal = hit.normal;
+        if (hit.clearcoat_normal_texture_index >= 0) {
+            const float3 encoded = sample_texture(textures, hit.clearcoat_normal_texture_index,
+                                                  hit.clearcoat_normal_uv);
+            const float3 tangent_normal = normalize3(make_float3(
+                (encoded.x * 2.0f - 1.0f) * hit.clearcoat_normal_scale,
+                (encoded.y * 2.0f - 1.0f) * hit.clearcoat_normal_scale,
+                encoded.z * 2.0f - 1.0f));
+            const float3 tangent = normalize3(sub(hit.tangent, mul(hit.normal, dot3(hit.normal, hit.tangent))));
+            const float3 bitangent = mul(cross3(hit.normal, tangent), hit.tangent_handedness);
+            const float3 mapped = normalize3(add(add(mul(tangent, tangent_normal.x),
+                                                      mul(bitangent, tangent_normal.y)),
+                                                  mul(hit.normal, tangent_normal.z)));
+            hit.clearcoat_normal = dot3(mapped, ray.direction) < 0.0f ? mapped : mul(mapped, -1.0f);
         }
         const float3 view_direction = mul(ray.direction, -1.0f);
         const bool non_transmissive_surface = hit.transmission <= 0.0f;
@@ -708,11 +744,11 @@ __device__ float3 radiance(Ray ray, const Sphere* spheres, int sphere_count,
                     const float light_pdf = distance_squared /
                         (light_cosine * light_area(light) * static_cast<float>(lights.count));
                     const float3 brdf = evaluate_metallic_roughness(
-                        hit.normal, view_direction, direction_to_light,
+                        hit.normal, hit.clearcoat_normal, view_direction, direction_to_light,
                         hit.albedo, hit.metallic, hit.roughness,
                         hit.clearcoat, hit.clearcoat_roughness, hit.sheen_color, hit.sheen_roughness);
                     const float bsdf_pdf = metallic_roughness_pdf(
-                        hit.normal, view_direction, direction_to_light, hit.metallic, hit.roughness,
+                        hit.normal, hit.clearcoat_normal, view_direction, direction_to_light, hit.metallic, hit.roughness,
                         hit.clearcoat, hit.clearcoat_roughness);
                     const float weight = power_heuristic(light_pdf, bsdf_pdf);
                     result = add(result, mul(mul(mul(throughput, brdf), light.emission),
@@ -732,11 +768,11 @@ __device__ float3 radiance(Ray ray, const Sphere* spheres, int sphere_count,
                                                          node_count, textures, blocker);
                     if (!blocked) {
                         const float3 brdf = evaluate_metallic_roughness(
-                            hit.normal, view_direction, environment_direction,
+                            hit.normal, hit.clearcoat_normal, view_direction, environment_direction,
                             hit.albedo, hit.metallic, hit.roughness,
                             hit.clearcoat, hit.clearcoat_roughness, hit.sheen_color, hit.sheen_roughness);
                         const float bsdf_pdf = metallic_roughness_pdf(
-                            hit.normal, view_direction, environment_direction, hit.metallic, hit.roughness,
+                            hit.normal, hit.clearcoat_normal, view_direction, environment_direction, hit.metallic, hit.roughness,
                             hit.clearcoat, hit.clearcoat_roughness);
                         const float weight = power_heuristic(environment_sample_pdf, bsdf_pdf);
                         result = add(result, mul(mul(mul(throughput, brdf), environment_value),
@@ -792,7 +828,7 @@ __device__ float3 radiance(Ray ray, const Sphere* spheres, int sphere_count,
             const float base_specular_probability =
                 coat_probability + (1.0f - coat_probability) * specular_probability(hit.metallic);
             if (choice < coat_probability) {
-                const float3 microfacet = sample_ggx_normal(hit.normal, hit.clearcoat_roughness, rng);
+                const float3 microfacet = sample_ggx_normal(hit.clearcoat_normal, hit.clearcoat_roughness, rng);
                 direction = normalize3(reflect3(ray.direction, microfacet));
             } else if (choice < base_specular_probability) {
                 const float3 microfacet = sample_ggx_normal(hit.normal, hit.roughness, rng);
@@ -802,11 +838,11 @@ __device__ float3 radiance(Ray ray, const Sphere* spheres, int sphere_count,
             }
             const float cosine = fmaxf(0.0f, dot3(hit.normal, direction));
             const float pdf = metallic_roughness_pdf(
-                hit.normal, view_direction, direction, hit.metallic, hit.roughness,
+                hit.normal, hit.clearcoat_normal, view_direction, direction, hit.metallic, hit.roughness,
                 hit.clearcoat, hit.clearcoat_roughness);
             if (pdf <= 0.0f || cosine <= 0.0f) break;
             const float3 brdf = evaluate_metallic_roughness(
-                hit.normal, view_direction, direction, hit.albedo, hit.metallic, hit.roughness,
+                hit.normal, hit.clearcoat_normal, view_direction, direction, hit.albedo, hit.metallic, hit.roughness,
                 hit.clearcoat, hit.clearcoat_roughness, hit.sheen_color, hit.sheen_roughness);
             throughput = mul(throughput, mul(brdf, cosine / pdf));
             previous_bsdf_pdf = pdf;
@@ -1147,6 +1183,9 @@ ImportedAssets load_gltf_triangles(const std::filesystem::path& path) {
             register_texture(triangle.metallic_roughness_texture, false);
         const int emissive_texture_index = register_texture(triangle.emissive_texture, true);
         const int clearcoat_texture_index = register_texture(triangle.clearcoat_texture, false);
+        const int clearcoat_roughness_texture_index =
+            register_texture(triangle.clearcoat_roughness_texture, false);
+        const int clearcoat_normal_texture_index = register_texture(triangle.clearcoat_normal_texture, false);
         const int occlusion_texture_index = register_texture(triangle.occlusion_texture, false);
         const float3 first = convert(triangle.first), second = convert(triangle.second), third = convert(triangle.third);
         const float2 uv0 = make_float2(static_cast<float>(triangle.first_uv.x), static_cast<float>(triangle.first_uv.y));
@@ -1186,7 +1225,9 @@ ImportedAssets load_gltf_triangles(const std::filesystem::path& path) {
                           convert(triangle.emissive_factor), emissive_texture_index,
                           triangle.material_index, static_cast<float>(triangle.clearcoat_factor),
                           fmaxf(0.04f, static_cast<float>(triangle.clearcoat_roughness)),
-                          clearcoat_texture_index, convert(triangle.sheen_color_factor),
+                          clearcoat_texture_index, clearcoat_roughness_texture_index,
+                          clearcoat_normal_texture_index, static_cast<float>(triangle.clearcoat_normal_scale),
+                          convert(triangle.sheen_color_factor),
                           static_cast<float>(triangle.sheen_roughness), occlusion_texture_index,
                           static_cast<float>(triangle.occlusion_strength), triangle.double_sided,
                           triangle.alpha_mode, static_cast<float>(triangle.alpha_cutoff),
@@ -1195,6 +1236,8 @@ ImportedAssets load_gltf_triangles(const std::filesystem::path& path) {
                           convert_mapping(triangle.metallic_roughness_mapping),
                           convert_mapping(triangle.emissive_mapping),
                           convert_mapping(triangle.clearcoat_mapping),
+                          convert_mapping(triangle.clearcoat_roughness_mapping),
+                          convert_mapping(triangle.clearcoat_normal_mapping),
                           convert_mapping(triangle.occlusion_mapping)});
     }
     return result;
@@ -1216,6 +1259,10 @@ void append_imported(ImportedAssets& destination, ImportedAssets source) {
             triangle.metallic_roughness_texture_index += texture_base;
         if (triangle.emissive_texture_index >= 0) triangle.emissive_texture_index += texture_base;
         if (triangle.clearcoat_texture_index >= 0) triangle.clearcoat_texture_index += texture_base;
+        if (triangle.clearcoat_roughness_texture_index >= 0)
+            triangle.clearcoat_roughness_texture_index += texture_base;
+        if (triangle.clearcoat_normal_texture_index >= 0)
+            triangle.clearcoat_normal_texture_index += texture_base;
         if (triangle.occlusion_texture_index >= 0) triangle.occlusion_texture_index += texture_base;
         destination.triangles.push_back(triangle);
     }
@@ -1617,6 +1664,8 @@ int main(int argc, char** argv) {
         const bool alpha_mode = argc > 1 && std::string(argv[1]) == "--alpha";
         const bool texture_transform_baseline_mode = argc > 1 && std::string(argv[1]) == "--texture-transform-baseline";
         const bool texture_transform_mode = argc > 1 && std::string(argv[1]) == "--texture-transform";
+        const bool clearcoat_texture_baseline_mode = argc > 1 && std::string(argv[1]) == "--clearcoat-texture-baseline";
+        const bool clearcoat_texture_mode = argc > 1 && std::string(argv[1]) == "--clearcoat-texture";
         const bool scene_mode = argc > 1 && std::string(argv[1]) == "--scene";
         const bool hdr_mode = argc > 1 && std::string(argv[1]) == "--hdr";
         if (scene_mode) {
@@ -1638,7 +1687,7 @@ int main(int argc, char** argv) {
                    fabric_baseline_mode || fabric_sheen_mode || fabric_close_baseline_mode ||
                    fabric_close_sheen_mode || occlusion_baseline_mode || occlusion_mode ||
                    alpha_baseline_mode || alpha_mode || texture_transform_baseline_mode ||
-                   texture_transform_mode) {
+                   texture_transform_mode || clearcoat_texture_baseline_mode || clearcoat_texture_mode) {
             if (argc < 3) throw std::invalid_argument(
                 "usage: cuda_pathtracer --gltf|--showcase|--showcase-angle|--showcase-studio|--fabric-baseline|--fabric-sheen|--fabric-close-baseline|--fabric-close-sheen|--occlusion-baseline|--occlusion|--alpha-baseline|--alpha|--texture-transform-baseline|--texture-transform model.gltf [output.bmp] [spp] [environment.hdr]");
             imported = load_gltf_triangles(argv[2]);
@@ -1674,6 +1723,11 @@ int main(int argc, char** argv) {
                 camera = {make_float3(1.0f, 0.6f, 1.5f),
                           make_float3(0.0f, 0.25f, -4.4f), 42.0f};
             }
+            else if (clearcoat_texture_baseline_mode || clearcoat_texture_mode) {
+                frame_imported_triangles(imported.triangles, 4.5f, 0.0f, -4.5f);
+                camera = {make_float3(0.6f, 0.45f, 1.6f),
+                          make_float3(0.0f, 0.0f, -4.4f), 43.0f};
+            }
             else frame_imported_triangles(imported.triangles);
             if (showcase_studio_mode || fabric_baseline_mode || fabric_close_baseline_mode)
                 for (Triangle& triangle : imported.triangles)
@@ -1692,6 +1746,12 @@ int main(int argc, char** argv) {
                     triangle.emissive_mapping = {};
                     triangle.clearcoat_mapping = {};
                     triangle.occlusion_mapping = {};
+                }
+            if (clearcoat_texture_baseline_mode)
+                for (Triangle& triangle : imported.triangles) {
+                    triangle.clearcoat_texture_index = -1;
+                    triangle.clearcoat_roughness_texture_index = -1;
+                    triangle.clearcoat_normal_texture_index = -1;
                 }
             output = argc > 3 ? argv[3] : "cuda_gltf_pathtracer.bmp";
             samples = argc > 4 ? std::stoi(argv[4]) : 64;
@@ -1715,12 +1775,14 @@ int main(int argc, char** argv) {
                                !fabric_sheen_mode && !fabric_close_baseline_mode &&
                                !fabric_close_sheen_mode && !occlusion_baseline_mode &&
                                !occlusion_mode && !alpha_baseline_mode && !alpha_mode &&
-                               !texture_transform_baseline_mode && !texture_transform_mode && !scene_mode,
+                               !texture_transform_baseline_mode && !texture_transform_mode &&
+                               !clearcoat_texture_baseline_mode && !clearcoat_texture_mode && !scene_mode,
                            environment.get(), camera,
                            showcase_studio_mode || fabric_baseline_mode || fabric_sheen_mode ||
                                fabric_close_baseline_mode || fabric_close_sheen_mode ||
                                occlusion_baseline_mode || occlusion_mode || alpha_baseline_mode || alpha_mode ||
-                               texture_transform_baseline_mode || texture_transform_mode));
+                               texture_transform_baseline_mode || texture_transform_mode ||
+                               clearcoat_texture_baseline_mode || clearcoat_texture_mode));
         std::cout << "CUDA path traced " << width << 'x' << height << " at " << samples
                   << " spp with " << imported.triangles.size() << " imported triangles"
                   << (environment ? " and HDR environment" : "") << " to " << output << '\n';

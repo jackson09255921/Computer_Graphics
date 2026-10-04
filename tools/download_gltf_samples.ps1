@@ -9,6 +9,7 @@ $models = @(
     "Avocado",
     "BoomBox",
     "BoxTextured",
+    "ClearCoatTest",
     "DamagedHelmet",
     "Duck",
     "Lantern",

@@ -42,12 +42,15 @@ struct GltfTriangle {
     std::shared_ptr<const GltfTexture> metallic_roughness_texture;
     std::shared_ptr<const GltfTexture> emissive_texture;
     std::shared_ptr<const GltfTexture> clearcoat_texture;
+    std::shared_ptr<const GltfTexture> clearcoat_roughness_texture;
+    std::shared_ptr<const GltfTexture> clearcoat_normal_texture;
     std::shared_ptr<const GltfTexture> occlusion_texture;
     Color emissive_factor{};
     Color sheen_color_factor{};
     double sheen_roughness{0.0};
     double clearcoat_factor{0.0};
     double clearcoat_roughness{0.0};
+    double clearcoat_normal_scale{1.0};
     double normal_scale{1.0};
     rt::Material material;
     int material_index{-1};
@@ -64,6 +67,8 @@ struct GltfTriangle {
     GltfTextureMapping metallic_roughness_mapping;
     GltfTextureMapping emissive_mapping;
     GltfTextureMapping clearcoat_mapping;
+    GltfTextureMapping clearcoat_roughness_mapping;
+    GltfTextureMapping clearcoat_normal_mapping;
     GltfTextureMapping occlusion_mapping;
 };
 
