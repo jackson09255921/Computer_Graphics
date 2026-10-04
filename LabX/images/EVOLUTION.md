@@ -127,7 +127,7 @@ while the checkerboard remains visible through refracted regions. The glTF
 
 | Stage | Commit | Controlled change | Result |
 | --- | --- | --- | --- |
-| 14 — Specular extension | pending | Enable factor/color and alpha/RGB texture controls for dielectric F0/F90 | [`baseline`](evolution_specular_stage14_baseline_128spp.png) · [`extension`](evolution_specular_stage14_extension_128spp.png) |
+| 14 — Specular extension | `66aa5ab` | Enable factor/color and alpha/RGB texture controls for dielectric F0/F90 | [`baseline`](evolution_specular_stage14_baseline_128spp.png) · [`extension`](evolution_specular_stage14_extension_128spp.png) |
 
 The official Khronos SpecularTest contains 44,828 triangles and seven labelled
 rows. Both 640x360 renders use the same camera, studio lights, 128 spp and seed
