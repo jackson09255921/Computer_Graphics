@@ -45,7 +45,7 @@ def main() -> int:
         run([str(executable(gpu, "cuda_pathtracer", args.config)), mode,
              str(samples / model / f"{model}.glb"), str(source), str(args.gpu_spp)])
         suffix = "_emissive" if model == "Lantern" else "_subject_framing" if model == "ToyCar" else ""
-        destination = (f"evolution_toycar_stage4_studio_lighting_{args.gpu_spp}spp.png"
+        destination = (f"evolution_toycar_stage5_clearcoat_{args.gpu_spp}spp.png"
                        if model == "ToyCar" else
                        f"quality_gltf_{model.lower()}{suffix}_{args.gpu_spp}spp.png")
         publish(source, destination,

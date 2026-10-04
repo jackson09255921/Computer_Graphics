@@ -27,11 +27,14 @@ int main(int argc, char** argv) {
         const std::size_t emissive_mapped = static_cast<std::size_t>(std::count_if(
             asset.triangles().begin(), asset.triangles().end(),
             [](const cg::assets::GltfTriangle& triangle) { return triangle.emissive_texture != nullptr; }));
+        const std::size_t clearcoated = static_cast<std::size_t>(std::count_if(
+            asset.triangles().begin(), asset.triangles().end(),
+            [](const cg::assets::GltfTriangle& triangle) { return triangle.clearcoat_factor > 0.0; }));
         std::cout << "loaded " << asset.triangles().size() << " triangles (" << smooth
                   << " with vertex normals, " << textured << " with base-color textures, "
                   << normal_mapped << " with normal maps, " << pbr_mapped
                   << " with metallic-roughness maps, " << emissive_mapped
-                  << " with emissive maps) from " << argv[1] << '\n';
+                  << " with emissive maps, " << clearcoated << " with clearcoat) from " << argv[1] << '\n';
         return 0;
     } catch (const std::exception& error) {
         std::cerr << "glTF load failed: " << error.what() << '\n';

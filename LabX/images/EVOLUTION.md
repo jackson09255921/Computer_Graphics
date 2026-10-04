@@ -27,7 +27,8 @@ light that transports energy into the scene.
 | 2 — Subject framing | `d1815ee` | Frame material 0/2 car geometry while material 1 fabric no longer controls bounds | [`evolution_toycar_stage2_subject_framing_128spp.png`](evolution_toycar_stage2_subject_framing_128spp.png) |
 | 3 — Three-quarter camera | `66536a6` | Low 3/4 view to expose body curvature and silhouette | [`evolution_toycar_stage3_three_quarter_camera_128spp.png`](evolution_toycar_stage3_three_quarter_camera_128spp.png) |
 | 4 — Studio lighting | `538a865` | Warm key, cool fill, and off-camera rim lights with multi-light MIS | [`evolution_toycar_stage4_studio_lighting_128spp.png`](evolution_toycar_stage4_studio_lighting_128spp.png) |
-| 5 — Clearcoat and sheen | planned | Add the car-paint coat and fabric grazing reflection | — |
+| 5 — Clearcoat | current change | Add a second dielectric GGX coat with matched lobe sampling/PDF | [`evolution_toycar_stage5_clearcoat_128spp.png`](evolution_toycar_stage5_clearcoat_128spp.png) |
+| 6 — Sheen | planned | Add the fabric grazing-angle fiber reflection | — |
 
 The original framing is deliberately retained: it documents why scene-wide
 bounding boxes are reliable for CI yet weak for presentation. The next render
