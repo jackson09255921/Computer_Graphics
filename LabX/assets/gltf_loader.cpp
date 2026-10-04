@@ -535,6 +535,7 @@ GltfAsset GltfAsset::load(const std::filesystem::path& path) {
             std::shared_ptr<const GltfTexture> transmission_texture;
             std::shared_ptr<const GltfTexture> specular_texture;
             std::shared_ptr<const GltfTexture> specular_color_texture;
+            std::shared_ptr<const GltfTexture> anisotropy_texture;
             std::shared_ptr<const GltfTexture> occlusion_texture;
             Color emissive_factor{};
             Color sheen_color_factor{};
@@ -545,6 +546,8 @@ GltfAsset GltfAsset::load(const std::filesystem::path& path) {
             double normal_scale = 1.0;
             double specular_factor = 1.0;
             Color specular_color_factor{1.0, 1.0, 1.0};
+            double anisotropy_strength = 0.0;
+            double anisotropy_rotation = 0.0;
             int primitive_material_index = -1;
             double occlusion_strength = 1.0;
             bool double_sided = false;
@@ -557,6 +560,7 @@ GltfAsset GltfAsset::load(const std::filesystem::path& path) {
             GltfTextureMapping sheen_color_mapping, sheen_roughness_mapping;
             GltfTextureMapping transmission_mapping;
             GltfTextureMapping specular_mapping, specular_color_mapping;
+            GltfTextureMapping anisotropy_mapping;
             if (const Json* material_index = primitive.find("material")) {
                 const std::size_t index = integer(*material_index);
                 primitive_material_index = static_cast<int>(index);
@@ -623,6 +627,16 @@ GltfAsset GltfAsset::load(const std::filesystem::path& path) {
                             specular_color_mapping = texture_mapping(*texture);
                         }
                     }
+                    if (const Json* anisotropy = extensions->find("KHR_materials_anisotropy")) {
+                        if (const Json* strength = anisotropy->find("anisotropyStrength"))
+                            anisotropy_strength = strength->number();
+                        if (const Json* rotation = anisotropy->find("anisotropyRotation"))
+                            anisotropy_rotation = rotation->number();
+                        if (const Json* texture = anisotropy->find("anisotropyTexture")) {
+                            anisotropy_texture = textures.at(member_integer(*texture, "index"));
+                            anisotropy_mapping = texture_mapping(*texture);
+                        }
+                    }
                     if (const Json* clearcoat = extensions->find("KHR_materials_clearcoat")) {
                         if (const Json* factor = clearcoat->find("clearcoatFactor"))
                             clearcoat_factor = factor->number();
@@ -675,10 +689,12 @@ GltfAsset GltfAsset::load(const std::filesystem::path& path) {
                         emissive_texture, clearcoat_texture, clearcoat_roughness_texture,
                         clearcoat_normal_texture, sheen_color_texture, sheen_roughness_texture,
                         transmission_texture, specular_texture, specular_color_texture,
+                        anisotropy_texture,
                         occlusion_texture, emissive_factor,
                         sheen_color_factor, sheen_roughness,
                         clearcoat_factor, clearcoat_roughness, clearcoat_normal_scale,
-                        normal_scale, specular_factor, specular_color_factor, material,
+                        normal_scale, specular_factor, specular_color_factor,
+                        anisotropy_strength, anisotropy_rotation, material,
                         primitive_material_index, occlusion_strength, double_sided,
                         alpha_mode, alpha_cutoff, base_color_alpha,
                         vertex_uvs1.empty() ? Vec2{} : vertex_uvs1.at(element_indices[i]),
@@ -688,6 +704,7 @@ GltfAsset GltfAsset::load(const std::filesystem::path& path) {
                         emissive_mapping, clearcoat_mapping, clearcoat_roughness_mapping,
                         clearcoat_normal_mapping, sheen_color_mapping, sheen_roughness_mapping,
                         transmission_mapping, specular_mapping, specular_color_mapping,
+                        anisotropy_mapping,
                         occlusion_mapping});
                 } else {
                     const auto normal_or_face = [&](std::uint32_t vertex) {
@@ -704,10 +721,12 @@ GltfAsset GltfAsset::load(const std::filesystem::path& path) {
                         emissive_texture, clearcoat_texture, clearcoat_roughness_texture,
                         clearcoat_normal_texture, sheen_color_texture, sheen_roughness_texture,
                         transmission_texture, specular_texture, specular_color_texture,
+                        anisotropy_texture,
                         occlusion_texture, emissive_factor,
                         sheen_color_factor, sheen_roughness,
                         clearcoat_factor, clearcoat_roughness, clearcoat_normal_scale,
-                        normal_scale, specular_factor, specular_color_factor, material,
+                        normal_scale, specular_factor, specular_color_factor,
+                        anisotropy_strength, anisotropy_rotation, material,
                         primitive_material_index, occlusion_strength, double_sided,
                         alpha_mode, alpha_cutoff, base_color_alpha,
                         vertex_uvs1.empty() ? Vec2{} : vertex_uvs1.at(element_indices[i]),
@@ -717,6 +736,7 @@ GltfAsset GltfAsset::load(const std::filesystem::path& path) {
                         emissive_mapping, clearcoat_mapping, clearcoat_roughness_mapping,
                         clearcoat_normal_mapping, sheen_color_mapping, sheen_roughness_mapping,
                         transmission_mapping, specular_mapping, specular_color_mapping,
+                        anisotropy_mapping,
                         occlusion_mapping});
                 }
             }

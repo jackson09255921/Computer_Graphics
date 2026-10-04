@@ -6,6 +6,7 @@ $ErrorActionPreference = "Stop"
 $repository = "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/main/Models"
 $models = @(
     "AlphaBlendModeTest",
+    "AnisotropyDiscTest",
     "Avocado",
     "BoomBox",
     "BoxTextured",

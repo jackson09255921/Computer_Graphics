@@ -131,6 +131,14 @@ def main() -> int:
         publish(source, f"evolution_specular_stage14_{label}_{args.gpu_spp}spp.png",
                 (640, 360), f"specular-{label}")
 
+    anisotropy_test = samples / "AnisotropyDiscTest" / "AnisotropyDiscTest.glb"
+    for mode, label in (("--anisotropy-baseline", "baseline"), ("--anisotropy", "extension")):
+        source = artifacts / f"anisotropy_{label}_{args.gpu_spp}spp.ppm"
+        run([str(executable(gpu, "cuda_pathtracer", args.config)), mode,
+             str(anisotropy_test), str(source), str(args.gpu_spp)])
+        publish(source, f"evolution_anisotropy_stage15_{label}_{args.gpu_spp}spp.png",
+                (640, 360), f"anisotropy-{label}")
+
     models = ROOT / "LabX" / "data" / "legacy_converted" / "meshes"
     multi = artifacts / f"cuda_multi_asset_{args.gpu_spp}spp.ppm"
     run([str(executable(gpu, "cuda_pathtracer", args.config)), "--scene", str(multi), str(args.gpu_spp),

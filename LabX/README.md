@@ -39,7 +39,8 @@ LabX/
 13. Sheen color and alpha-channel roughness textures with independent mappings.
 14. Red-channel transmission textures over the rough dielectric path.
 15. Specular factor/color and alpha/RGB textures with F0/F90 separation.
-16. OptiX indexed geometry, recursive GGX, temporal reprojection and ReSTIR DI.
+16. Anisotropic GGX strength, rotation, RGB maps and matched sampling/PDF.
+17. OptiX indexed geometry, recursive GGX, temporal reprojection and ReSTIR DI.
 
 The reviewed progression is recorded in
 [`images/EVOLUTION.md`](images/EVOLUTION.md). Every comparison uses a new file

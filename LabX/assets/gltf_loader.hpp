@@ -49,6 +49,7 @@ struct GltfTriangle {
     std::shared_ptr<const GltfTexture> transmission_texture;
     std::shared_ptr<const GltfTexture> specular_texture;
     std::shared_ptr<const GltfTexture> specular_color_texture;
+    std::shared_ptr<const GltfTexture> anisotropy_texture;
     std::shared_ptr<const GltfTexture> occlusion_texture;
     Color emissive_factor{};
     Color sheen_color_factor{};
@@ -59,6 +60,8 @@ struct GltfTriangle {
     double normal_scale{1.0};
     double specular_factor{1.0};
     Color specular_color_factor{1.0, 1.0, 1.0};
+    double anisotropy_strength{0.0};
+    double anisotropy_rotation{0.0};
     rt::Material material;
     int material_index{-1};
     double occlusion_strength{1.0};
@@ -81,6 +84,7 @@ struct GltfTriangle {
     GltfTextureMapping transmission_mapping;
     GltfTextureMapping specular_mapping;
     GltfTextureMapping specular_color_mapping;
+    GltfTextureMapping anisotropy_mapping;
     GltfTextureMapping occlusion_mapping;
 };
 

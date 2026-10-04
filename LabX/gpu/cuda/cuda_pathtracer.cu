@@ -65,6 +65,8 @@ struct Triangle {
     int transmission_texture_index{-1};
     float specular_factor{1.0f}; float3 specular_color{1.0f, 1.0f, 1.0f};
     int specular_texture_index{-1}; int specular_color_texture_index{-1};
+    float anisotropy_strength{0.0f}; float anisotropy_rotation{0.0f};
+    int anisotropy_texture_index{-1};
     int occlusion_texture_index{-1}; float occlusion_strength{1.0f}; bool double_sided{false};
     int alpha_mode{0}; float alpha_cutoff{0.5f}; float alpha_factor{1.0f};
     float2 first_uv1{}; float2 second_uv1{}; float2 third_uv1{};
@@ -75,6 +77,7 @@ struct Triangle {
     UvMapping sheen_color_mapping{}; UvMapping sheen_roughness_mapping{};
     UvMapping transmission_mapping{};
     UvMapping specular_mapping{}; UvMapping specular_color_mapping{};
+    UvMapping anisotropy_mapping{};
 };
 struct TextureDescriptor { int offset; int width; int height; int wrap_s; int wrap_t; };
 struct ImportedAssets {
@@ -109,6 +112,7 @@ struct Hit {
     int transmission_texture_index;
     float specular_factor; float3 specular_color;
     int specular_texture_index; int specular_color_texture_index;
+    float anisotropy_strength; float anisotropy_rotation; int anisotropy_texture_index;
     int occlusion_texture_index; float occlusion_strength;
     float2 base_color_uv; float2 normal_uv; float2 metallic_roughness_uv;
     float2 emissive_uv; float2 clearcoat_uv; float2 clearcoat_roughness_uv;
@@ -116,6 +120,7 @@ struct Hit {
     float2 sheen_color_uv; float2 sheen_roughness_uv;
     float2 transmission_uv;
     float2 specular_uv; float2 specular_color_uv;
+    float2 anisotropy_uv;
 };
 
 struct Rng {
@@ -242,6 +247,7 @@ __device__ void intersect_triangles(const Ray& ray, const Triangle* triangles, c
                 closest.transmission_uv = mapped_uv(closest.uv, uv1, triangle.transmission_mapping);
                 closest.specular_uv = mapped_uv(closest.uv, uv1, triangle.specular_mapping);
                 closest.specular_color_uv = mapped_uv(closest.uv, uv1, triangle.specular_color_mapping);
+                closest.anisotropy_uv = mapped_uv(closest.uv, uv1, triangle.anisotropy_mapping);
                 closest.texture_index = triangle.texture_index;
                 closest.tangent = triangle.tangent;
                 closest.tangent_handedness = triangle.tangent_handedness;
@@ -265,6 +271,9 @@ __device__ void intersect_triangles(const Ray& ray, const Triangle* triangles, c
                 closest.specular_color = triangle.specular_color;
                 closest.specular_texture_index = triangle.specular_texture_index;
                 closest.specular_color_texture_index = triangle.specular_color_texture_index;
+                closest.anisotropy_strength = triangle.anisotropy_strength;
+                closest.anisotropy_rotation = triangle.anisotropy_rotation;
+                closest.anisotropy_texture_index = triangle.anisotropy_texture_index;
                 closest.occlusion_texture_index = triangle.occlusion_texture_index;
                 closest.occlusion_strength = triangle.occlusion_strength;
                 closest.found = true;
@@ -322,6 +331,9 @@ __device__ bool intersect_scene(const Ray& ray, const Sphere* spheres, int spher
         closest.specular_color = make_float3(1, 1, 1);
         closest.specular_texture_index = -1;
         closest.specular_color_texture_index = -1;
+        closest.anisotropy_strength = 0.0f;
+        closest.anisotropy_rotation = 0.0f;
+        closest.anisotropy_texture_index = -1;
         closest.occlusion_texture_index = -1;
         closest.occlusion_strength = 1.0f;
         closest.found = true;
@@ -404,6 +416,51 @@ __host__ __device__ float smith_schlick(float normal_dot_direction, float roughn
     return normal_dot_direction / (normal_dot_direction * (1.0f - k) + k);
 }
 
+__host__ __device__ void anisotropic_alpha(float roughness, float strength,
+                                            float& alpha_x, float& alpha_y) {
+    const float alpha = fmaxf(0.001f, roughness * roughness);
+    const float clamped = fminf(1.0f, fmaxf(0.0f, strength));
+    alpha_x = alpha * (1.0f - clamped * clamped) + clamped * clamped;
+    alpha_y = alpha;
+}
+
+__host__ __device__ float anisotropic_ggx_distribution(float3 half_vector, float3 normal,
+                                                        float3 tangent, float3 bitangent,
+                                                        float roughness, float strength) {
+    const float hz = fmaxf(0.0f, dot3(normal, half_vector));
+    if (hz <= 0.0f) return 0.0f;
+    float alpha_x, alpha_y;
+    anisotropic_alpha(roughness, strength, alpha_x, alpha_y);
+    const float hx = dot3(tangent, half_vector), hy = dot3(bitangent, half_vector);
+    const float denominator = hx * hx / (alpha_x * alpha_x) +
+                              hy * hy / (alpha_y * alpha_y) + hz * hz;
+    return 1.0f / (kPi * alpha_x * alpha_y * denominator * denominator);
+}
+
+__host__ __device__ float anisotropic_smith_g1(float3 direction, float3 normal,
+                                               float3 tangent, float3 bitangent,
+                                               float roughness, float strength) {
+    const float vz = fmaxf(0.0f, dot3(normal, direction));
+    if (vz <= 0.0f) return 0.0f;
+    float alpha_x, alpha_y;
+    anisotropic_alpha(roughness, strength, alpha_x, alpha_y);
+    const float vx = dot3(tangent, direction), vy = dot3(bitangent, direction);
+    const float lambda = sqrtf(1.0f + (alpha_x * alpha_x * vx * vx +
+                                      alpha_y * alpha_y * vy * vy) / (vz * vz));
+    return 2.0f / (1.0f + lambda);
+}
+
+__device__ float3 sample_anisotropic_ggx_normal(float3 normal, float3 tangent, float3 bitangent,
+                                                float roughness, float strength, Rng& rng) {
+    float alpha_x, alpha_y;
+    anisotropic_alpha(roughness, strength, alpha_x, alpha_y);
+    const float uniform = fminf(rng.next(), 1.0f - 1.0e-7f);
+    const float radius = sqrtf(uniform / (1.0f - uniform));
+    const float azimuth = 2.0f * kPi * rng.next();
+    return normalize3(add(add(mul(tangent, alpha_x * radius * cosf(azimuth)),
+                              mul(bitangent, alpha_y * radius * sinf(azimuth))), normal));
+}
+
 __host__ __device__ float3 fresnel_schlick(float cosine, float3 reflectance_at_normal) {
     const float factor = powf(1.0f - fminf(1.0f, fmaxf(0.0f, cosine)), 5.0f);
     return add(reflectance_at_normal, mul(sub(make_float3(1, 1, 1), reflectance_at_normal), factor));
@@ -452,7 +509,10 @@ __device__ float3 evaluate_metallic_roughness(float3 normal, float3 coat_normal,
                                                float clearcoat = 0.0f, float clearcoat_roughness = 0.04f,
                                                float3 sheen_color = {}, float sheen_roughness = 0.0f,
                                                float specular_factor = 1.0f,
-                                               float3 specular_color = {1.0f, 1.0f, 1.0f}) {
+                                               float3 specular_color = {1.0f, 1.0f, 1.0f},
+                                               float3 anisotropy_tangent = {1.0f, 0.0f, 0.0f},
+                                               float3 anisotropy_bitangent = {0.0f, 1.0f, 0.0f},
+                                               float anisotropy_strength = 0.0f) {
     const float n_dot_v = fmaxf(0.0f, dot3(normal, view));
     const float n_dot_l = fmaxf(0.0f, dot3(normal, light));
     if (n_dot_v <= 0.0f || n_dot_l <= 0.0f) return make_float3(0, 0, 0);
@@ -466,8 +526,16 @@ __device__ float3 evaluate_metallic_roughness(float3 normal, float3 coat_normal,
                           mul(base_color, metallic));
     const float f90 = metallic + (1.0f - metallic) * specular_factor;
     const float3 fresnel = fresnel_schlick_f90(v_dot_h, f0, f90);
-    const float distribution = ggx_distribution(fmaxf(0.0f, dot3(normal, half_vector)), roughness);
-    const float geometry = smith_schlick(n_dot_v, roughness) * smith_schlick(n_dot_l, roughness);
+    const float distribution = anisotropy_strength > 0.0f
+        ? anisotropic_ggx_distribution(half_vector, normal, anisotropy_tangent,
+                                       anisotropy_bitangent, roughness, anisotropy_strength)
+        : ggx_distribution(fmaxf(0.0f, dot3(normal, half_vector)), roughness);
+    const float geometry = anisotropy_strength > 0.0f
+        ? anisotropic_smith_g1(view, normal, anisotropy_tangent, anisotropy_bitangent,
+                               roughness, anisotropy_strength) *
+          anisotropic_smith_g1(light, normal, anisotropy_tangent, anisotropy_bitangent,
+                               roughness, anisotropy_strength)
+        : smith_schlick(n_dot_v, roughness) * smith_schlick(n_dot_l, roughness);
     const float3 specular = mul(fresnel,
         distribution * geometry / fmaxf(4.0f * n_dot_v * n_dot_l, 1.0e-8f));
     const float3 diffuse_weight = mul(sub(make_float3(1, 1, 1), fresnel), 1.0f - metallic);
@@ -501,12 +569,23 @@ __device__ float3 evaluate_metallic_roughness(float3 normal, float3 coat_normal,
 
 __device__ float metallic_roughness_pdf(float3 normal, float3 coat_normal, float3 view, float3 light,
                                          float metallic, float roughness,
-                                         float clearcoat = 0.0f, float clearcoat_roughness = 0.04f) {
+                                         float clearcoat = 0.0f, float clearcoat_roughness = 0.04f,
+                                         float3 anisotropy_tangent = {1.0f, 0.0f, 0.0f},
+                                         float3 anisotropy_bitangent = {0.0f, 1.0f, 0.0f},
+                                         float anisotropy_strength = 0.0f) {
     const float coat = clearcoat_probability(clearcoat);
     const float base_specular = (1.0f - coat) * specular_probability(metallic);
     const float diffuse = 1.0f - coat - base_specular;
+    const float3 half_vector = normalize3(add(view, light));
+    const float v_dot_h = fabsf(dot3(view, half_vector));
+    const float anisotropic_pdf = v_dot_h > 0.0f
+        ? anisotropic_ggx_distribution(half_vector, normal, anisotropy_tangent,
+                                       anisotropy_bitangent, roughness, anisotropy_strength) *
+          fmaxf(0.0f, dot3(normal, half_vector)) / (4.0f * v_dot_h)
+        : 0.0f;
     return coat * ggx_reflection_pdf(coat_normal, view, light, clearcoat_roughness) +
-           base_specular * ggx_reflection_pdf(normal, view, light, roughness) +
+           base_specular * (anisotropy_strength > 0.0f ? anisotropic_pdf
+                                                       : ggx_reflection_pdf(normal, view, light, roughness)) +
            diffuse * fmaxf(0.0f, dot3(normal, light)) / kPi;
 }
 
@@ -746,6 +825,16 @@ __device__ float3 radiance(Ray ray, const Sphere* spheres, int sphere_count,
         if (hit.specular_color_texture_index >= 0)
             hit.specular_color = mul(hit.specular_color,
                 sample_texture(textures, hit.specular_color_texture_index, hit.specular_color_uv));
+        float anisotropy_angle = hit.anisotropy_rotation;
+        if (hit.anisotropy_texture_index >= 0) {
+            const float3 sampled = sample_texture(textures, hit.anisotropy_texture_index,
+                                                  hit.anisotropy_uv);
+            const float direction_x = sampled.x * 2.0f - 1.0f;
+            const float direction_y = sampled.y * 2.0f - 1.0f;
+            if (direction_x * direction_x + direction_y * direction_y > 1.0e-8f)
+                anisotropy_angle += atan2f(direction_y, direction_x);
+            hit.anisotropy_strength *= sampled.z;
+        }
         float surface_occlusion = 1.0f;
         if (hit.occlusion_texture_index >= 0) {
             const float sampled = sample_texture(textures, hit.occlusion_texture_index, hit.occlusion_uv).x;
@@ -785,6 +874,14 @@ __device__ float3 radiance(Ray ray, const Sphere* spheres, int sphere_count,
                                                   mul(hit.normal, tangent_normal.z)));
             hit.clearcoat_normal = dot3(mapped, ray.direction) < 0.0f ? mapped : mul(mapped, -1.0f);
         }
+        const float3 surface_tangent = normalize3(sub(hit.tangent,
+            mul(hit.normal, dot3(hit.normal, hit.tangent))));
+        const float3 surface_bitangent = mul(cross3(hit.normal, surface_tangent), hit.tangent_handedness);
+        const float cosine_anisotropy = cosf(anisotropy_angle), sine_anisotropy = sinf(anisotropy_angle);
+        const float3 anisotropy_tangent = normalize3(add(mul(surface_tangent, cosine_anisotropy),
+                                                         mul(surface_bitangent, sine_anisotropy)));
+        const float3 anisotropy_bitangent = normalize3(sub(mul(surface_bitangent, cosine_anisotropy),
+                                                           mul(surface_tangent, sine_anisotropy)));
         const float3 view_direction = mul(ray.direction, -1.0f);
         const bool non_transmissive_surface = hit.transmission <= 0.0f;
         if (non_transmissive_surface) {
@@ -812,10 +909,12 @@ __device__ float3 radiance(Ray ray, const Sphere* spheres, int sphere_count,
                         hit.normal, hit.clearcoat_normal, view_direction, direction_to_light,
                         hit.albedo, hit.metallic, hit.roughness,
                         hit.clearcoat, hit.clearcoat_roughness, hit.sheen_color, hit.sheen_roughness,
-                        hit.specular_factor, hit.specular_color);
+                        hit.specular_factor, hit.specular_color, anisotropy_tangent,
+                        anisotropy_bitangent, hit.anisotropy_strength);
                     const float bsdf_pdf = metallic_roughness_pdf(
                         hit.normal, hit.clearcoat_normal, view_direction, direction_to_light, hit.metallic, hit.roughness,
-                        hit.clearcoat, hit.clearcoat_roughness);
+                        hit.clearcoat, hit.clearcoat_roughness, anisotropy_tangent,
+                        anisotropy_bitangent, hit.anisotropy_strength);
                     const float weight = power_heuristic(light_pdf, bsdf_pdf);
                     result = add(result, mul(mul(mul(throughput, brdf), light.emission),
                                              surface_cosine * weight / light_pdf));
@@ -837,10 +936,12 @@ __device__ float3 radiance(Ray ray, const Sphere* spheres, int sphere_count,
                             hit.normal, hit.clearcoat_normal, view_direction, environment_direction,
                             hit.albedo, hit.metallic, hit.roughness,
                             hit.clearcoat, hit.clearcoat_roughness, hit.sheen_color, hit.sheen_roughness,
-                            hit.specular_factor, hit.specular_color);
+                            hit.specular_factor, hit.specular_color, anisotropy_tangent,
+                            anisotropy_bitangent, hit.anisotropy_strength);
                         const float bsdf_pdf = metallic_roughness_pdf(
                             hit.normal, hit.clearcoat_normal, view_direction, environment_direction, hit.metallic, hit.roughness,
-                            hit.clearcoat, hit.clearcoat_roughness);
+                            hit.clearcoat, hit.clearcoat_roughness, anisotropy_tangent,
+                            anisotropy_bitangent, hit.anisotropy_strength);
                         const float weight = power_heuristic(environment_sample_pdf, bsdf_pdf);
                         result = add(result, mul(mul(mul(throughput, brdf), environment_value),
                                                  surface_occlusion *
@@ -898,7 +999,11 @@ __device__ float3 radiance(Ray ray, const Sphere* spheres, int sphere_count,
                 const float3 microfacet = sample_ggx_normal(hit.clearcoat_normal, hit.clearcoat_roughness, rng);
                 direction = normalize3(reflect3(ray.direction, microfacet));
             } else if (choice < base_specular_probability) {
-                const float3 microfacet = sample_ggx_normal(hit.normal, hit.roughness, rng);
+                const float3 microfacet = hit.anisotropy_strength > 0.0f
+                    ? sample_anisotropic_ggx_normal(hit.normal, anisotropy_tangent,
+                                                    anisotropy_bitangent, hit.roughness,
+                                                    hit.anisotropy_strength, rng)
+                    : sample_ggx_normal(hit.normal, hit.roughness, rng);
                 direction = normalize3(reflect3(ray.direction, microfacet));
             } else {
                 direction = cosine_direction(hit.normal, rng);
@@ -906,12 +1011,14 @@ __device__ float3 radiance(Ray ray, const Sphere* spheres, int sphere_count,
             const float cosine = fmaxf(0.0f, dot3(hit.normal, direction));
             const float pdf = metallic_roughness_pdf(
                 hit.normal, hit.clearcoat_normal, view_direction, direction, hit.metallic, hit.roughness,
-                hit.clearcoat, hit.clearcoat_roughness);
+                hit.clearcoat, hit.clearcoat_roughness, anisotropy_tangent,
+                anisotropy_bitangent, hit.anisotropy_strength);
             if (pdf <= 0.0f || cosine <= 0.0f) break;
             const float3 brdf = evaluate_metallic_roughness(
                 hit.normal, hit.clearcoat_normal, view_direction, direction, hit.albedo, hit.metallic, hit.roughness,
                 hit.clearcoat, hit.clearcoat_roughness, hit.sheen_color, hit.sheen_roughness,
-                hit.specular_factor, hit.specular_color);
+                hit.specular_factor, hit.specular_color, anisotropy_tangent,
+                anisotropy_bitangent, hit.anisotropy_strength);
             throughput = mul(throughput, mul(brdf, cosine / pdf));
             previous_bsdf_pdf = pdf;
             previous_uses_mis = true;
@@ -1259,6 +1366,7 @@ ImportedAssets load_gltf_triangles(const std::filesystem::path& path) {
         const int transmission_texture_index = register_texture(triangle.transmission_texture, false);
         const int specular_texture_index = register_texture(triangle.specular_texture, false);
         const int specular_color_texture_index = register_texture(triangle.specular_color_texture, true);
+        const int anisotropy_texture_index = register_texture(triangle.anisotropy_texture, false);
         const int occlusion_texture_index = register_texture(triangle.occlusion_texture, false);
         const float3 first = convert(triangle.first), second = convert(triangle.second), third = convert(triangle.third);
         const float2 uv0 = make_float2(static_cast<float>(triangle.first_uv.x), static_cast<float>(triangle.first_uv.y));
@@ -1305,6 +1413,8 @@ ImportedAssets load_gltf_triangles(const std::filesystem::path& path) {
                           sheen_roughness_texture_index, transmission_texture_index,
                           static_cast<float>(triangle.specular_factor), convert(triangle.specular_color_factor),
                           specular_texture_index, specular_color_texture_index,
+                          static_cast<float>(triangle.anisotropy_strength),
+                          static_cast<float>(triangle.anisotropy_rotation), anisotropy_texture_index,
                           occlusion_texture_index,
                           static_cast<float>(triangle.occlusion_strength), triangle.double_sided,
                           triangle.alpha_mode, static_cast<float>(triangle.alpha_cutoff),
@@ -1320,7 +1430,8 @@ ImportedAssets load_gltf_triangles(const std::filesystem::path& path) {
                           convert_mapping(triangle.sheen_roughness_mapping),
                           convert_mapping(triangle.transmission_mapping),
                           convert_mapping(triangle.specular_mapping),
-                          convert_mapping(triangle.specular_color_mapping)});
+                          convert_mapping(triangle.specular_color_mapping),
+                          convert_mapping(triangle.anisotropy_mapping)});
     }
     return result;
 }
@@ -1351,6 +1462,7 @@ void append_imported(ImportedAssets& destination, ImportedAssets source) {
         if (triangle.specular_texture_index >= 0) triangle.specular_texture_index += texture_base;
         if (triangle.specular_color_texture_index >= 0)
             triangle.specular_color_texture_index += texture_base;
+        if (triangle.anisotropy_texture_index >= 0) triangle.anisotropy_texture_index += texture_base;
         if (triangle.occlusion_texture_index >= 0) triangle.occlusion_texture_index += texture_base;
         destination.triangles.push_back(triangle);
     }
@@ -1760,6 +1872,8 @@ int main(int argc, char** argv) {
         const bool transmission_texture_mode = argc > 1 && std::string(argv[1]) == "--transmission-texture";
         const bool specular_baseline_mode = argc > 1 && std::string(argv[1]) == "--specular-baseline";
         const bool specular_mode = argc > 1 && std::string(argv[1]) == "--specular";
+        const bool anisotropy_baseline_mode = argc > 1 && std::string(argv[1]) == "--anisotropy-baseline";
+        const bool anisotropy_mode = argc > 1 && std::string(argv[1]) == "--anisotropy";
         const bool scene_mode = argc > 1 && std::string(argv[1]) == "--scene";
         const bool hdr_mode = argc > 1 && std::string(argv[1]) == "--hdr";
         if (scene_mode) {
@@ -1784,7 +1898,7 @@ int main(int argc, char** argv) {
                    texture_transform_mode || clearcoat_texture_baseline_mode || clearcoat_texture_mode ||
                    sheen_texture_baseline_mode || sheen_texture_mode ||
                    transmission_texture_baseline_mode || transmission_texture_mode ||
-                   specular_baseline_mode || specular_mode) {
+                   specular_baseline_mode || specular_mode || anisotropy_baseline_mode || anisotropy_mode) {
             if (argc < 3) throw std::invalid_argument(
                 "usage: cuda_pathtracer --gltf|--showcase|--showcase-angle|--showcase-studio|--fabric-baseline|--fabric-sheen|--fabric-close-baseline|--fabric-close-sheen|--occlusion-baseline|--occlusion|--alpha-baseline|--alpha|--texture-transform-baseline|--texture-transform model.gltf [output.bmp] [spp] [environment.hdr]");
             imported = load_gltf_triangles(argv[2]);
@@ -1840,6 +1954,11 @@ int main(int argc, char** argv) {
                 camera = {make_float3(0.5f, 0.45f, 1.6f),
                           make_float3(0.0f, 0.0f, -4.4f), 44.0f};
             }
+            else if (anisotropy_baseline_mode || anisotropy_mode) {
+                frame_imported_triangles(imported.triangles, 4.4f, 0.0f, -4.5f);
+                camera = {make_float3(0.55f, 0.55f, 1.6f),
+                          make_float3(0.0f, 0.0f, -4.4f), 43.0f};
+            }
             else frame_imported_triangles(imported.triangles);
             if (showcase_studio_mode || fabric_baseline_mode || fabric_close_baseline_mode)
                 for (Triangle& triangle : imported.triangles)
@@ -1880,6 +1999,12 @@ int main(int argc, char** argv) {
                     triangle.specular_texture_index = -1;
                     triangle.specular_color_texture_index = -1;
                 }
+            if (anisotropy_baseline_mode)
+                for (Triangle& triangle : imported.triangles) {
+                    triangle.anisotropy_strength = 0.0f;
+                    triangle.anisotropy_rotation = 0.0f;
+                    triangle.anisotropy_texture_index = -1;
+                }
             output = argc > 3 ? argv[3] : "cuda_gltf_pathtracer.bmp";
             samples = argc > 4 ? std::stoi(argv[4]) : 64;
             if (argc > 5) environment = std::make_unique<cg::environment::EnvironmentMap>(
@@ -1906,7 +2031,8 @@ int main(int argc, char** argv) {
                                !clearcoat_texture_baseline_mode && !clearcoat_texture_mode &&
                                !sheen_texture_baseline_mode && !sheen_texture_mode &&
                                !transmission_texture_baseline_mode && !transmission_texture_mode &&
-                               !specular_baseline_mode && !specular_mode && !scene_mode,
+                               !specular_baseline_mode && !specular_mode &&
+                               !anisotropy_baseline_mode && !anisotropy_mode && !scene_mode,
                            environment.get(), camera,
                            showcase_studio_mode || fabric_baseline_mode || fabric_sheen_mode ||
                                fabric_close_baseline_mode || fabric_close_sheen_mode ||
@@ -1915,7 +2041,8 @@ int main(int argc, char** argv) {
                                clearcoat_texture_baseline_mode || clearcoat_texture_mode ||
                                sheen_texture_baseline_mode || sheen_texture_mode ||
                                transmission_texture_baseline_mode || transmission_texture_mode ||
-                               specular_baseline_mode || specular_mode));
+                               specular_baseline_mode || specular_mode ||
+                               anisotropy_baseline_mode || anisotropy_mode));
         std::cout << "CUDA path traced " << width << 'x' << height << " at " << samples
                   << " spp with " << imported.triangles.size() << " imported triangles"
                   << (environment ? " and HDR environment" : "") << " to " << output << '\n';

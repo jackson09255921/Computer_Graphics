@@ -80,6 +80,10 @@ int main() {
                     triangle.specular_texture == nullptr &&
                     triangle.specular_color_texture == nullptr,
                 "specular extension inputs must retain glTF defaults when omitted");
+        require(near(triangle.anisotropy_strength, 0.0) &&
+                    near(triangle.anisotropy_rotation, 0.0) &&
+                    triangle.anisotropy_texture == nullptr,
+                "anisotropy extension inputs must retain glTF defaults when omitted");
         require(near(triangle.clearcoat_factor, 0.8) && near(triangle.clearcoat_roughness, 0.12),
                 "clearcoat extension factors must be imported");
         require(triangle.clearcoat_texture == nullptr &&

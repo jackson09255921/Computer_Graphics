@@ -137,6 +137,22 @@ rows, yellow F0 with white grazing reflections, no purple RGB leakage from the
 alpha-only texture, and the final above-one color ramp reaching mirror-like F0.
 `KHR_materials_specular` was ratified in 2021.
 
+## AnisotropyDiscTest: directional roughness evolution
+
+| Stage | Commit | Controlled change | Result |
+| --- | --- | --- | --- |
+| 15 — Anisotropic GGX | pending | Enable strength, rotation and RGB direction/strength texture with matched sampling/PDF | [`baseline`](evolution_anisotropy_stage15_baseline_128spp.png) · [`extension`](evolution_anisotropy_stage15_extension_128spp.png) |
+
+The official CC0 Khronos AnisotropyDiscTest contains 2,788 triangles and tests
+six base roughness values against a four-quadrant direction/strength map. Both
+640x360 renders use the same camera, studio lights, 128 spp and seed
+`0xC0FFEE`. Anisotropy changes 56,399 pixels with a 0.757 channel MAE and
+maximum channel delta of 160. Native review confirms rotated elongated
+highlights at low roughness and the expected disappearance of anisotropy as
+roughness approaches one. The implementation uses the Khronos alpha formula
+`mix(roughness², 1, strength²)` consistently in BRDF, Smith masking, sampling
+and PDF. `KHR_materials_anisotropy` was ratified in 2023.
+
 ## Rules for future stages
 
 1. Use a new descriptive filename; never replace a reviewed image.

@@ -8,6 +8,14 @@
         "sha256":  "37c3577d143071b42dd46e9d942b157837eb25c6340112171d7faecaa987b14e"
     },
     {
+        "name":  "AnisotropyDiscTest",
+        "file":  "AnisotropyDiscTest/AnisotropyDiscTest.glb",
+        "source":  "https://github.com/KhronosGroup/glTF-Sample-Assets/tree/main/Models/AnisotropyDiscTest",
+        "license":  "AnisotropyDiscTest/README.md",
+        "bytes":  242128,
+        "sha256":  "649b47c896f078fa56070f0ddaf07c57d6a7d109324acdd7d9f2d6748d9842ec"
+    },
+    {
         "name":  "Avocado",
         "file":  "Avocado/Avocado.glb",
         "source":  "https://github.com/KhronosGroup/glTF-Sample-Assets/tree/main/Models/Avocado",

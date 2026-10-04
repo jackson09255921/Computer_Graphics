@@ -62,6 +62,8 @@ visually inspected at native resolution after automated image validation.
 | Transmission textures | [`evolution_transmission_stage13_textures_128spp.png`](evolution_transmission_stage13_textures_128spp.png) | Red-channel patterns control local dielectric reflection/refraction probability |
 | Specular baseline | [`evolution_specular_stage14_baseline_128spp.png`](evolution_specular_stage14_baseline_128spp.png) | Official Khronos grid with extension inputs restored to core dielectric defaults |
 | Specular extension | [`evolution_specular_stage14_extension_128spp.png`](evolution_specular_stage14_extension_128spp.png) | Factor, alpha texture, linear color factor and sRGB color texture separately control F0/F90 |
+| Anisotropy baseline | [`evolution_anisotropy_stage15_baseline_128spp.png`](evolution_anisotropy_stage15_baseline_128spp.png) | Official Khronos disc grid with directional roughness disabled |
+| Anisotropy extension | [`evolution_anisotropy_stage15_extension_128spp.png`](evolution_anisotropy_stage15_extension_128spp.png) | RGB direction/strength map rotates and stretches GGX highlights with matched sampling and PDF |
 | WaterBottle | [`quality_gltf_waterbottle_128spp.png`](quality_gltf_waterbottle_128spp.png) | 4,510 textured PBR triangles at 128 spp |
 | CUDA multi-asset | [`quality_cuda_multi_asset_128spp.png`](quality_cuda_multi_asset_128spp.png) | Bunny and teapot, 11,288 triangles at 1280x720 and 128 spp |
 
