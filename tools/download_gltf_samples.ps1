@@ -39,5 +39,38 @@ foreach ($model in $models) {
         sha256 = $hash
     }
 }
+
+$transformModel = "TextureTransformTest"
+$transformDirectory = Join-Path $Destination $transformModel
+New-Item -ItemType Directory -Force -Path $transformDirectory | Out-Null
+$transformFiles = @("TextureTransformTest.gltf", "TextureTransformTest.bin", "Arrow.png",
+    "Correct.png", "Error.png", "NotSupported.png", "UV.png")
+foreach ($file in $transformFiles) {
+    $target = Join-Path $transformDirectory $file
+    & curl.exe --fail --location --silent --show-error --output $target "$repository/$transformModel/glTF/$file"
+    if ($LASTEXITCODE -ne 0) { throw "failed to download $transformModel/$file" }
+}
+& curl.exe --fail --location --silent --show-error --output (Join-Path $transformDirectory "README.md") `
+    "$repository/$transformModel/README.md"
+if ($LASTEXITCODE -ne 0) { throw "failed to download $transformModel README" }
+$transformAsset = Join-Path $transformDirectory "TextureTransformTest.gltf"
+$dependencies = @()
+foreach ($file in $transformFiles | Where-Object { $_ -ne "TextureTransformTest.gltf" }) {
+    $dependency = Join-Path $transformDirectory $file
+    $dependencies += [ordered]@{
+        file = "$transformModel/$file"
+        bytes = (Get-Item $dependency).Length
+        sha256 = (Get-FileHash -Algorithm SHA256 -Path $dependency).Hash.ToLowerInvariant()
+    }
+}
+$manifest += [ordered]@{
+    name = $transformModel
+    file = "$transformModel/TextureTransformTest.gltf"
+    source = "https://github.com/KhronosGroup/glTF-Sample-Assets/tree/main/Models/$transformModel"
+    license = "$transformModel/README.md"
+    bytes = (Get-Item $transformAsset).Length
+    sha256 = (Get-FileHash -Algorithm SHA256 -Path $transformAsset).Hash.ToLowerInvariant()
+    dependencies = $dependencies
+}
 $manifest | ConvertTo-Json -Depth 4 | Set-Content -Encoding utf8 (Join-Path $Destination "manifest.json")
-Write-Host "Downloaded $($models.Count) licensed Khronos glTF sample assets to $Destination"
+Write-Host "Downloaded $($models.Count + 1) licensed Khronos glTF sample assets to $Destination"

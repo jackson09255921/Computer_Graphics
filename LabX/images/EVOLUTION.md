@@ -69,6 +69,18 @@ and seed `0xC0FFEE`. Alpha processing changes 94,139 pixels with a 4.825 channel
 MAE and maximum channel delta of 181; the reviewed result reveals the rear frame
 and background through MASK/BLEND texels while OPAQUE remains solid.
 
+## TextureTransformTest: UV mapping evolution
+
+| Stage | Commit | Controlled change | Result |
+| --- | --- | --- | --- |
+| 10 — Texture transforms | pending | Enable per-texture texCoord, offset, rotation, scale and sampler wrapping | [`baseline`](evolution_texture_stage10_baseline_128spp.png) · [`transformed`](evolution_texture_stage10_transformed_128spp.png) |
+
+The official Khronos test uses six panels to expose offset, rotation, scale and
+combined mapping errors. Both 640x360 renders use the same camera, studio lights,
+128 spp and seed `0xC0FFEE`. Transform support changes 131,488 pixels with a
+16.287 channel MAE and maximum channel delta of 202. Native review confirms the
+three U/V/UV success panels and all green arrow targets.
+
 ## Rules for future stages
 
 1. Use a new descriptive filename; never replace a reviewed image.

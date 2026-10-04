@@ -8,3 +8,6 @@ the canonical source URL, byte size, and SHA-256 digest of every downloaded GLB.
 These assets exercise UVs, RGBA image textures, alpha modes, normal and
 occlusion maps, multiple materials, and PBR metallic/roughness data. The corpus
 is expanded as each compatibility stage gains a deterministic visual test.
+TextureTransformTest intentionally uses external `.bin` and PNG dependencies;
+the manifest pins every dependency independently rather than treating it as a
+single GLB.

@@ -33,7 +33,9 @@ LabX/
 8. Transmission/IOR, clearcoat and fabric sheen material extensions.
 9. Multi-light studio MIS, material-aware framing and close camera studies.
 10. Occlusion maps, `doubleSided`, RGBA, alpha MASK and stochastic BLEND.
-11. OptiX indexed geometry, recursive GGX, temporal reprojection and ReSTIR DI.
+11. External images, sampler wrapping, TEXCOORD_0/1 and independent
+    `KHR_texture_transform` mappings.
+12. OptiX indexed geometry, recursive GGX, temporal reprojection and ReSTIR DI.
 
 The reviewed progression is recorded in
 [`images/EVOLUTION.md`](images/EVOLUTION.md). Every comparison uses a new file
@@ -73,8 +75,9 @@ READMEs for Khronos validation assets. Large GLBs are downloaded by:
 ```
 
 The current corpus includes Avocado, BoomBox, BoxTextured, DamagedHelmet, Duck,
-Lantern, ToyCar, WaterBottle and AlphaBlendModeTest. Validation checks GLB v2
-headers, byte sizes, SHA-256 digests and license files.
+Lantern, ToyCar, WaterBottle, AlphaBlendModeTest and TextureTransformTest.
+Validation checks glTF/GLB 2.x data, dependency files, byte sizes, SHA-256
+digests and license files.
 
 Legacy `.obj` and `.asc` inputs are normalized under `data/legacy_converted`.
 The converter produces glTF 2.0 geometry plus scene-command JSON, and
@@ -114,11 +117,10 @@ succeeds, so native Windows is the recommended OptiX runtime.
 
 ## Next material stages
 
-1. `KHR_texture_transform` and independent `texCoord` selection per texture.
-2. Clearcoat, sheen and transmission texture variants.
-3. Specular, anisotropy and iridescence extensions.
-4. Volume thickness and colored absorption.
-5. Emissive triangle sampling and mesh-light MIS.
+1. Clearcoat, sheen and transmission texture variants.
+2. Specular, anisotropy and iridescence extensions.
+3. Volume thickness and colored absorption.
+4. Emissive triangle sampling and mesh-light MIS.
 
 Sparse accessors, compressed geometry, skinning and morph targets are separate
 future asset-pipeline tracks.

@@ -21,14 +21,25 @@ def main():
             raise ValueError(f"{entry['name']}: byte length mismatch")
         if hashlib.sha256(payload).hexdigest() != entry["sha256"]:
             raise ValueError(f"{entry['name']}: SHA-256 mismatch")
-        if len(payload) < 12 or payload[:4] != b"glTF":
-            raise ValueError(f"{entry['name']}: invalid GLB magic")
-        version, declared_length = struct.unpack_from("<II", payload, 4)
-        if version != 2 or declared_length != len(payload):
-            raise ValueError(f"{entry['name']}: invalid GLB v2 header")
+        if path.suffix == ".glb":
+            if len(payload) < 12 or payload[:4] != b"glTF":
+                raise ValueError(f"{entry['name']}: invalid GLB magic")
+            version, declared_length = struct.unpack_from("<II", payload, 4)
+            if version != 2 or declared_length != len(payload):
+                raise ValueError(f"{entry['name']}: invalid GLB v2 header")
+        else:
+            document = json.loads(payload)
+            if not str(document.get("asset", {}).get("version", "")).startswith("2."):
+                raise ValueError(f"{entry['name']}: invalid glTF 2.x document")
+        for dependency in entry.get("dependencies", []):
+            dependency_path = ASSETS / dependency["file"]
+            dependency_payload = dependency_path.read_bytes()
+            if len(dependency_payload) != dependency["bytes"] or \
+                    hashlib.sha256(dependency_payload).hexdigest() != dependency["sha256"]:
+                raise ValueError(f"{entry['name']}: dependency mismatch: {dependency['file']}")
         if not (ASSETS / entry["license"]).is_file():
             raise ValueError(f"{entry['name']}: license README missing")
-    print(f"validated {len(entries)} Khronos GLB assets with licenses and SHA-256 digests")
+    print(f"validated {len(entries)} Khronos glTF/GLB assets with licenses and SHA-256 digests")
 
 
 if __name__ == "__main__":

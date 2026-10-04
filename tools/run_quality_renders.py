@@ -83,6 +83,15 @@ def main() -> int:
         publish(source, f"evolution_alpha_stage9_{label}_{args.gpu_spp}spp.png",
                 (640, 360), f"alpha-modes-{label}")
 
+    transform_test = samples / "TextureTransformTest" / "TextureTransformTest.gltf"
+    for mode, label in (("--texture-transform-baseline", "baseline"),
+                        ("--texture-transform", "transformed")):
+        source = artifacts / f"texture_transform_{label}_{args.gpu_spp}spp.ppm"
+        run([str(executable(gpu, "cuda_pathtracer", args.config)), mode,
+             str(transform_test), str(source), str(args.gpu_spp)])
+        publish(source, f"evolution_texture_stage10_{label}_{args.gpu_spp}spp.png",
+                (640, 360), f"texture-transform-{label}")
+
     models = ROOT / "LabX" / "data" / "legacy_converted" / "meshes"
     multi = artifacts / f"cuda_multi_asset_{args.gpu_spp}spp.ppm"
     run([str(executable(gpu, "cuda_pathtracer", args.config)), "--scene", str(multi), str(args.gpu_spp),

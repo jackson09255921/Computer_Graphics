@@ -45,6 +45,9 @@ the reusable core and offline renderers are API-independent and headless.
 - Energy-compensated clearcoat and Charlie/Neubelt fabric sheen.
 - RGBA textures with `OPAQUE`, cutoff `MASK` and stochastic `BLEND` traversal.
 - Correct glTF `doubleSided` handling and single-sided back-face culling.
+- External glTF image URIs, repeat/clamp/mirrored-repeat samplers and
+  `KHR_texture_transform` with independent UV set, offset, rotation and scale
+  for each supported texture slot.
 
 ### OptiX research branch
 
@@ -72,6 +75,7 @@ possible.
 | ToyCar 7 | Close material framing | [baseline](LabX/images/evolution_toycar_stage7_close_baseline_128spp.png) / [sheen](LabX/images/evolution_toycar_stage7_close_sheen_128spp.png) |
 | Helmet 8 | Occlusion map | [baseline](LabX/images/evolution_helmet_stage8_baseline_128spp.png) / [occlusion](LabX/images/evolution_helmet_stage8_occlusion_128spp.png) |
 | Alpha 9 | MASK and BLEND | [opaque](LabX/images/evolution_alpha_stage9_opaque_128spp.png) / [alpha](LabX/images/evolution_alpha_stage9_alpha_128spp.png) |
+| Texture 10 | KHR texture transforms | [baseline](LabX/images/evolution_texture_stage10_baseline_128spp.png) / [transformed](LabX/images/evolution_texture_stage10_transformed_128spp.png) |
 
 See the complete [rendering evolution log](LabX/images/EVOLUTION.md) and
 [reviewed image gallery](LabX/images/README.md).
@@ -217,11 +221,10 @@ The renderer is already useful for deterministic PBR experiments, but full glTF
 and production rendering compatibility is not claimed. The next material stages
 are:
 
-1. `KHR_texture_transform` with independent texture-coordinate selection.
-2. Clearcoat, sheen and transmission texture variants not yet wired end-to-end.
-3. Specular, anisotropy, iridescence and volume/absorption extensions.
-4. Emissive triangle sampling as mesh lights.
-5. Denoising after stable temporal buffers and motion validation.
+1. Clearcoat, sheen and transmission texture variants not yet wired end-to-end.
+2. Specular, anisotropy, iridescence and volume/absorption extensions.
+3. Emissive triangle sampling as mesh lights.
+4. Denoising after stable temporal buffers and motion validation.
 
 Sparse accessors, Draco/Meshopt compression, skinning and morph targets also
 remain future asset-pipeline work.

@@ -52,6 +52,8 @@ visually inspected at native resolution after automated image validation.
 | DamagedHelmet occlusion | [`evolution_helmet_stage8_occlusion_128spp.png`](evolution_helmet_stage8_occlusion_128spp.png) | Occlusion texture and strength darken seams and recessed indirect-light regions |
 | Alpha modes opaque baseline | [`evolution_alpha_stage9_opaque_128spp.png`](evolution_alpha_stage9_opaque_128spp.png) | Khronos AlphaBlendModeTest rendered with every panel forced opaque |
 | Alpha MASK/BLEND | [`evolution_alpha_stage9_alpha_128spp.png`](evolution_alpha_stage9_alpha_128spp.png) | RGBA, cutoff masks, and stochastic blended coverage expose the frame and background |
+| Texture transform baseline | [`evolution_texture_stage10_baseline_128spp.png`](evolution_texture_stage10_baseline_128spp.png) | Khronos transform test with all per-texture transforms disabled |
+| Texture transforms | [`evolution_texture_stage10_transformed_128spp.png`](evolution_texture_stage10_transformed_128spp.png) | Independent texCoord, offset, rotation, scale and sampler wrapping reach the authored success markers |
 | WaterBottle | [`quality_gltf_waterbottle_128spp.png`](quality_gltf_waterbottle_128spp.png) | 4,510 textured PBR triangles at 128 spp |
 | CUDA multi-asset | [`quality_cuda_multi_asset_128spp.png`](quality_cuda_multi_asset_128spp.png) | Bunny and teapot, 11,288 triangles at 1280x720 and 128 spp |
 

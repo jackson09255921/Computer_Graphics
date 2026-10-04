@@ -47,6 +47,7 @@ struct Sphere {
     float3 center; float radius; float3 albedo; float metallic; float roughness;
     float transmission; float index_of_refraction;
 };
+struct UvMapping { float2 offset{}; float2 scale{1.0f, 1.0f}; float rotation{0.0f}; int texcoord{0}; };
 struct Triangle {
     float3 first; float3 second; float3 third; float3 albedo; float metallic; float roughness;
     float transmission; float index_of_refraction;
@@ -60,8 +61,12 @@ struct Triangle {
     float3 sheen_color{}; float sheen_roughness{0.0f};
     int occlusion_texture_index{-1}; float occlusion_strength{1.0f}; bool double_sided{false};
     int alpha_mode{0}; float alpha_cutoff{0.5f}; float alpha_factor{1.0f};
+    float2 first_uv1{}; float2 second_uv1{}; float2 third_uv1{};
+    UvMapping base_color_mapping{}; UvMapping normal_mapping{};
+    UvMapping metallic_roughness_mapping{}; UvMapping emissive_mapping{};
+    UvMapping clearcoat_mapping{}; UvMapping occlusion_mapping{};
 };
-struct TextureDescriptor { int offset; int width; int height; };
+struct TextureDescriptor { int offset; int width; int height; int wrap_s; int wrap_t; };
 struct ImportedAssets {
     std::vector<Triangle> triangles;
     std::vector<float4> texture_pixels;
@@ -89,6 +94,8 @@ struct Hit {
     float clearcoat; float clearcoat_roughness; int clearcoat_texture_index;
     float3 sheen_color; float sheen_roughness;
     int occlusion_texture_index; float occlusion_strength;
+    float2 base_color_uv; float2 normal_uv; float2 metallic_roughness_uv;
+    float2 emissive_uv; float2 clearcoat_uv; float2 occlusion_uv;
 };
 
 struct Rng {
@@ -126,6 +133,14 @@ __device__ bool intersect_box(const Ray& ray, const BvhNode& node, float maximum
 }
 
 __device__ float4 sample_texture_rgba(const GpuTextures& textures, int index, float2 uv);
+__host__ __device__ float2 mapped_uv(float2 uv0, float2 uv1, UvMapping mapping) {
+    const float2 uv = mapping.texcoord == 1 ? uv1 : uv0;
+    const float x = uv.x * mapping.scale.x;
+    const float y = uv.y * mapping.scale.y;
+    const float cosine = cosf(mapping.rotation), sine = sinf(mapping.rotation);
+    return make_float2(mapping.offset.x + cosine * x - sine * y,
+                       mapping.offset.y + sine * x + cosine * y);
+}
 
 __device__ void intersect_triangles(const Ray& ray, const Triangle* triangles, const BvhNode* nodes,
                                     int node_count, GpuTextures textures, Hit& closest) {
@@ -154,11 +169,15 @@ __device__ void intersect_triangles(const Ray& ray, const Triangle* triangles, c
                 const float distance = dot3(edge2, q) * inverse;
                 if (distance <= 1.0e-4f || distance >= closest.distance) continue;
                 if (triangle.alpha_mode != 0) {
-                    const float2 uv = make_float2(
+                    const float2 uv0 = make_float2(
                         triangle.first_uv.x * (1.0f - u - v) + triangle.second_uv.x * u + triangle.third_uv.x * v,
                         triangle.first_uv.y * (1.0f - u - v) + triangle.second_uv.y * u + triangle.third_uv.y * v);
+                    const float2 uv1 = make_float2(
+                        triangle.first_uv1.x * (1.0f - u - v) + triangle.second_uv1.x * u + triangle.third_uv1.x * v,
+                        triangle.first_uv1.y * (1.0f - u - v) + triangle.second_uv1.y * u + triangle.third_uv1.y * v);
                     const float opacity = triangle.alpha_factor *
-                        sample_texture_rgba(textures, triangle.texture_index, uv).w;
+                        sample_texture_rgba(textures, triangle.texture_index,
+                                            mapped_uv(uv0, uv1, triangle.base_color_mapping)).w;
                     if (triangle.alpha_mode == 1 && opacity < triangle.alpha_cutoff) continue;
                     if (triangle.alpha_mode == 2) {
                         const float noise = sinf((ray.origin.x + distance * ray.direction.x) * 12.9898f +
@@ -187,6 +206,15 @@ __device__ void intersect_triangles(const Ray& ray, const Triangle* triangles, c
                                          triangle.third_uv.x * v,
                                          triangle.first_uv.y * (1.0f - u - v) + triangle.second_uv.y * u +
                                          triangle.third_uv.y * v);
+                const float2 uv1 = make_float2(
+                    triangle.first_uv1.x * (1.0f - u - v) + triangle.second_uv1.x * u + triangle.third_uv1.x * v,
+                    triangle.first_uv1.y * (1.0f - u - v) + triangle.second_uv1.y * u + triangle.third_uv1.y * v);
+                closest.base_color_uv = mapped_uv(closest.uv, uv1, triangle.base_color_mapping);
+                closest.normal_uv = mapped_uv(closest.uv, uv1, triangle.normal_mapping);
+                closest.metallic_roughness_uv = mapped_uv(closest.uv, uv1, triangle.metallic_roughness_mapping);
+                closest.emissive_uv = mapped_uv(closest.uv, uv1, triangle.emissive_mapping);
+                closest.clearcoat_uv = mapped_uv(closest.uv, uv1, triangle.clearcoat_mapping);
+                closest.occlusion_uv = mapped_uv(closest.uv, uv1, triangle.occlusion_mapping);
                 closest.texture_index = triangle.texture_index;
                 closest.tangent = triangle.tangent;
                 closest.tangent_handedness = triangle.tangent_handedness;
@@ -270,12 +298,20 @@ __device__ float3 cosine_direction(float3 normal, Rng& rng) {
 __device__ float4 sample_texture_rgba(const GpuTextures& textures, int index, float2 uv) {
     if (index < 0 || index >= textures.count) return make_float4(1, 1, 1, 1);
     const TextureDescriptor texture = textures.descriptors[index];
-    uv.x -= floorf(uv.x); uv.y -= floorf(uv.y);
     const float x = uv.x * texture.width - 0.5f, y = uv.y * texture.height - 0.5f;
     const int x0 = static_cast<int>(floorf(x)), y0 = static_cast<int>(floorf(y));
     const auto texel = [&](int column, int row) {
-        column = (column % texture.width + texture.width) % texture.width;
-        row = (row % texture.height + texture.height) % texture.height;
+        const auto wrap = [](int value, int size, int mode) {
+            if (mode == 33071) return max(0, min(value, size - 1));
+            if (mode == 33648) {
+                const int period = size * 2;
+                const int repeated = (value % period + period) % period;
+                return repeated < size ? repeated : period - 1 - repeated;
+            }
+            return (value % size + size) % size;
+        };
+        column = wrap(column, texture.width, texture.wrap_s);
+        row = wrap(row, texture.height, texture.wrap_t);
         return textures.pixels[texture.offset + row * texture.width + column];
     };
     const float tx = x - floorf(x), ty = y - floorf(y);
@@ -618,24 +654,25 @@ __device__ float3 radiance(Ray ray, const Sphere* spheres, int sphere_count,
             result = add(result, mul(mul(throughput, sample_environment(environment, ray.direction)), weight));
             break;
         }
-        hit.albedo = mul(hit.albedo, sample_texture(textures, hit.texture_index, hit.uv));
+        hit.albedo = mul(hit.albedo, sample_texture(textures, hit.texture_index, hit.base_color_uv));
         if (hit.emissive_texture_index >= 0)
-            hit.emissive = mul(hit.emissive, sample_texture(textures, hit.emissive_texture_index, hit.uv));
+            hit.emissive = mul(hit.emissive, sample_texture(textures, hit.emissive_texture_index, hit.emissive_uv));
         result = add(result, mul(throughput, hit.emissive));
         if (hit.clearcoat_texture_index >= 0)
-            hit.clearcoat *= sample_texture(textures, hit.clearcoat_texture_index, hit.uv).x;
+            hit.clearcoat *= sample_texture(textures, hit.clearcoat_texture_index, hit.clearcoat_uv).x;
         float surface_occlusion = 1.0f;
         if (hit.occlusion_texture_index >= 0) {
-            const float sampled = sample_texture(textures, hit.occlusion_texture_index, hit.uv).x;
+            const float sampled = sample_texture(textures, hit.occlusion_texture_index, hit.occlusion_uv).x;
             surface_occlusion = 1.0f + hit.occlusion_strength * (sampled - 1.0f);
         }
         if (hit.metallic_roughness_texture_index >= 0) {
-            const float3 packed = sample_texture(textures, hit.metallic_roughness_texture_index, hit.uv);
+            const float3 packed = sample_texture(textures, hit.metallic_roughness_texture_index,
+                                                 hit.metallic_roughness_uv);
             hit.roughness = fminf(1.0f, fmaxf(0.04f, hit.roughness * packed.y));
             hit.metallic = fminf(1.0f, fmaxf(0.0f, hit.metallic * packed.z));
         }
         if (hit.normal_texture_index >= 0) {
-            const float3 encoded = sample_texture(textures, hit.normal_texture_index, hit.uv);
+            const float3 encoded = sample_texture(textures, hit.normal_texture_index, hit.normal_uv);
             const float3 tangent_normal = normalize3(make_float3(
                 (encoded.x * 2.0f - 1.0f) * hit.normal_scale,
                 (encoded.y * 2.0f - 1.0f) * hit.normal_scale,
@@ -1076,6 +1113,11 @@ ImportedAssets load_gltf_triangles(const std::filesystem::path& path) {
     const auto convert = [](const cg::Vec3& value) {
         return make_float3(static_cast<float>(value.x), static_cast<float>(value.y), static_cast<float>(value.z));
     };
+    const auto convert_mapping = [](const cg::assets::GltfTextureMapping& mapping) {
+        return UvMapping{make_float2(static_cast<float>(mapping.offset.x), static_cast<float>(mapping.offset.y)),
+                         make_float2(static_cast<float>(mapping.scale.x), static_cast<float>(mapping.scale.y)),
+                         static_cast<float>(mapping.rotation), mapping.texcoord};
+    };
     const auto register_texture = [&](const std::shared_ptr<const cg::assets::GltfTexture>& texture,
                                       bool srgb) {
         if (!texture) return -1;
@@ -1085,7 +1127,8 @@ ImportedAssets load_gltf_triangles(const std::filesystem::path& path) {
         texture_sources.push_back(texture);
         texture_srgb.push_back(srgb);
         result.textures.push_back({static_cast<int>(result.texture_pixels.size()),
-                                   static_cast<int>(texture->width), static_cast<int>(texture->height)});
+                                   static_cast<int>(texture->width), static_cast<int>(texture->height),
+                                   texture->wrap_s, texture->wrap_t});
         for (std::size_t pixel_index = 0; pixel_index < texture->pixels.size(); ++pixel_index) {
             const cg::Color& pixel = texture->pixels[pixel_index];
             const cg::Color value = srgb ? cg::Color{std::pow(pixel.x, 2.2), std::pow(pixel.y, 2.2),
@@ -1109,14 +1152,24 @@ ImportedAssets load_gltf_triangles(const std::filesystem::path& path) {
         const float2 uv0 = make_float2(static_cast<float>(triangle.first_uv.x), static_cast<float>(triangle.first_uv.y));
         const float2 uv1 = make_float2(static_cast<float>(triangle.second_uv.x), static_cast<float>(triangle.second_uv.y));
         const float2 uv2 = make_float2(static_cast<float>(triangle.third_uv.x), static_cast<float>(triangle.third_uv.y));
-        const float determinant = (uv1.x - uv0.x) * (uv2.y - uv0.y) - (uv1.y - uv0.y) * (uv2.x - uv0.x);
+        const float2 uv10 = make_float2(static_cast<float>(triangle.first_uv1.x), static_cast<float>(triangle.first_uv1.y));
+        const float2 uv11 = make_float2(static_cast<float>(triangle.second_uv1.x), static_cast<float>(triangle.second_uv1.y));
+        const float2 uv12 = make_float2(static_cast<float>(triangle.third_uv1.x), static_cast<float>(triangle.third_uv1.y));
+        const UvMapping normal_mapping = convert_mapping(triangle.normal_mapping);
+        const float2 tangent_uv0 = mapped_uv(uv0, uv10, normal_mapping);
+        const float2 tangent_uv1 = mapped_uv(uv1, uv11, normal_mapping);
+        const float2 tangent_uv2 = mapped_uv(uv2, uv12, normal_mapping);
+        const float determinant = (tangent_uv1.x - tangent_uv0.x) * (tangent_uv2.y - tangent_uv0.y) -
+                                  (tangent_uv1.y - tangent_uv0.y) * (tangent_uv2.x - tangent_uv0.x);
         float3 tangent = make_float3(1, 0, 0);
         float handedness = 1.0f;
         if (fabsf(determinant) > 1.0e-8f) {
             const float inverse = 1.0f / determinant;
             const float3 edge1 = sub(second, first), edge2 = sub(third, first);
-            tangent = normalize3(mul(sub(mul(edge1, uv2.y - uv0.y), mul(edge2, uv1.y - uv0.y)), inverse));
-            const float3 bitangent = normalize3(mul(sub(mul(edge2, uv1.x - uv0.x), mul(edge1, uv2.x - uv0.x)), inverse));
+            tangent = normalize3(mul(sub(mul(edge1, tangent_uv2.y - tangent_uv0.y),
+                                         mul(edge2, tangent_uv1.y - tangent_uv0.y)), inverse));
+            const float3 bitangent = normalize3(mul(sub(mul(edge2, tangent_uv1.x - tangent_uv0.x),
+                                                          mul(edge1, tangent_uv2.x - tangent_uv0.x)), inverse));
             const float3 normal = triangle.has_normals ? convert(triangle.first_normal)
                                                         : normalize3(cross3(edge1, edge2));
             handedness = dot3(cross3(normal, tangent), bitangent) < 0.0f ? -1.0f : 1.0f;
@@ -1137,7 +1190,12 @@ ImportedAssets load_gltf_triangles(const std::filesystem::path& path) {
                           static_cast<float>(triangle.sheen_roughness), occlusion_texture_index,
                           static_cast<float>(triangle.occlusion_strength), triangle.double_sided,
                           triangle.alpha_mode, static_cast<float>(triangle.alpha_cutoff),
-                          static_cast<float>(triangle.base_color_alpha)});
+                          static_cast<float>(triangle.base_color_alpha), uv10, uv11, uv12,
+                          convert_mapping(triangle.base_color_mapping), normal_mapping,
+                          convert_mapping(triangle.metallic_roughness_mapping),
+                          convert_mapping(triangle.emissive_mapping),
+                          convert_mapping(triangle.clearcoat_mapping),
+                          convert_mapping(triangle.occlusion_mapping)});
     }
     return result;
 }
@@ -1557,6 +1615,8 @@ int main(int argc, char** argv) {
         const bool occlusion_mode = argc > 1 && std::string(argv[1]) == "--occlusion";
         const bool alpha_baseline_mode = argc > 1 && std::string(argv[1]) == "--alpha-baseline";
         const bool alpha_mode = argc > 1 && std::string(argv[1]) == "--alpha";
+        const bool texture_transform_baseline_mode = argc > 1 && std::string(argv[1]) == "--texture-transform-baseline";
+        const bool texture_transform_mode = argc > 1 && std::string(argv[1]) == "--texture-transform";
         const bool scene_mode = argc > 1 && std::string(argv[1]) == "--scene";
         const bool hdr_mode = argc > 1 && std::string(argv[1]) == "--hdr";
         if (scene_mode) {
@@ -1577,9 +1637,10 @@ int main(int argc, char** argv) {
         } else if (gltf_mode || showcase_mode || showcase_angle_mode || showcase_studio_mode ||
                    fabric_baseline_mode || fabric_sheen_mode || fabric_close_baseline_mode ||
                    fabric_close_sheen_mode || occlusion_baseline_mode || occlusion_mode ||
-                   alpha_baseline_mode || alpha_mode) {
+                   alpha_baseline_mode || alpha_mode || texture_transform_baseline_mode ||
+                   texture_transform_mode) {
             if (argc < 3) throw std::invalid_argument(
-                "usage: cuda_pathtracer --gltf|--showcase|--showcase-angle|--showcase-studio|--fabric-baseline|--fabric-sheen|--fabric-close-baseline|--fabric-close-sheen|--occlusion-baseline|--occlusion|--alpha-baseline|--alpha model.gltf [output.bmp] [spp] [environment.hdr]");
+                "usage: cuda_pathtracer --gltf|--showcase|--showcase-angle|--showcase-studio|--fabric-baseline|--fabric-sheen|--fabric-close-baseline|--fabric-close-sheen|--occlusion-baseline|--occlusion|--alpha-baseline|--alpha|--texture-transform-baseline|--texture-transform model.gltf [output.bmp] [spp] [environment.hdr]");
             imported = load_gltf_triangles(argv[2]);
             if (showcase_mode || showcase_angle_mode || showcase_studio_mode) {
                 frame_imported_triangles(imported.triangles, 3.8f, 0.0f, -4.5f, 1);
@@ -1608,6 +1669,11 @@ int main(int argc, char** argv) {
                 camera = {make_float3(1.0f, 0.4f, 1.5f),
                           make_float3(0.0f, -0.25f, -4.4f), 40.0f};
             }
+            else if (texture_transform_baseline_mode || texture_transform_mode) {
+                frame_imported_triangles(imported.triangles, 4.7f, 0.0f, -4.5f);
+                camera = {make_float3(1.0f, 0.6f, 1.5f),
+                          make_float3(0.0f, 0.25f, -4.4f), 42.0f};
+            }
             else frame_imported_triangles(imported.triangles);
             if (showcase_studio_mode || fabric_baseline_mode || fabric_close_baseline_mode)
                 for (Triangle& triangle : imported.triangles)
@@ -1618,6 +1684,15 @@ int main(int argc, char** argv) {
             if (alpha_baseline_mode)
                 for (Triangle& triangle : imported.triangles)
                     triangle.alpha_mode = 0;
+            if (texture_transform_baseline_mode)
+                for (Triangle& triangle : imported.triangles) {
+                    triangle.base_color_mapping = {};
+                    triangle.normal_mapping = {};
+                    triangle.metallic_roughness_mapping = {};
+                    triangle.emissive_mapping = {};
+                    triangle.clearcoat_mapping = {};
+                    triangle.occlusion_mapping = {};
+                }
             output = argc > 3 ? argv[3] : "cuda_gltf_pathtracer.bmp";
             samples = argc > 4 ? std::stoi(argv[4]) : 64;
             if (argc > 5) environment = std::make_unique<cg::environment::EnvironmentMap>(
@@ -1639,11 +1714,13 @@ int main(int argc, char** argv) {
                                !showcase_studio_mode && !fabric_baseline_mode &&
                                !fabric_sheen_mode && !fabric_close_baseline_mode &&
                                !fabric_close_sheen_mode && !occlusion_baseline_mode &&
-                               !occlusion_mode && !alpha_baseline_mode && !alpha_mode && !scene_mode,
+                               !occlusion_mode && !alpha_baseline_mode && !alpha_mode &&
+                               !texture_transform_baseline_mode && !texture_transform_mode && !scene_mode,
                            environment.get(), camera,
                            showcase_studio_mode || fabric_baseline_mode || fabric_sheen_mode ||
                                fabric_close_baseline_mode || fabric_close_sheen_mode ||
-                               occlusion_baseline_mode || occlusion_mode || alpha_baseline_mode || alpha_mode));
+                               occlusion_baseline_mode || occlusion_mode || alpha_baseline_mode || alpha_mode ||
+                               texture_transform_baseline_mode || texture_transform_mode));
         std::cout << "CUDA path traced " << width << 'x' << height << " at " << samples
                   << " spp with " << imported.triangles.size() << " imported triangles"
                   << (environment ? " and HDR environment" : "") << " to " << output << '\n';

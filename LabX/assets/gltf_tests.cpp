@@ -169,6 +169,14 @@ int main() {
         require(near(texture.sample_alpha({0.25, 0.25}), 0.25) &&
                     near(texture.sample_alpha({1.25, 0.25}), 0.25),
                 "alpha texture sampling must be bilinear and repeat UV coordinates");
+        cg::assets::GltfTexture clamped = texture;
+        clamped.wrap_s = 33071;
+        require(near(clamped.sample({1.25, 0.25}).y, 1.0),
+                "clamp-to-edge sampler mode must retain the last column");
+        cg::assets::GltfTexture mirrored = texture;
+        mirrored.wrap_s = 33648;
+        require(near(mirrored.sample({1.25, 0.25}).y, 1.0),
+                "mirrored-repeat sampler mode must reflect alternate periods");
 
         std::filesystem::remove(gltf_path);
         std::filesystem::remove(bin_path);

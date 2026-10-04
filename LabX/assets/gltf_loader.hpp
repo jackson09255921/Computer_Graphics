@@ -13,8 +13,17 @@ struct GltfTexture {
     std::size_t height{};
     std::vector<Color> pixels;
     std::vector<double> alpha;
+    int wrap_s{10497};
+    int wrap_t{10497};
     [[nodiscard]] Color sample(Vec2 uv) const;
     [[nodiscard]] double sample_alpha(Vec2 uv) const;
+};
+
+struct GltfTextureMapping {
+    int texcoord{0};
+    Vec2 offset{};
+    Vec2 scale{1.0, 1.0};
+    double rotation{0.0};
 };
 
 struct GltfTriangle {
@@ -47,6 +56,15 @@ struct GltfTriangle {
     int alpha_mode{0};  // 0: OPAQUE, 1: MASK, 2: BLEND
     double alpha_cutoff{0.5};
     double base_color_alpha{1.0};
+    Vec2 first_uv1;
+    Vec2 second_uv1;
+    Vec2 third_uv1;
+    GltfTextureMapping base_color_mapping;
+    GltfTextureMapping normal_mapping;
+    GltfTextureMapping metallic_roughness_mapping;
+    GltfTextureMapping emissive_mapping;
+    GltfTextureMapping clearcoat_mapping;
+    GltfTextureMapping occlusion_mapping;
 };
 
 class GltfAsset {
