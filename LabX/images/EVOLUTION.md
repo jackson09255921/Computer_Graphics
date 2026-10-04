@@ -61,7 +61,7 @@ darkening in seams, panel gaps, and recessed parts rather than a global color sh
 
 | Stage | Commit | Controlled change | Result |
 | --- | --- | --- | --- |
-| 9 — Alpha modes | pending | Preserve RGBA and enable MASK cutoff plus stochastic BLEND coverage during BVH traversal | [`opaque baseline`](evolution_alpha_stage9_opaque_128spp.png) · [`alpha`](evolution_alpha_stage9_alpha_128spp.png) |
+| 9 — Alpha modes | `979a9d1` | Preserve RGBA and enable MASK cutoff plus stochastic BLEND coverage during BVH traversal | [`opaque baseline`](evolution_alpha_stage9_opaque_128spp.png) · [`alpha`](evolution_alpha_stage9_alpha_128spp.png) |
 
 The official Khronos test asset exposes five authored opacity/cutoff cases in a
 single view. Both 640x360 renders use the same camera, studio lights, 128 spp,
