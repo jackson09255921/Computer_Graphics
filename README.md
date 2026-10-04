@@ -38,6 +38,8 @@ the reusable core and offline renderers are API-independent and headless.
 - CPU-built flattened BVH traversed on the GPU.
 - Bounded 16×16 tile buffers for the RTX 4060 Laptop 8 GiB target.
 - Multi-light MIS, environment MIS, Russian roulette and up to six path bounces.
+- Emissive triangle mesh lights with area/power CDF selection, next-event
+  estimation, solid-angle PDFs and BSDF/light power-heuristic MIS.
 - Textured glTF scenes, multi-object composition and deterministic quality renders.
 - Base-color, normal, metallic-roughness, emissive and occlusion maps.
 - `KHR_materials_transmission`, `KHR_materials_ior`, `KHR_materials_clearcoat` and
@@ -90,6 +92,7 @@ possible.
 | Transmission 13 | Per-pixel dielectric transmission | [baseline](LabX/images/evolution_transmission_stage13_baseline_128spp.png) / [textures](LabX/images/evolution_transmission_stage13_textures_128spp.png) |
 | Specular 14 | Dielectric F0/F90 factor and color controls | [baseline](LabX/images/evolution_specular_stage14_baseline_128spp.png) / [extension](LabX/images/evolution_specular_stage14_extension_128spp.png) |
 | Anisotropy 15 | Directional GGX strength, rotation and texture | [baseline](LabX/images/evolution_anisotropy_stage15_baseline_128spp.png) / [extension](LabX/images/evolution_anisotropy_stage15_extension_128spp.png) |
+| Mesh light 16 | Emissive triangles, NEE and BSDF/light MIS | [baseline](LabX/images/evolution_mesh_light_stage16_baseline_128spp.png) / [NEE + MIS](LabX/images/evolution_mesh_light_stage16_nee_mis_128spp.png) |
 
 See the complete [rendering evolution log](LabX/images/EVOLUTION.md) and
 [reviewed image gallery](LabX/images/README.md).
@@ -232,12 +235,12 @@ shading. See [the legacy source tree](legacy/) and
 ## Current roadmap and limitations
 
 The renderer is already useful for deterministic PBR experiments, but full glTF
-and production rendering compatibility is not claimed. The next material stages
-are:
+and production rendering compatibility is not claimed. Emissive triangles now
+participate in direct-light transport through NEE/MIS. The next stages are:
 
-1. Iridescence and volume/absorption extensions.
-3. Emissive triangle sampling as mesh lights.
-4. Denoising after stable temporal buffers and motion validation.
+1. Colored volume absorption and more stable transmission sampling.
+2. Focused glass-caustic validation and variance measurements.
+3. Adaptive sampling and denoising after stable temporal-buffer validation.
 
 Sparse accessors, Draco/Meshopt compression, skinning and morph targets also
 remain future asset-pipeline work.

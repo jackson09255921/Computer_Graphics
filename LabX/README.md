@@ -125,7 +125,10 @@ succeeds, so native Windows is the recommended OptiX runtime.
 1. Clearcoat, sheen and transmission texture variants.
 2. Specular, anisotropy and iridescence extensions.
 3. Volume thickness and colored absorption.
-4. Emissive triangle sampling and mesh-light MIS.
+4. Emissive triangle sampling, power-weighted selection, NEE and mesh-light MIS (complete).
+
+The next lighting milestone is stable dielectric transmission plus a controlled
+glass-caustic validation scene before adaptive sampling and denoising.
 
 Sparse accessors, compressed geometry, skinning and morph targets are separate
 future asset-pipeline tracks.

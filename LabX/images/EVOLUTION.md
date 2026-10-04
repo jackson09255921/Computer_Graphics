@@ -5,6 +5,20 @@ variable at a time. Images are never overwritten after review. Every comparison
 uses the same model, resolution, sample count, and random seed unless the table
 explicitly says otherwise.
 
+## Mesh-light transport evolution
+
+| Stage | Commit | Controlled change | Result |
+| --- | --- | --- | --- |
+| 16 — Emissive surface only | `885ead0` | Keep the same emissive ceiling geometry but disable explicit mesh-light sampling | [`baseline`](evolution_mesh_light_stage16_baseline_128spp.png) |
+| 17 — Mesh-light NEE | `885ead0` | Uniform point sampling on emissive triangles converts the area PDF to solid angle | [`NEE + MIS`](evolution_mesh_light_stage16_nee_mis_128spp.png) |
+| 18 — BSDF/light MIS | `885ead0` | Power-heuristic weighting joins direct-light samples with BSDF hits | [`NEE + MIS`](evolution_mesh_light_stage16_nee_mis_128spp.png) |
+| 19 — Power distribution | `885ead0` | Select triangles from an area-times-average-luminance CDF | [`NEE + MIS`](evolution_mesh_light_stage16_nee_mis_128spp.png) |
+
+Both 640x360 images use 128 spp and seed `0xC0FFEE`. Their mean absolute
+channel difference is 10.909. The feature image shows the emissive ceiling
+casting warm light and soft shadows onto the floor and three test materials;
+the baseline can only discover that transport through much noisier BSDF paths.
+
 ## Lantern: material evolution
 
 | Stage | Commit | Controlled change | Result |

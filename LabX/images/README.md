@@ -64,6 +64,8 @@ visually inspected at native resolution after automated image validation.
 | Specular extension | [`evolution_specular_stage14_extension_128spp.png`](evolution_specular_stage14_extension_128spp.png) | Factor, alpha texture, linear color factor and sRGB color texture separately control F0/F90 |
 | Anisotropy baseline | [`evolution_anisotropy_stage15_baseline_128spp.png`](evolution_anisotropy_stage15_baseline_128spp.png) | Official Khronos disc grid with directional roughness disabled |
 | Anisotropy extension | [`evolution_anisotropy_stage15_extension_128spp.png`](evolution_anisotropy_stage15_extension_128spp.png) | RGB direction/strength map rotates and stretches GGX highlights with matched sampling and PDF |
+| Mesh-light baseline | [`evolution_mesh_light_stage16_baseline_128spp.png`](evolution_mesh_light_stage16_baseline_128spp.png) | Emissive ceiling triangles are visible, but excluded from explicit direct-light sampling |
+| Mesh-light NEE + MIS | [`evolution_mesh_light_stage16_nee_mis_128spp.png`](evolution_mesh_light_stage16_nee_mis_128spp.png) | Power-weighted triangle selection, solid-angle PDF and BSDF/light MIS produce warm illumination and stable soft shadows |
 | WaterBottle | [`quality_gltf_waterbottle_128spp.png`](quality_gltf_waterbottle_128spp.png) | 4,510 textured PBR triangles at 128 spp |
 | CUDA multi-asset | [`quality_cuda_multi_asset_128spp.png`](quality_cuda_multi_asset_128spp.png) | Bunny and teapot, 11,288 triangles at 1280x720 and 128 spp |
 
