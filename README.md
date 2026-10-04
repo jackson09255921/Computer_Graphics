@@ -346,8 +346,9 @@ The pipeline runs the CTest suite, Bezier, CPU ray/path tracing, all 60 animatio
 frames, four legacy ASC meshes, manifest-pinned Khronos glTF assets, and the
 optional CUDA suite plus multi-asset render. It rejects missing, truncated,
 blank, or incorrectly sized images and writes both JSON and JUnit reports under
-`<build-dir>/validation-artifacts`. Jenkins invokes this same entry point and
-archives the reports and render outputs.
+`<build-dir>/validation-artifacts`. Validated representative renders are also
+published as `pipeline_*.png` files in `LabX/images`. Jenkins invokes this same
+entry point and archives the reports and render outputs.
 
 ## Current limitations
 

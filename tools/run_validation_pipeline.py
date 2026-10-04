@@ -13,6 +13,7 @@ import subprocess
 import sys
 import time
 import xml.etree.ElementTree as ET
+import zlib
 
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
@@ -79,6 +80,42 @@ def validate_image(path: pathlib.Path, expected: tuple[int, int]) -> dict[str, o
             "bytes": path.stat().st_size, "sha256": hashlib.sha256(path.read_bytes()).hexdigest()}
 
 
+def rgb_pixels(path: pathlib.Path) -> tuple[int, int, bytes]:
+    payload = path.read_bytes()
+    if payload[:2] == b"BM" and len(payload) >= 54:
+        width, signed_height = struct.unpack_from("<ii", payload, 18)
+        bits = struct.unpack_from("<H", payload, 28)[0]
+        if width <= 0 or signed_height == 0 or bits != 24:
+            raise ValueError(f"unsupported BMP layout: {path}")
+        height = abs(signed_height)
+        offset = struct.unpack_from("<I", payload, 10)[0]
+        stride = (width * 3 + 3) & ~3
+        rows = []
+        for display_y in range(height):
+            source_y = height - 1 - display_y if signed_height > 0 else display_y
+            row = payload[offset + source_y * stride:offset + source_y * stride + width * 3]
+            rows.append(bytes(channel for pixel in range(width)
+                              for channel in (row[pixel * 3 + 2], row[pixel * 3 + 1], row[pixel * 3])))
+        return width, height, b"".join(rows)
+    width, height, pixels = image_info(path)
+    if payload[:2] != b"P6" or len(pixels) < width * height * 3:
+        raise ValueError(f"PNG publication requires a binary RGB image: {path}")
+    return width, height, pixels[:width * height * 3]
+
+
+def publish_png(source: pathlib.Path, destination: pathlib.Path) -> str:
+    width, height, pixels = rgb_pixels(source)
+    scanlines = b"".join(b"\0" + pixels[row * width * 3:(row + 1) * width * 3]
+                         for row in range(height))
+    def chunk(kind: bytes, data: bytes) -> bytes:
+        return struct.pack(">I", len(data)) + kind + data + struct.pack(">I", zlib.crc32(kind + data) & 0xffffffff)
+    png = (b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", struct.pack(">IIBBBBB", width, height, 8, 2, 0, 0, 0)) +
+           chunk(b"IDAT", zlib.compress(scanlines, 9)) + chunk(b"IEND", b""))
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    destination.write_bytes(png)
+    return str(destination.relative_to(ROOT))
+
+
 def write_reports(output: pathlib.Path, records: list[dict[str, object]], elapsed: float) -> None:
     report = {"status": "passed", "elapsed_seconds": round(elapsed, 3), "validations": records}
     (output / "validation-report.json").write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
@@ -99,6 +136,7 @@ def main() -> int:
     args = parser.parse_args()
     build = (ROOT / args.build_dir).resolve()
     output = build / "validation-artifacts"
+    gallery = ROOT / "LabX" / "images"
     output.mkdir(parents=True, exist_ok=True)
     records: list[dict[str, object]] = []
     started = time.monotonic()
@@ -114,14 +152,18 @@ def main() -> int:
     stage("cpu-ctest", lambda: {"output": run(ctest).strip().splitlines()[-1]})
 
     renders = [
-        ("bezier", "bezier_demo", [str(output / "bezier.bmp")], (960, 540)),
-        ("raytracer", "raytracer_demo", [str(output / "raytracer.bmp")], (800, 450)),
-        ("pathtracer", "pathtracer_demo", [str(output / "pathtracer.bmp"), str(args.spp)], (640, 360)),
+        ("bezier", "bezier_demo", [str(output / "bezier.bmp")], (960, 540), "pipeline_bezier.png"),
+        ("raytracer", "raytracer_demo", [str(output / "raytracer.bmp")], (800, 450), "pipeline_cpu_raytracer.png"),
+        ("pathtracer", "pathtracer_demo", [str(output / "pathtracer.bmp"), str(args.spp)], (640, 360),
+         "pipeline_cpu_pathtracer_smoke.png"),
     ]
-    for name, program, command_args, dimensions in renders:
-        def render(program=program, command_args=command_args, dimensions=dimensions):
+    for name, program, command_args, dimensions, gallery_name in renders:
+        def render(program=program, command_args=command_args, dimensions=dimensions, gallery_name=gallery_name):
             run([str(executable(build, program, args.config)), *command_args])
-            return validate_image(pathlib.Path(command_args[0]), dimensions)
+            source = pathlib.Path(command_args[0])
+            result = validate_image(source, dimensions)
+            result["published"] = publish_png(source, gallery / gallery_name)
+            return result
         stage(f"render-{name}", render)
 
     animation_dir = output / "animation"
@@ -135,6 +177,8 @@ def main() -> int:
         sheet = validate_image(animation_dir / "contact_sheet.bmp", (960, 540))
         if first["sha256"] == last["sha256"]:
             raise ValueError("animation: first and last frames are identical")
+        sheet["published"] = publish_png(animation_dir / "contact_sheet.bmp",
+                                          gallery / "pipeline_animation_contact_sheet.png")
         return {"frames": len(frames), "contact_sheet": sheet}
     stage("render-animation", animation)
 
@@ -143,7 +187,9 @@ def main() -> int:
         def render_legacy(model=model):
             target = output / f"legacy_{model}.bmp"
             run([str(executable(build, "legacy_asc_demo", args.config)), str(legacy / f"{model}.asc"), str(target)])
-            return validate_image(target, (512, 512))
+            result = validate_image(target, (512, 512))
+            result["published"] = publish_png(target, gallery / f"pipeline_legacy_{model}.png")
+            return result
         stage(f"legacy-{model}", render_legacy)
 
     def external_assets() -> dict[str, object]:
@@ -174,7 +220,9 @@ def main() -> int:
         def cuda_render():
             run([str(executable(gpu, "cuda_pathtracer", args.config)), "--scene", str(target), str(args.spp),
                  str(models / "bunny_from_obj.gltf"), str(models / "teapot_from_obj.gltf")])
-            return validate_image(target, (1280, 720))
+            result = validate_image(target, (1280, 720))
+            result["published"] = publish_png(target, gallery / "pipeline_cuda_multi_asset_smoke.png")
+            return result
         stage("render-cuda-multi-asset", cuda_render)
 
     write_reports(output, records, time.monotonic() - started)
