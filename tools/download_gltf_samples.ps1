@@ -14,6 +14,7 @@ $models = @(
     "Duck",
     "Lantern",
     "SheenTestGrid",
+    "SpecularTest",
     "ToyCar",
     "TransmissionTest",
     "WaterBottle"

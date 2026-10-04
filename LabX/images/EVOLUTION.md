@@ -123,6 +123,20 @@ changes 48,355 pixels with a 0.601 channel MAE and maximum channel delta of
 while the checkerboard remains visible through refracted regions. The glTF
 `KHR_materials_transmission` workflow dates to 2020.
 
+## SpecularTest: dielectric reflectance evolution
+
+| Stage | Commit | Controlled change | Result |
+| --- | --- | --- | --- |
+| 14 — Specular extension | pending | Enable factor/color and alpha/RGB texture controls for dielectric F0/F90 | [`baseline`](evolution_specular_stage14_baseline_128spp.png) · [`extension`](evolution_specular_stage14_extension_128spp.png) |
+
+The official Khronos SpecularTest contains 44,828 triangles and seven labelled
+rows. Both 640x360 renders use the same camera, studio lights, 128 spp and seed
+`0xC0FFEE`. The extension changes 51,047 pixels with a 1.980 channel MAE and
+maximum channel delta of 255. Native review confirms matching factor/texture
+rows, yellow F0 with white grazing reflections, no purple RGB leakage from the
+alpha-only texture, and the final above-one color ramp reaching mirror-like F0.
+`KHR_materials_specular` was ratified in 2021.
+
 ## Rules for future stages
 
 1. Use a new descriptive filename; never replace a reviewed image.

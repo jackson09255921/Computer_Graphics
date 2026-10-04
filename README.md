@@ -48,6 +48,8 @@ the reusable core and offline renderers are API-independent and headless.
 - Sheen color (sRGB RGB) and roughness (linear alpha) textures with independent
   UV mappings.
 - Red-channel transmission textures layered over dielectric Fresnel/refraction.
+- `KHR_materials_specular` factor/color controls and alpha/RGB textures with
+  distinct F0 and grazing-angle F90 behavior.
 - RGBA textures with `OPAQUE`, cutoff `MASK` and stochastic `BLEND` traversal.
 - Correct glTF `doubleSided` handling and single-sided back-face culling.
 - External glTF image URIs, repeat/clamp/mirrored-repeat samplers and
@@ -84,6 +86,7 @@ possible.
 | Clearcoat 11 | Factor, roughness and coat-normal textures | [baseline](LabX/images/evolution_clearcoat_stage11_baseline_128spp.png) / [textures](LabX/images/evolution_clearcoat_stage11_textures_128spp.png) |
 | Sheen 12 | Color and alpha-channel roughness textures | [baseline](LabX/images/evolution_sheen_stage12_baseline_128spp.png) / [textures](LabX/images/evolution_sheen_stage12_textures_128spp.png) |
 | Transmission 13 | Per-pixel dielectric transmission | [baseline](LabX/images/evolution_transmission_stage13_baseline_128spp.png) / [textures](LabX/images/evolution_transmission_stage13_textures_128spp.png) |
+| Specular 14 | Dielectric F0/F90 factor and color controls | [baseline](LabX/images/evolution_specular_stage14_baseline_128spp.png) / [extension](LabX/images/evolution_specular_stage14_extension_128spp.png) |
 
 See the complete [rendering evolution log](LabX/images/EVOLUTION.md) and
 [reviewed image gallery](LabX/images/README.md).
@@ -229,7 +232,7 @@ The renderer is already useful for deterministic PBR experiments, but full glTF
 and production rendering compatibility is not claimed. The next material stages
 are:
 
-1. Specular, anisotropy, iridescence and volume/absorption extensions.
+1. Anisotropy, iridescence and volume/absorption extensions.
 3. Emissive triangle sampling as mesh lights.
 4. Denoising after stable temporal buffers and motion validation.
 

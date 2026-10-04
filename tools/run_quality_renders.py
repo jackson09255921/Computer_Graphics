@@ -123,6 +123,14 @@ def main() -> int:
         publish(source, f"evolution_transmission_stage13_{label}_{args.gpu_spp}spp.png",
                 (640, 360), f"transmission-texture-{label}")
 
+    specular_test = samples / "SpecularTest" / "SpecularTest.glb"
+    for mode, label in (("--specular-baseline", "baseline"), ("--specular", "extension")):
+        source = artifacts / f"specular_{label}_{args.gpu_spp}spp.ppm"
+        run([str(executable(gpu, "cuda_pathtracer", args.config)), mode,
+             str(specular_test), str(source), str(args.gpu_spp)])
+        publish(source, f"evolution_specular_stage14_{label}_{args.gpu_spp}spp.png",
+                (640, 360), f"specular-{label}")
+
     models = ROOT / "LabX" / "data" / "legacy_converted" / "meshes"
     multi = artifacts / f"cuda_multi_asset_{args.gpu_spp}spp.ppm"
     run([str(executable(gpu, "cuda_pathtracer", args.config)), "--scene", str(multi), str(args.gpu_spp),
