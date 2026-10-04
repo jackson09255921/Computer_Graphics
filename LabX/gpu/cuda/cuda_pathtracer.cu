@@ -54,6 +54,7 @@ struct Triangle {
     float2 first_uv; float2 second_uv; float2 third_uv; int texture_index{-1};
     float3 tangent; float tangent_handedness{1.0f}; int normal_texture_index{-1}; float normal_scale{1.0f};
     int metallic_roughness_texture_index{-1};
+    float3 emissive; int emissive_texture_index{-1};
 };
 struct TextureDescriptor { int offset; int width; int height; };
 struct ImportedAssets {
@@ -77,6 +78,7 @@ struct Hit {
     float2 uv; int texture_index;
     float3 tangent; float tangent_handedness; int normal_texture_index; float normal_scale;
     int metallic_roughness_texture_index;
+    float3 emissive; int emissive_texture_index;
 };
 
 struct Rng {
@@ -164,6 +166,8 @@ __device__ void intersect_triangles(const Ray& ray, const Triangle* triangles, c
                 closest.normal_texture_index = triangle.normal_texture_index;
                 closest.normal_scale = triangle.normal_scale;
                 closest.metallic_roughness_texture_index = triangle.metallic_roughness_texture_index;
+                closest.emissive = triangle.emissive;
+                closest.emissive_texture_index = triangle.emissive_texture_index;
                 closest.found = true;
             }
         } else {
@@ -203,6 +207,8 @@ __device__ bool intersect_scene(const Ray& ray, const Sphere* spheres, int spher
         closest.texture_index = -1;
         closest.normal_texture_index = -1;
         closest.metallic_roughness_texture_index = -1;
+        closest.emissive = make_float3(0, 0, 0);
+        closest.emissive_texture_index = -1;
         closest.found = true;
     }
     intersect_triangles(ray, triangles, nodes, node_count, closest);
@@ -518,6 +524,9 @@ __device__ float3 radiance(Ray ray, const Sphere* spheres, int sphere_count,
             break;
         }
         hit.albedo = mul(hit.albedo, sample_texture(textures, hit.texture_index, hit.uv));
+        if (hit.emissive_texture_index >= 0)
+            hit.emissive = mul(hit.emissive, sample_texture(textures, hit.emissive_texture_index, hit.uv));
+        result = add(result, mul(throughput, hit.emissive));
         if (hit.metallic_roughness_texture_index >= 0) {
             const float3 packed = sample_texture(textures, hit.metallic_roughness_texture_index, hit.uv);
             hit.roughness = fminf(1.0f, fmaxf(0.04f, hit.roughness * packed.y));
@@ -967,6 +976,7 @@ ImportedAssets load_gltf_triangles(const std::filesystem::path& path) {
         const int normal_texture_index = register_texture(triangle.normal_texture, false);
         const int metallic_roughness_texture_index =
             register_texture(triangle.metallic_roughness_texture, false);
+        const int emissive_texture_index = register_texture(triangle.emissive_texture, true);
         const float3 first = convert(triangle.first), second = convert(triangle.second), third = convert(triangle.third);
         const float2 uv0 = make_float2(static_cast<float>(triangle.first_uv.x), static_cast<float>(triangle.first_uv.y));
         const float2 uv1 = make_float2(static_cast<float>(triangle.second_uv.x), static_cast<float>(triangle.second_uv.y));
@@ -991,7 +1001,8 @@ ImportedAssets load_gltf_triangles(const std::filesystem::path& path) {
                           convert(triangle.first_normal), convert(triangle.second_normal),
                           convert(triangle.third_normal), triangle.has_normals,
                           uv0, uv1, uv2, texture_index, tangent, handedness, normal_texture_index,
-                          static_cast<float>(triangle.normal_scale), metallic_roughness_texture_index});
+                          static_cast<float>(triangle.normal_scale), metallic_roughness_texture_index,
+                          convert(triangle.emissive_factor), emissive_texture_index});
     }
     return result;
 }
@@ -1010,6 +1021,7 @@ void append_imported(ImportedAssets& destination, ImportedAssets source) {
         if (triangle.normal_texture_index >= 0) triangle.normal_texture_index += texture_base;
         if (triangle.metallic_roughness_texture_index >= 0)
             triangle.metallic_roughness_texture_index += texture_base;
+        if (triangle.emissive_texture_index >= 0) triangle.emissive_texture_index += texture_base;
         destination.triangles.push_back(triangle);
     }
 }

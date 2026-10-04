@@ -29,6 +29,8 @@ struct GltfTriangle {
     std::shared_ptr<const GltfTexture> base_color_texture;
     std::shared_ptr<const GltfTexture> normal_texture;
     std::shared_ptr<const GltfTexture> metallic_roughness_texture;
+    std::shared_ptr<const GltfTexture> emissive_texture;
+    Color emissive_factor{};
     double normal_scale{1.0};
     rt::Material material;
 };

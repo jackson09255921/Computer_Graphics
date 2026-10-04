@@ -50,7 +50,7 @@ int main() {
     {"bufferView":1,"componentType":5123,"count":3,"type":"SCALAR"},
     {"bufferView":2,"componentType":5126,"count":3,"type":"VEC3"}
   ],
-  "materials":[{"pbrMetallicRoughness":{"baseColorFactor":[0.2,0.4,0.8,1],"metallicFactor":0.6,"roughnessFactor":0.25}}],
+  "materials":[{"emissiveFactor":[0.1,0.2,0.3],"pbrMetallicRoughness":{"baseColorFactor":[0.2,0.4,0.8,1],"metallicFactor":0.6,"roughnessFactor":0.25}}],
   "meshes":[{"primitives":[{"attributes":{"POSITION":0,"NORMAL":2},"indices":1,"material":0}]}],
   "nodes":[{"mesh":0,"translation":[2,3,4],"scale":[2,2,2]}],
   "scenes":[{"nodes":[0]}],"scene":0
@@ -67,6 +67,9 @@ int main() {
         require(near(triangle.material.albedo.z, 0.8) && near(triangle.material.metallic, 0.6) &&
                     near(triangle.material.roughness, 0.25),
                 "metallic-roughness material factors must be imported");
+        require(near(triangle.emissive_factor.x, 0.1) && near(triangle.emissive_factor.y, 0.2) &&
+                    near(triangle.emissive_factor.z, 0.3),
+                "emissive material factor must be imported");
         require(triangle.has_normals && near(triangle.first_normal.z, 1.0) &&
                     near(triangle.second_normal.y, 1.0) && near(triangle.third_normal.x, 1.0),
                 "NORMAL accessor must be imported and transformed");

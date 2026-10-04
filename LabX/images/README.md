@@ -32,7 +32,8 @@ visually inspected at native resolution after automated image validation.
 | CPU path tracer | [`quality_cpu_pathtracer_512spp.png`](quality_cpu_pathtracer_512spp.png) | 512 spp reference for indirect lighting, glass, reflection, and soft shadows |
 | Avocado | [`quality_gltf_avocado_128spp.png`](quality_gltf_avocado_128spp.png) | 682 textured PBR triangles at 128 spp |
 | BoomBox | [`quality_gltf_boombox_128spp.png`](quality_gltf_boombox_128spp.png) | 6,018 textured PBR triangles at 128 spp |
-| Lantern | [`quality_gltf_lantern_128spp.png`](quality_gltf_lantern_128spp.png) | 5,392 textured PBR triangles at 128 spp |
+| Lantern baseline | [`quality_gltf_lantern_128spp.png`](quality_gltf_lantern_128spp.png) | Pre-emissive reference retained for visual comparison |
+| Lantern emissive | [`quality_gltf_lantern_emissive_128spp.png`](quality_gltf_lantern_emissive_128spp.png) | 5,392 textured PBR triangles with an sRGB emissive map at 128 spp |
 | ToyCar | [`quality_gltf_toycar_128spp.png`](quality_gltf_toycar_128spp.png) | 99,081 triangles at 128 spp; singular hidden-node transforms handled safely |
 | WaterBottle | [`quality_gltf_waterbottle_128spp.png`](quality_gltf_waterbottle_128spp.png) | 4,510 textured PBR triangles at 128 spp |
 | CUDA multi-asset | [`quality_cuda_multi_asset_128spp.png`](quality_cuda_multi_asset_128spp.png) | Bunny and teapot, 11,288 triangles at 1280x720 and 128 spp |

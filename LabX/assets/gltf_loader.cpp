@@ -436,6 +436,8 @@ GltfAsset GltfAsset::load(const std::filesystem::path& path) {
             std::shared_ptr<const GltfTexture> base_color_texture;
             std::shared_ptr<const GltfTexture> normal_texture;
             std::shared_ptr<const GltfTexture> metallic_roughness_texture;
+            std::shared_ptr<const GltfTexture> emissive_texture;
+            Color emissive_factor{};
             double normal_scale = 1.0;
             if (const Json* material_index = primitive.find("material")) {
                 const std::size_t index = integer(*material_index);
@@ -452,6 +454,11 @@ GltfAsset GltfAsset::load(const std::filesystem::path& path) {
                     normal_texture = textures.at(member_integer(*texture, "index"));
                     if (const Json* scale = texture->find("scale")) normal_scale = scale->number();
                 }
+                if (const Json* texture = material_source.find("emissiveTexture"))
+                    emissive_texture = textures.at(member_integer(*texture, "index"));
+                if (const Json* factor = material_source.find("emissiveFactor"))
+                    emissive_factor = {factor->array()[0].number(), factor->array()[1].number(),
+                                       factor->array()[2].number()};
             }
             for (std::size_t i = 0; i < element_indices.size(); i += 3) {
                 const Vec3 a = transform(world, vertices.at(element_indices[i]));
@@ -464,7 +471,8 @@ GltfAsset GltfAsset::load(const std::filesystem::path& path) {
                         vertex_uvs.empty() ? Vec2{} : vertex_uvs.at(element_indices[i]),
                         vertex_uvs.empty() ? Vec2{} : vertex_uvs.at(element_indices[i + 1]),
                         vertex_uvs.empty() ? Vec2{} : vertex_uvs.at(element_indices[i + 2]),
-                        base_color_texture, normal_texture, metallic_roughness_texture, normal_scale, material});
+                        base_color_texture, normal_texture, metallic_roughness_texture,
+                        emissive_texture, emissive_factor, normal_scale, material});
                 } else {
                     const auto normal_or_face = [&](std::uint32_t vertex) {
                         const Vec3 transformed = transform_normal(world, vertex_normals.at(vertex));
@@ -476,7 +484,8 @@ GltfAsset GltfAsset::load(const std::filesystem::path& path) {
                         vertex_uvs.empty() ? Vec2{} : vertex_uvs.at(element_indices[i]),
                         vertex_uvs.empty() ? Vec2{} : vertex_uvs.at(element_indices[i + 1]),
                         vertex_uvs.empty() ? Vec2{} : vertex_uvs.at(element_indices[i + 2]),
-                        base_color_texture, normal_texture, metallic_roughness_texture, normal_scale, material});
+                        base_color_texture, normal_texture, metallic_roughness_texture,
+                        emissive_texture, emissive_factor, normal_scale, material});
                 }
             }
         }

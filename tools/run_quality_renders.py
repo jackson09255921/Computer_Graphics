@@ -43,7 +43,9 @@ def main() -> int:
         source = artifacts / f"gltf_{model.lower()}_{args.gpu_spp}spp.ppm"
         run([str(executable(gpu, "cuda_pathtracer", args.config)), "--gltf",
              str(samples / model / f"{model}.glb"), str(source), str(args.gpu_spp)])
-        publish(source, f"quality_gltf_{model.lower()}_{args.gpu_spp}spp.png", (640, 360), f"gltf-{model}")
+        suffix = "_emissive" if model == "Lantern" else ""
+        publish(source, f"quality_gltf_{model.lower()}{suffix}_{args.gpu_spp}spp.png",
+                (640, 360), f"gltf-{model}")
 
     models = ROOT / "LabX" / "data" / "legacy_converted" / "meshes"
     multi = artifacts / f"cuda_multi_asset_{args.gpu_spp}spp.ppm"

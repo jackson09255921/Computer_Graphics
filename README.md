@@ -108,7 +108,8 @@ The `--gltf` path converts imported scene triangles, base-color and normal maps,
 and glTF's packed metallic-roughness texture into compact CUDA buffers and
 rebuilds the flattened GPU BVH. Base color is decoded from sRGB while normal and
 material data remain linear; the packed texture's green and blue channels
-modulate roughness and metallic factors respectively. Radiance RGBE environments retain linear HDR energy during
+modulate roughness and metallic factors respectively. Emissive textures are
+decoded from sRGB and add radiance at surface hits. Radiance RGBE environments retain linear HDR energy during
 upload and use device-side latitude-longitude bilinear filtering. A CPU-built
 `luminance * sin(theta)` PMF/CDF concentrates CUDA samples on bright texels;
 solid-angle environment PDFs and the power heuristic combine environment NEE
