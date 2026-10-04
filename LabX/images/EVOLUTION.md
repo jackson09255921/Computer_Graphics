@@ -141,7 +141,7 @@ alpha-only texture, and the final above-one color ramp reaching mirror-like F0.
 
 | Stage | Commit | Controlled change | Result |
 | --- | --- | --- | --- |
-| 15 — Anisotropic GGX | pending | Enable strength, rotation and RGB direction/strength texture with matched sampling/PDF | [`baseline`](evolution_anisotropy_stage15_baseline_128spp.png) · [`extension`](evolution_anisotropy_stage15_extension_128spp.png) |
+| 15 — Anisotropic GGX | `6a3aed7` | Enable strength, rotation and RGB direction/strength texture with matched sampling/PDF | [`baseline`](evolution_anisotropy_stage15_baseline_128spp.png) · [`extension`](evolution_anisotropy_stage15_extension_128spp.png) |
 
 The official CC0 Khronos AnisotropyDiscTest contains 2,788 triangles and tests
 six base roughness values against a four-quadrant direction/strength map. Both
