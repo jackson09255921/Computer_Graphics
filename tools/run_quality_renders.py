@@ -59,6 +59,14 @@ def main() -> int:
         publish(source, f"evolution_toycar_stage6_fabric_{label}_{args.gpu_spp}spp.png",
                 (640, 360), f"toycar-fabric-{label}")
 
+    for mode, label in (("--fabric-close-baseline", "baseline"),
+                        ("--fabric-close-sheen", "sheen")):
+        source = artifacts / f"toycar_fabric_close_{label}_{args.gpu_spp}spp.ppm"
+        run([str(executable(gpu, "cuda_pathtracer", args.config)), mode,
+             str(toycar), str(source), str(args.gpu_spp)])
+        publish(source, f"evolution_toycar_stage7_close_{label}_{args.gpu_spp}spp.png",
+                (640, 360), f"toycar-fabric-close-{label}")
+
     models = ROOT / "LabX" / "data" / "legacy_converted" / "meshes"
     multi = artifacts / f"cuda_multi_asset_{args.gpu_spp}spp.ppm"
     run([str(executable(gpu, "cuda_pathtracer", args.config)), "--scene", str(multi), str(args.gpu_spp),

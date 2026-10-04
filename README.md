@@ -107,6 +107,7 @@ cmake --build build-wsl --target cuda_pathtracer
 ./build-wsl/cuda_pathtracer --showcase-studio model.gltf studio.bmp 128
 ./build-wsl/cuda_pathtracer --fabric-baseline model.gltf fabric-before.bmp 128
 ./build-wsl/cuda_pathtracer --fabric-sheen model.gltf fabric-sheen.bmp 128
+./build-wsl/cuda_pathtracer --fabric-close-sheen model.gltf fabric-close.bmp 128
 ```
 
 The `--gltf` path converts imported scene triangles, base-color and normal maps,

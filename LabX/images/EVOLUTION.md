@@ -29,6 +29,7 @@ light that transports energy into the scene.
 | 4 — Studio lighting | `538a865` | Warm key, cool fill, and off-camera rim lights with multi-light MIS | [`evolution_toycar_stage4_studio_lighting_128spp.png`](evolution_toycar_stage4_studio_lighting_128spp.png) |
 | 5 — Clearcoat | `a75e312` | Add a second dielectric GGX coat with matched lobe sampling/PDF | [`evolution_toycar_stage5_clearcoat_128spp.png`](evolution_toycar_stage5_clearcoat_128spp.png) |
 | 6 — Fabric sheen | `8670276` | Enable KHR_materials_sheen with Charlie microfiber distribution; paired baseline changes only this lobe | [`baseline`](evolution_toycar_stage6_fabric_baseline_128spp.png) · [`sheen`](evolution_toycar_stage6_fabric_sheen_128spp.png) |
+| 7 — Close framing | pending | Increase full-scene scale and narrow the camera FOV while retaining the complete car and cloth silhouette | [`baseline`](evolution_toycar_stage7_close_baseline_128spp.png) · [`sheen`](evolution_toycar_stage7_close_sheen_128spp.png) |
 
 The original framing is deliberately retained: it documents why scene-wide
 bounding boxes are reliable for CI yet weak for presentation. Stages 2–5 then
@@ -39,6 +40,11 @@ the draped fabric. Both 640x360 renders use 128 spp and seed `0xC0FFEE`; only
 the sheen lobe changes. Automated comparison found 44,926 changed pixels with
 a 0.987 channel MAE and a maximum channel delta of 165, while native-resolution
 review confirmed that the red grazing highlights follow the cloth folds.
+
+Stage 7 keeps the Stage 6 material comparison but moves the composition closer:
+the car body, cloth perimeter, and primary folds occupy most of the frame without
+clipping. At 128 spp, the paired renders differ across 98,431 pixels with a
+2.760 channel MAE and a maximum channel delta of 177.
 
 ## Rules for future stages
 

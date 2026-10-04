@@ -46,6 +46,8 @@ visually inspected at native resolution after automated image validation.
 | ToyCar clearcoat | [`evolution_toycar_stage5_clearcoat_128spp.png`](evolution_toycar_stage5_clearcoat_128spp.png) | Second dielectric GGX lobe with energy compensation and a matching coat/base/diffuse mixture PDF |
 | ToyCar fabric baseline | [`evolution_toycar_stage6_fabric_baseline_128spp.png`](evolution_toycar_stage6_fabric_baseline_128spp.png) | Controlled full-scene reference with the sheen lobe disabled |
 | ToyCar fabric sheen | [`evolution_toycar_stage6_fabric_sheen_128spp.png`](evolution_toycar_stage6_fabric_sheen_128spp.png) | KHR_materials_sheen color/roughness evaluated with Charlie distribution and Neubelt visibility |
+| ToyCar close fabric baseline | [`evolution_toycar_stage7_close_baseline_128spp.png`](evolution_toycar_stage7_close_baseline_128spp.png) | Tighter full-scene framing with the complete car and cloth silhouette retained |
+| ToyCar close fabric sheen | [`evolution_toycar_stage7_close_sheen_128spp.png`](evolution_toycar_stage7_close_sheen_128spp.png) | Same close camera with fabric sheen enabled for clearer fold and contour inspection |
 | WaterBottle | [`quality_gltf_waterbottle_128spp.png`](quality_gltf_waterbottle_128spp.png) | 4,510 textured PBR triangles at 128 spp |
 | CUDA multi-asset | [`quality_cuda_multi_asset_128spp.png`](quality_cuda_multi_asset_128spp.png) | Bunny and teapot, 11,288 triangles at 1280x720 and 128 spp |
 

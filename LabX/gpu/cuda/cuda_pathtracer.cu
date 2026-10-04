@@ -1498,6 +1498,8 @@ int main(int argc, char** argv) {
         const bool showcase_studio_mode = argc > 1 && std::string(argv[1]) == "--showcase-studio";
         const bool fabric_baseline_mode = argc > 1 && std::string(argv[1]) == "--fabric-baseline";
         const bool fabric_sheen_mode = argc > 1 && std::string(argv[1]) == "--fabric-sheen";
+        const bool fabric_close_baseline_mode = argc > 1 && std::string(argv[1]) == "--fabric-close-baseline";
+        const bool fabric_close_sheen_mode = argc > 1 && std::string(argv[1]) == "--fabric-close-sheen";
         const bool scene_mode = argc > 1 && std::string(argv[1]) == "--scene";
         const bool hdr_mode = argc > 1 && std::string(argv[1]) == "--hdr";
         if (scene_mode) {
@@ -1516,9 +1518,10 @@ int main(int argc, char** argv) {
                 append_imported(imported, std::move(mesh));
             }
         } else if (gltf_mode || showcase_mode || showcase_angle_mode || showcase_studio_mode ||
-                   fabric_baseline_mode || fabric_sheen_mode) {
+                   fabric_baseline_mode || fabric_sheen_mode || fabric_close_baseline_mode ||
+                   fabric_close_sheen_mode) {
             if (argc < 3) throw std::invalid_argument(
-                "usage: cuda_pathtracer --gltf|--showcase|--showcase-angle|--showcase-studio|--fabric-baseline|--fabric-sheen model.gltf [output.bmp] [spp] [environment.hdr]");
+                "usage: cuda_pathtracer --gltf|--showcase|--showcase-angle|--showcase-studio|--fabric-baseline|--fabric-sheen|--fabric-close-baseline|--fabric-close-sheen model.gltf [output.bmp] [spp] [environment.hdr]");
             imported = load_gltf_triangles(argv[2]);
             if (showcase_mode || showcase_angle_mode || showcase_studio_mode) {
                 frame_imported_triangles(imported.triangles, 3.8f, 0.0f, -4.5f, 1);
@@ -1532,8 +1535,13 @@ int main(int argc, char** argv) {
                 camera = {make_float3(2.3f, 0.55f, 1.7f),
                           make_float3(0.0f, -0.05f, -4.4f), 45.0f};
             }
+            else if (fabric_close_baseline_mode || fabric_close_sheen_mode) {
+                frame_imported_triangles(imported.triangles, 5.0f, 0.0f, -4.5f);
+                camera = {make_float3(2.0f, 0.45f, 1.5f),
+                          make_float3(0.0f, -0.05f, -4.4f), 41.0f};
+            }
             else frame_imported_triangles(imported.triangles);
-            if (showcase_studio_mode || fabric_baseline_mode)
+            if (showcase_studio_mode || fabric_baseline_mode || fabric_close_baseline_mode)
                 for (Triangle& triangle : imported.triangles)
                     triangle.sheen_color = make_float3(0, 0, 0);
             output = argc > 3 ? argv[3] : "cuda_gltf_pathtracer.bmp";
@@ -1555,9 +1563,11 @@ int main(int argc, char** argv) {
                     render(width, height, samples, 0xC0FFEEu, imported,
                            !gltf_mode && !showcase_mode && !showcase_angle_mode &&
                                !showcase_studio_mode && !fabric_baseline_mode &&
-                               !fabric_sheen_mode && !scene_mode,
+                               !fabric_sheen_mode && !fabric_close_baseline_mode &&
+                               !fabric_close_sheen_mode && !scene_mode,
                            environment.get(), camera,
-                           showcase_studio_mode || fabric_baseline_mode || fabric_sheen_mode));
+                           showcase_studio_mode || fabric_baseline_mode || fabric_sheen_mode ||
+                               fabric_close_baseline_mode || fabric_close_sheen_mode));
         std::cout << "CUDA path traced " << width << 'x' << height << " at " << samples
                   << " spp with " << imported.triangles.size() << " imported triangles"
                   << (environment ? " and HDR environment" : "") << " to " << output << '\n';
