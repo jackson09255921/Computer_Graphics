@@ -113,7 +113,7 @@ distribution published by Conty and Kulla in 2017.
 
 | Stage | Commit | Controlled change | Result |
 | --- | --- | --- | --- |
-| 13 — Transmission texture | pending | Multiply dielectric transmission by the texture red channel | [`baseline`](evolution_transmission_stage13_baseline_128spp.png) · [`textures`](evolution_transmission_stage13_textures_128spp.png) |
+| 13 — Transmission texture | `5d7453d` | Multiply dielectric transmission by the texture red channel | [`baseline`](evolution_transmission_stage13_baseline_128spp.png) · [`textures`](evolution_transmission_stage13_textures_128spp.png) |
 
 The official CC0 Khronos TransmissionTest contains 128,775 triangles and mixes
 uniform, rough, metallic and textured transmission. Both 640x360 renders use
