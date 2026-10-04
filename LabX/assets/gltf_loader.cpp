@@ -313,6 +313,13 @@ rt::Material material_at(const Json& root, std::size_t index) {
         result.albedo = {color->array()[0].number(), color->array()[1].number(), color->array()[2].number()};
     if (const Json* metallic = pbr->find("metallicFactor")) result.metallic = metallic->number();
     if (const Json* roughness = pbr->find("roughnessFactor")) result.roughness = roughness->number();
+    if (const Json* extensions = materials->array()[index].find("extensions")) {
+        if (const Json* transmission = extensions->find("KHR_materials_transmission"))
+            if (const Json* factor = transmission->find("transmissionFactor"))
+                result.transmission = factor->number();
+        if (const Json* ior = extensions->find("KHR_materials_ior"))
+            if (const Json* factor = ior->find("ior")) result.index_of_refraction = factor->number();
+    }
     return result;
 }
 

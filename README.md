@@ -119,7 +119,8 @@ metallic value, with a matching mixture PDF and `BRDF * cos / PDF` throughput.
 Their area-light and HDR samples participate in
 the same MIS framework. Rough dielectric transmission uses the Walter
 transmission Jacobian, matched microfacet BTDF/PDF, and
-`BTDF * abs(cos) / PDF` throughput.
+`BTDF * abs(cos) / PDF` throughput. glTF `KHR_materials_transmission` and
+`KHR_materials_ior` values feed this dielectric path directly.
 
 The optional `restir_di` CUDA target contains the 2020 ReSTIR DI reservoir
 foundation: weighted candidate streaming, temporal reuse, spatial reuse, and
