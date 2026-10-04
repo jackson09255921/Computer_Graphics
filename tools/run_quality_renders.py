@@ -41,10 +41,14 @@ def main() -> int:
     samples = ROOT / "LabX" / "data" / "external" / "gltf_samples"
     for model in ("Avocado", "BoomBox", "Lantern", "ToyCar", "WaterBottle"):
         source = artifacts / f"gltf_{model.lower()}_{args.gpu_spp}spp.ppm"
-        run([str(executable(gpu, "cuda_pathtracer", args.config)), "--gltf",
+        mode = "--showcase" if model == "ToyCar" else "--gltf"
+        run([str(executable(gpu, "cuda_pathtracer", args.config)), mode,
              str(samples / model / f"{model}.glb"), str(source), str(args.gpu_spp)])
-        suffix = "_emissive" if model == "Lantern" else "_transmission" if model == "ToyCar" else ""
-        publish(source, f"quality_gltf_{model.lower()}{suffix}_{args.gpu_spp}spp.png",
+        suffix = "_emissive" if model == "Lantern" else "_subject_framing" if model == "ToyCar" else ""
+        destination = (f"evolution_toycar_stage2_subject_framing_{args.gpu_spp}spp.png"
+                       if model == "ToyCar" else
+                       f"quality_gltf_{model.lower()}{suffix}_{args.gpu_spp}spp.png")
+        publish(source, destination,
                 (640, 360), f"gltf-{model}")
 
     models = ROOT / "LabX" / "data" / "legacy_converted" / "meshes"

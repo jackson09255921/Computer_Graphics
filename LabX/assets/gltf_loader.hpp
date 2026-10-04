@@ -33,6 +33,7 @@ struct GltfTriangle {
     Color emissive_factor{};
     double normal_scale{1.0};
     rt::Material material;
+    int material_index{-1};
 };
 
 class GltfAsset {

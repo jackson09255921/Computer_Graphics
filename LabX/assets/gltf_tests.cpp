@@ -73,6 +73,7 @@ int main() {
         require(near(triangle.material.transmission, 0.7) &&
                     near(triangle.material.index_of_refraction, 1.4),
                 "transmission and IOR extensions must be imported");
+        require(triangle.material_index == 0, "primitive material index must be retained for scene framing");
         require(triangle.has_normals && near(triangle.first_normal.z, 1.0) &&
                     near(triangle.second_normal.y, 1.0) && near(triangle.third_normal.x, 1.0),
                 "NORMAL accessor must be imported and transformed");

@@ -446,8 +446,10 @@ GltfAsset GltfAsset::load(const std::filesystem::path& path) {
             std::shared_ptr<const GltfTexture> emissive_texture;
             Color emissive_factor{};
             double normal_scale = 1.0;
+            int primitive_material_index = -1;
             if (const Json* material_index = primitive.find("material")) {
                 const std::size_t index = integer(*material_index);
+                primitive_material_index = static_cast<int>(index);
                 material = material_at(root, index);
                 const Json& material_source = root.find("materials")->array().at(index);
                 const Json* pbr = material_source.find("pbrMetallicRoughness");
@@ -479,7 +481,8 @@ GltfAsset GltfAsset::load(const std::filesystem::path& path) {
                         vertex_uvs.empty() ? Vec2{} : vertex_uvs.at(element_indices[i + 1]),
                         vertex_uvs.empty() ? Vec2{} : vertex_uvs.at(element_indices[i + 2]),
                         base_color_texture, normal_texture, metallic_roughness_texture,
-                        emissive_texture, emissive_factor, normal_scale, material});
+                        emissive_texture, emissive_factor, normal_scale, material,
+                        primitive_material_index});
                 } else {
                     const auto normal_or_face = [&](std::uint32_t vertex) {
                         const Vec3 transformed = transform_normal(world, vertex_normals.at(vertex));
@@ -492,7 +495,8 @@ GltfAsset GltfAsset::load(const std::filesystem::path& path) {
                         vertex_uvs.empty() ? Vec2{} : vertex_uvs.at(element_indices[i + 1]),
                         vertex_uvs.empty() ? Vec2{} : vertex_uvs.at(element_indices[i + 2]),
                         base_color_texture, normal_texture, metallic_roughness_texture,
-                        emissive_texture, emissive_factor, normal_scale, material});
+                        emissive_texture, emissive_factor, normal_scale, material,
+                        primitive_material_index});
                 }
             }
         }

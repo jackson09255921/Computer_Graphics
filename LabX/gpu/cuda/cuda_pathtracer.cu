@@ -55,6 +55,7 @@ struct Triangle {
     float3 tangent; float tangent_handedness{1.0f}; int normal_texture_index{-1}; float normal_scale{1.0f};
     int metallic_roughness_texture_index{-1};
     float3 emissive; int emissive_texture_index{-1};
+    int material_index{-1};
 };
 struct TextureDescriptor { int offset; int width; int height; };
 struct ImportedAssets {
@@ -1002,7 +1003,8 @@ ImportedAssets load_gltf_triangles(const std::filesystem::path& path) {
                           convert(triangle.third_normal), triangle.has_normals,
                           uv0, uv1, uv2, texture_index, tangent, handedness, normal_texture_index,
                           static_cast<float>(triangle.normal_scale), metallic_roughness_texture_index,
-                          convert(triangle.emissive_factor), emissive_texture_index});
+                          convert(triangle.emissive_factor), emissive_texture_index,
+                          triangle.material_index});
     }
     return result;
 }
@@ -1027,9 +1029,15 @@ void append_imported(ImportedAssets& destination, ImportedAssets source) {
 }
 
 void frame_imported_triangles(std::vector<Triangle>& triangles, float target_extent = 3.2f,
-                              float target_x = 0.0f, float target_z = -4.5f) {
+                              float target_x = 0.0f, float target_z = -4.5f,
+                              int excluded_bounds_material = -1) {
     if (triangles.empty()) return;
-    float3 minimum = triangles.front().first;
+    const auto contributes_to_bounds = [&](const Triangle& triangle) {
+        return triangle.material_index != excluded_bounds_material;
+    };
+    const auto first = std::find_if(triangles.begin(), triangles.end(), contributes_to_bounds);
+    if (first == triangles.end()) throw std::runtime_error("no triangles remain for subject framing");
+    float3 minimum = first->first;
     float3 maximum = minimum;
     const auto include = [&](const float3& point) {
         minimum.x = std::min(minimum.x, point.x);
@@ -1040,6 +1048,7 @@ void frame_imported_triangles(std::vector<Triangle>& triangles, float target_ext
         maximum.z = std::max(maximum.z, point.z);
     };
     for (const Triangle& triangle : triangles) {
+        if (!contributes_to_bounds(triangle)) continue;
         include(triangle.first);
         include(triangle.second);
         include(triangle.third);
@@ -1384,6 +1393,7 @@ int main(int argc, char** argv) {
         int width = 640;
         int height = 360;
         const bool gltf_mode = argc > 1 && std::string(argv[1]) == "--gltf";
+        const bool showcase_mode = argc > 1 && std::string(argv[1]) == "--showcase";
         const bool scene_mode = argc > 1 && std::string(argv[1]) == "--scene";
         const bool hdr_mode = argc > 1 && std::string(argv[1]) == "--hdr";
         if (scene_mode) {
@@ -1401,11 +1411,12 @@ int main(int argc, char** argv) {
                 frame_imported_triangles(mesh.triangles, 1.3f, x, z);
                 append_imported(imported, std::move(mesh));
             }
-        } else if (gltf_mode) {
+        } else if (gltf_mode || showcase_mode) {
             if (argc < 3) throw std::invalid_argument(
-                "usage: cuda_pathtracer --gltf model.gltf [output.bmp] [spp] [environment.hdr]");
+                "usage: cuda_pathtracer --gltf|--showcase model.gltf [output.bmp] [spp] [environment.hdr]");
             imported = load_gltf_triangles(argv[2]);
-            frame_imported_triangles(imported.triangles);
+            if (showcase_mode) frame_imported_triangles(imported.triangles, 3.8f, 0.0f, -4.5f, 1);
+            else frame_imported_triangles(imported.triangles);
             output = argc > 3 ? argv[3] : "cuda_gltf_pathtracer.bmp";
             samples = argc > 4 ? std::stoi(argv[4]) : 64;
             if (argc > 5) environment = std::make_unique<cg::environment::EnvironmentMap>(
@@ -1423,7 +1434,7 @@ int main(int argc, char** argv) {
         }
         write_image(output, width, height,
                     render(width, height, samples, 0xC0FFEEu, imported,
-                           !gltf_mode && !scene_mode, environment.get()));
+                           !gltf_mode && !showcase_mode && !scene_mode, environment.get()));
         std::cout << "CUDA path traced " << width << 'x' << height << " at " << samples
                   << " spp with " << imported.triangles.size() << " imported triangles"
                   << (environment ? " and HDR environment" : "") << " to " << output << '\n';

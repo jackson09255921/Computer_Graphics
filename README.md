@@ -102,6 +102,7 @@ cmake --build build-wsl --target cuda_pathtracer
 ./build-wsl/cuda_pathtracer --gltf model.gltf cuda_model.bmp 64
 ./build-wsl/cuda_pathtracer --hdr environment.hdr cuda_hdr.bmp 64
 ./build-wsl/cuda_pathtracer --gltf model.gltf cuda_model.bmp 64 environment.hdr
+./build-wsl/cuda_pathtracer --showcase model.gltf showcase.bmp 128
 ```
 
 The `--gltf` path converts imported scene triangles, base-color and normal maps,
