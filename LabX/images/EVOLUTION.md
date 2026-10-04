@@ -29,7 +29,7 @@ light that transports energy into the scene.
 | 4 — Studio lighting | `538a865` | Warm key, cool fill, and off-camera rim lights with multi-light MIS | [`evolution_toycar_stage4_studio_lighting_128spp.png`](evolution_toycar_stage4_studio_lighting_128spp.png) |
 | 5 — Clearcoat | `a75e312` | Add a second dielectric GGX coat with matched lobe sampling/PDF | [`evolution_toycar_stage5_clearcoat_128spp.png`](evolution_toycar_stage5_clearcoat_128spp.png) |
 | 6 — Fabric sheen | `8670276` | Enable KHR_materials_sheen with Charlie microfiber distribution; paired baseline changes only this lobe | [`baseline`](evolution_toycar_stage6_fabric_baseline_128spp.png) · [`sheen`](evolution_toycar_stage6_fabric_sheen_128spp.png) |
-| 7 — Close framing | pending | Increase full-scene scale and narrow the camera FOV while retaining the complete car and cloth silhouette | [`baseline`](evolution_toycar_stage7_close_baseline_128spp.png) · [`sheen`](evolution_toycar_stage7_close_sheen_128spp.png) |
+| 7 — Close framing | `a8bf651` | Increase full-scene scale and narrow the camera FOV while retaining the complete car and cloth silhouette | [`baseline`](evolution_toycar_stage7_close_baseline_128spp.png) · [`sheen`](evolution_toycar_stage7_close_sheen_128spp.png) |
 
 The original framing is deliberately retained: it documents why scene-wide
 bounding boxes are reliable for CI yet weak for presentation. Stages 2–5 then
