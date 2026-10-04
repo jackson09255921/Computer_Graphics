@@ -32,6 +32,8 @@ struct GltfTriangle {
     std::shared_ptr<const GltfTexture> emissive_texture;
     std::shared_ptr<const GltfTexture> clearcoat_texture;
     Color emissive_factor{};
+    Color sheen_color_factor{};
+    double sheen_roughness{0.0};
     double clearcoat_factor{0.0};
     double clearcoat_roughness{0.0};
     double normal_scale{1.0};

@@ -28,11 +28,17 @@ light that transports energy into the scene.
 | 3 — Three-quarter camera | `66536a6` | Low 3/4 view to expose body curvature and silhouette | [`evolution_toycar_stage3_three_quarter_camera_128spp.png`](evolution_toycar_stage3_three_quarter_camera_128spp.png) |
 | 4 — Studio lighting | `538a865` | Warm key, cool fill, and off-camera rim lights with multi-light MIS | [`evolution_toycar_stage4_studio_lighting_128spp.png`](evolution_toycar_stage4_studio_lighting_128spp.png) |
 | 5 — Clearcoat | `a75e312` | Add a second dielectric GGX coat with matched lobe sampling/PDF | [`evolution_toycar_stage5_clearcoat_128spp.png`](evolution_toycar_stage5_clearcoat_128spp.png) |
-| 6 — Sheen | planned | Add the fabric grazing-angle fiber reflection | — |
+| 6 — Fabric sheen | pending | Enable KHR_materials_sheen with Charlie microfiber distribution; paired baseline changes only this lobe | [`baseline`](evolution_toycar_stage6_fabric_baseline_128spp.png) · [`sheen`](evolution_toycar_stage6_fabric_sheen_128spp.png) |
 
 The original framing is deliberately retained: it documents why scene-wide
-bounding boxes are reliable for CI yet weak for presentation. The next render
-will change framing only before camera, lighting, or BSDF work is introduced.
+bounding boxes are reliable for CI yet weak for presentation. Stages 2–5 then
+isolate framing, camera, lighting, and clearcoat as separate changes.
+
+Stage 6 deliberately returns to the complete ToyCar scene because material 1 is
+the draped fabric. Both 640x360 renders use 128 spp and seed `0xC0FFEE`; only
+the sheen lobe changes. Automated comparison found 44,926 changed pixels with
+a 0.987 channel MAE and a maximum channel delta of 165, while native-resolution
+review confirmed that the red grazing highlights follow the cloth folds.
 
 ## Rules for future stages
 

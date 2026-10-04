@@ -44,6 +44,8 @@ visually inspected at native resolution after automated image validation.
 | ToyCar 3/4 camera | [`evolution_toycar_stage3_three_quarter_camera_128spp.png`](evolution_toycar_stage3_three_quarter_camera_128spp.png) | Low three-quarter camera exposes body curvature and silhouette while framing, lighting, materials, SPP, and seed remain fixed |
 | ToyCar studio lighting | [`evolution_toycar_stage4_studio_lighting_128spp.png`](evolution_toycar_stage4_studio_lighting_128spp.png) | Warm key, cool fill, and off-camera rim area lights sampled with a matching multi-light MIS PDF |
 | ToyCar clearcoat | [`evolution_toycar_stage5_clearcoat_128spp.png`](evolution_toycar_stage5_clearcoat_128spp.png) | Second dielectric GGX lobe with energy compensation and a matching coat/base/diffuse mixture PDF |
+| ToyCar fabric baseline | [`evolution_toycar_stage6_fabric_baseline_128spp.png`](evolution_toycar_stage6_fabric_baseline_128spp.png) | Controlled full-scene reference with the sheen lobe disabled |
+| ToyCar fabric sheen | [`evolution_toycar_stage6_fabric_sheen_128spp.png`](evolution_toycar_stage6_fabric_sheen_128spp.png) | KHR_materials_sheen color/roughness evaluated with Charlie distribution and Neubelt visibility |
 | WaterBottle | [`quality_gltf_waterbottle_128spp.png`](quality_gltf_waterbottle_128spp.png) | 4,510 textured PBR triangles at 128 spp |
 | CUDA multi-asset | [`quality_cuda_multi_asset_128spp.png`](quality_cuda_multi_asset_128spp.png) | Bunny and teapot, 11,288 triangles at 1280x720 and 128 spp |
 

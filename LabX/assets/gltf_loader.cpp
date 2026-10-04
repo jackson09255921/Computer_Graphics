@@ -446,6 +446,8 @@ GltfAsset GltfAsset::load(const std::filesystem::path& path) {
             std::shared_ptr<const GltfTexture> emissive_texture;
             std::shared_ptr<const GltfTexture> clearcoat_texture;
             Color emissive_factor{};
+            Color sheen_color_factor{};
+            double sheen_roughness = 0.0;
             double clearcoat_factor = 0.0;
             double clearcoat_roughness = 0.0;
             double normal_scale = 1.0;
@@ -480,6 +482,13 @@ GltfAsset GltfAsset::load(const std::filesystem::path& path) {
                         if (const Json* texture = clearcoat->find("clearcoatTexture"))
                             clearcoat_texture = textures.at(member_integer(*texture, "index"));
                     }
+                    if (const Json* sheen = extensions->find("KHR_materials_sheen")) {
+                        if (const Json* color = sheen->find("sheenColorFactor"))
+                            sheen_color_factor = {color->array()[0].number(), color->array()[1].number(),
+                                                  color->array()[2].number()};
+                        if (const Json* roughness = sheen->find("sheenRoughnessFactor"))
+                            sheen_roughness = roughness->number();
+                    }
                 }
             }
             for (std::size_t i = 0; i < element_indices.size(); i += 3) {
@@ -495,6 +504,7 @@ GltfAsset GltfAsset::load(const std::filesystem::path& path) {
                         vertex_uvs.empty() ? Vec2{} : vertex_uvs.at(element_indices[i + 2]),
                         base_color_texture, normal_texture, metallic_roughness_texture,
                         emissive_texture, clearcoat_texture, emissive_factor,
+                        sheen_color_factor, sheen_roughness,
                         clearcoat_factor, clearcoat_roughness, normal_scale, material,
                         primitive_material_index});
                 } else {
@@ -510,6 +520,7 @@ GltfAsset GltfAsset::load(const std::filesystem::path& path) {
                         vertex_uvs.empty() ? Vec2{} : vertex_uvs.at(element_indices[i + 2]),
                         base_color_texture, normal_texture, metallic_roughness_texture,
                         emissive_texture, clearcoat_texture, emissive_factor,
+                        sheen_color_factor, sheen_roughness,
                         clearcoat_factor, clearcoat_roughness, normal_scale, material,
                         primitive_material_index});
                 }

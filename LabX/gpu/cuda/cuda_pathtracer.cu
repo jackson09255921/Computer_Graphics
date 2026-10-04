@@ -57,6 +57,7 @@ struct Triangle {
     float3 emissive; int emissive_texture_index{-1};
     int material_index{-1};
     float clearcoat{0.0f}; float clearcoat_roughness{0.04f}; int clearcoat_texture_index{-1};
+    float3 sheen_color{}; float sheen_roughness{0.0f};
 };
 struct TextureDescriptor { int offset; int width; int height; };
 struct ImportedAssets {
@@ -84,6 +85,7 @@ struct Hit {
     int metallic_roughness_texture_index;
     float3 emissive; int emissive_texture_index;
     float clearcoat; float clearcoat_roughness; int clearcoat_texture_index;
+    float3 sheen_color; float sheen_roughness;
 };
 
 struct Rng {
@@ -176,6 +178,8 @@ __device__ void intersect_triangles(const Ray& ray, const Triangle* triangles, c
                 closest.clearcoat = triangle.clearcoat;
                 closest.clearcoat_roughness = triangle.clearcoat_roughness;
                 closest.clearcoat_texture_index = triangle.clearcoat_texture_index;
+                closest.sheen_color = triangle.sheen_color;
+                closest.sheen_roughness = triangle.sheen_roughness;
                 closest.found = true;
             }
         } else {
@@ -219,6 +223,8 @@ __device__ bool intersect_scene(const Ray& ray, const Sphere* spheres, int spher
         closest.emissive_texture_index = -1;
         closest.clearcoat = 0.0f;
         closest.clearcoat_texture_index = -1;
+        closest.sheen_color = make_float3(0, 0, 0);
+        closest.sheen_roughness = 0.0f;
         closest.found = true;
     }
     intersect_triangles(ray, triangles, nodes, node_count, closest);
@@ -318,7 +324,8 @@ __device__ float clearcoat_probability(float clearcoat) {
 
 __device__ float3 evaluate_metallic_roughness(float3 normal, float3 view, float3 light,
                                                float3 base_color, float metallic, float roughness,
-                                               float clearcoat = 0.0f, float clearcoat_roughness = 0.04f) {
+                                               float clearcoat = 0.0f, float clearcoat_roughness = 0.04f,
+                                               float3 sheen_color = {}, float sheen_roughness = 0.0f) {
     const float n_dot_v = fmaxf(0.0f, dot3(normal, view));
     const float n_dot_l = fmaxf(0.0f, dot3(normal, light));
     if (n_dot_v <= 0.0f || n_dot_l <= 0.0f) return make_float3(0, 0, 0);
@@ -332,7 +339,20 @@ __device__ float3 evaluate_metallic_roughness(float3 normal, float3 view, float3
     const float3 specular = mul(fresnel,
         distribution * geometry / fmaxf(4.0f * n_dot_v * n_dot_l, 1.0e-8f));
     const float3 diffuse_weight = mul(sub(make_float3(1, 1, 1), fresnel), 1.0f - metallic);
-    const float3 base = add(specular, mul(mul(diffuse_weight, base_color), 1.0f / kPi));
+    float3 base = add(specular, mul(mul(diffuse_weight, base_color), 1.0f / kPi));
+    const float sheen_strength = fmaxf(sheen_color.x, fmaxf(sheen_color.y, sheen_color.z));
+    if (sheen_strength > 0.0f) {
+        const float n_dot_h = fmaxf(0.0f, dot3(normal, half_vector));
+        const float alpha = fmaxf(0.001f, sheen_roughness * sheen_roughness);
+        const float inverse_alpha = 1.0f / alpha;
+        const float sin_theta_h = sqrtf(fmaxf(0.0f, 1.0f - n_dot_h * n_dot_h));
+        const float distribution_charlie = (2.0f + inverse_alpha) / (2.0f * kPi) *
+                                           powf(sin_theta_h, inverse_alpha);
+        const float visibility_neubelt = 1.0f /
+            fmaxf(4.0f * (n_dot_l + n_dot_v - n_dot_l * n_dot_v), 1.0e-5f);
+        base = add(mul(base, 1.0f - 0.157f * sheen_strength),
+                   mul(sheen_color, distribution_charlie * visibility_neubelt));
+    }
     const float coat = fminf(1.0f, fmaxf(0.0f, clearcoat));
     if (coat <= 0.0f) return base;
     const float3 coat_fresnel = fresnel_schlick(v_dot_h, make_float3(0.04f, 0.04f, 0.04f));
@@ -612,7 +632,7 @@ __device__ float3 radiance(Ray ray, const Sphere* spheres, int sphere_count,
                     const float3 brdf = evaluate_metallic_roughness(
                         hit.normal, view_direction, direction_to_light,
                         hit.albedo, hit.metallic, hit.roughness,
-                        hit.clearcoat, hit.clearcoat_roughness);
+                        hit.clearcoat, hit.clearcoat_roughness, hit.sheen_color, hit.sheen_roughness);
                     const float bsdf_pdf = metallic_roughness_pdf(
                         hit.normal, view_direction, direction_to_light, hit.metallic, hit.roughness,
                         hit.clearcoat, hit.clearcoat_roughness);
@@ -636,7 +656,7 @@ __device__ float3 radiance(Ray ray, const Sphere* spheres, int sphere_count,
                         const float3 brdf = evaluate_metallic_roughness(
                             hit.normal, view_direction, environment_direction,
                             hit.albedo, hit.metallic, hit.roughness,
-                            hit.clearcoat, hit.clearcoat_roughness);
+                            hit.clearcoat, hit.clearcoat_roughness, hit.sheen_color, hit.sheen_roughness);
                         const float bsdf_pdf = metallic_roughness_pdf(
                             hit.normal, view_direction, environment_direction, hit.metallic, hit.roughness,
                             hit.clearcoat, hit.clearcoat_roughness);
@@ -707,7 +727,7 @@ __device__ float3 radiance(Ray ray, const Sphere* spheres, int sphere_count,
             if (pdf <= 0.0f || cosine <= 0.0f) break;
             const float3 brdf = evaluate_metallic_roughness(
                 hit.normal, view_direction, direction, hit.albedo, hit.metallic, hit.roughness,
-                hit.clearcoat, hit.clearcoat_roughness);
+                hit.clearcoat, hit.clearcoat_roughness, hit.sheen_color, hit.sheen_roughness);
             throughput = mul(throughput, mul(brdf, cosine / pdf));
             previous_bsdf_pdf = pdf;
             previous_uses_mis = true;
@@ -1064,7 +1084,8 @@ ImportedAssets load_gltf_triangles(const std::filesystem::path& path) {
                           convert(triangle.emissive_factor), emissive_texture_index,
                           triangle.material_index, static_cast<float>(triangle.clearcoat_factor),
                           fmaxf(0.04f, static_cast<float>(triangle.clearcoat_roughness)),
-                          clearcoat_texture_index});
+                          clearcoat_texture_index, convert(triangle.sheen_color_factor),
+                          static_cast<float>(triangle.sheen_roughness)});
     }
     return result;
 }
@@ -1475,6 +1496,8 @@ int main(int argc, char** argv) {
         const bool showcase_mode = argc > 1 && std::string(argv[1]) == "--showcase";
         const bool showcase_angle_mode = argc > 1 && std::string(argv[1]) == "--showcase-angle";
         const bool showcase_studio_mode = argc > 1 && std::string(argv[1]) == "--showcase-studio";
+        const bool fabric_baseline_mode = argc > 1 && std::string(argv[1]) == "--fabric-baseline";
+        const bool fabric_sheen_mode = argc > 1 && std::string(argv[1]) == "--fabric-sheen";
         const bool scene_mode = argc > 1 && std::string(argv[1]) == "--scene";
         const bool hdr_mode = argc > 1 && std::string(argv[1]) == "--hdr";
         if (scene_mode) {
@@ -1492,9 +1515,10 @@ int main(int argc, char** argv) {
                 frame_imported_triangles(mesh.triangles, 1.3f, x, z);
                 append_imported(imported, std::move(mesh));
             }
-        } else if (gltf_mode || showcase_mode || showcase_angle_mode || showcase_studio_mode) {
+        } else if (gltf_mode || showcase_mode || showcase_angle_mode || showcase_studio_mode ||
+                   fabric_baseline_mode || fabric_sheen_mode) {
             if (argc < 3) throw std::invalid_argument(
-                "usage: cuda_pathtracer --gltf|--showcase|--showcase-angle|--showcase-studio model.gltf [output.bmp] [spp] [environment.hdr]");
+                "usage: cuda_pathtracer --gltf|--showcase|--showcase-angle|--showcase-studio|--fabric-baseline|--fabric-sheen model.gltf [output.bmp] [spp] [environment.hdr]");
             imported = load_gltf_triangles(argv[2]);
             if (showcase_mode || showcase_angle_mode || showcase_studio_mode) {
                 frame_imported_triangles(imported.triangles, 3.8f, 0.0f, -4.5f, 1);
@@ -1503,7 +1527,15 @@ int main(int argc, char** argv) {
                 camera = {make_float3(2.5f, 0.35f, 1.8f),
                           make_float3(0.0f, -0.15f, -4.35f), 43.0f};
             }
+            else if (fabric_baseline_mode || fabric_sheen_mode) {
+                frame_imported_triangles(imported.triangles, 3.6f, 0.0f, -4.5f);
+                camera = {make_float3(2.3f, 0.55f, 1.7f),
+                          make_float3(0.0f, -0.05f, -4.4f), 45.0f};
+            }
             else frame_imported_triangles(imported.triangles);
+            if (showcase_studio_mode || fabric_baseline_mode)
+                for (Triangle& triangle : imported.triangles)
+                    triangle.sheen_color = make_float3(0, 0, 0);
             output = argc > 3 ? argv[3] : "cuda_gltf_pathtracer.bmp";
             samples = argc > 4 ? std::stoi(argv[4]) : 64;
             if (argc > 5) environment = std::make_unique<cg::environment::EnvironmentMap>(
@@ -1522,8 +1554,10 @@ int main(int argc, char** argv) {
         write_image(output, width, height,
                     render(width, height, samples, 0xC0FFEEu, imported,
                            !gltf_mode && !showcase_mode && !showcase_angle_mode &&
-                               !showcase_studio_mode && !scene_mode,
-                           environment.get(), camera, showcase_studio_mode));
+                               !showcase_studio_mode && !fabric_baseline_mode &&
+                               !fabric_sheen_mode && !scene_mode,
+                           environment.get(), camera,
+                           showcase_studio_mode || fabric_baseline_mode || fabric_sheen_mode));
         std::cout << "CUDA path traced " << width << 'x' << height << " at " << samples
                   << " spp with " << imported.triangles.size() << " imported triangles"
                   << (environment ? " and HDR environment" : "") << " to " << output << '\n';

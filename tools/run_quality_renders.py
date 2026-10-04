@@ -51,6 +51,14 @@ def main() -> int:
         publish(source, destination,
                 (640, 360), f"gltf-{model}")
 
+    toycar = samples / "ToyCar" / "ToyCar.glb"
+    for mode, label in (("--fabric-baseline", "baseline"), ("--fabric-sheen", "sheen")):
+        source = artifacts / f"toycar_fabric_{label}_{args.gpu_spp}spp.ppm"
+        run([str(executable(gpu, "cuda_pathtracer", args.config)), mode,
+             str(toycar), str(source), str(args.gpu_spp)])
+        publish(source, f"evolution_toycar_stage6_fabric_{label}_{args.gpu_spp}spp.png",
+                (640, 360), f"toycar-fabric-{label}")
+
     models = ROOT / "LabX" / "data" / "legacy_converted" / "meshes"
     multi = artifacts / f"cuda_multi_asset_{args.gpu_spp}spp.ppm"
     run([str(executable(gpu, "cuda_pathtracer", args.config)), "--scene", str(multi), str(args.gpu_spp),

@@ -105,6 +105,8 @@ cmake --build build-wsl --target cuda_pathtracer
 ./build-wsl/cuda_pathtracer --showcase model.gltf showcase.bmp 128
 ./build-wsl/cuda_pathtracer --showcase-angle model.gltf angled.bmp 128
 ./build-wsl/cuda_pathtracer --showcase-studio model.gltf studio.bmp 128
+./build-wsl/cuda_pathtracer --fabric-baseline model.gltf fabric-before.bmp 128
+./build-wsl/cuda_pathtracer --fabric-sheen model.gltf fabric-sheen.bmp 128
 ```
 
 The `--gltf` path converts imported scene triangles, base-color and normal maps,
@@ -125,7 +127,12 @@ transmission Jacobian, matched microfacet BTDF/PDF, and
 `BTDF * abs(cos) / PDF` throughput. glTF `KHR_materials_transmission` and
 `KHR_materials_ior` values feed this dielectric path directly. The
 `KHR_materials_clearcoat` layer adds an energy-compensated dielectric GGX lobe
-with a matching coat/base-specular/diffuse sampling mixture.
+with a matching coat/base-specular/diffuse sampling mixture. The
+`KHR_materials_sheen` color and roughness factors feed a Charlie microfiber
+distribution with Neubelt visibility for broad, grazing-angle cloth highlights.
+The paired fabric modes preserve camera, lights, samples, and seed while
+disabling or enabling sheen, which makes the material change independently
+verifiable.
 
 The optional `restir_di` CUDA target contains the 2020 ReSTIR DI reservoir
 foundation: weighted candidate streaming, temporal reuse, spatial reuse, and
