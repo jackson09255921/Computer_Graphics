@@ -64,6 +64,7 @@ struct ImportedAssets {
     std::vector<TextureDescriptor> textures;
 };
 struct AreaLight { float3 center; float3 half_u; float3 half_v; float3 emission; };
+struct Camera { float3 origin; float3 target; float vertical_fov; };
 struct GpuEnvironment {
     const float3* pixels;
     const float* pmf;
@@ -670,7 +671,7 @@ __global__ void render_tile(float3* tile, int tile_x, int tile_y, int tile_width
                             int image_width, int image_height, int samples, std::uint32_t seed,
                             const Sphere* spheres, int sphere_count, const Triangle* triangles,
                             const BvhNode* nodes, int node_count, AreaLight light,
-                            GpuEnvironment environment, GpuTextures textures) {
+                            GpuEnvironment environment, GpuTextures textures, Camera camera) {
     const int local_x = static_cast<int>(blockIdx.x * blockDim.x + threadIdx.x);
     const int local_y = static_cast<int>(blockIdx.y * blockDim.y + threadIdx.y);
     if (local_x >= tile_width || local_y >= tile_height) return;
@@ -683,12 +684,12 @@ __global__ void render_tile(float3* tile, int tile_x, int tile_y, int tile_width
         const float u = (static_cast<float>(x) + rng.next()) / static_cast<float>(image_width);
         const float v = (static_cast<float>(y) + rng.next()) / static_cast<float>(image_height);
         const float aspect = static_cast<float>(image_width) / static_cast<float>(image_height);
-        const float3 origin = make_float3(0.0f, 0.65f, 2.8f);
-        const float3 target = make_float3(0.0f, -0.05f, -4.0f);
+        const float3 origin = camera.origin;
+        const float3 target = camera.target;
         const float3 forward = normalize3(sub(target, origin));
         const float3 right = normalize3(cross3(forward, make_float3(0, 1, 0)));
         const float3 up = cross3(right, forward);
-        const float viewport = tanf(48.0f * kPi / 360.0f) * 2.0f;
+        const float viewport = tanf(camera.vertical_fov * kPi / 360.0f) * 2.0f;
         const float3 direction = normalize3(add(forward, add(mul(right, (u - 0.5f) * viewport * aspect),
                                                                mul(up, (0.5f - v) * viewport))));
         color = add(color, radiance({origin, direction}, spheres, sphere_count,
@@ -1115,7 +1116,9 @@ EnvironmentData build_environment_data(const cg::environment::EnvironmentMap* en
 
 std::vector<float3> render(int width, int height, int samples, std::uint32_t seed,
                            const ImportedAssets& imported = {}, bool show_demo_spheres = true,
-                           const cg::environment::EnvironmentMap* environment_map = nullptr) {
+                           const cg::environment::EnvironmentMap* environment_map = nullptr,
+                           Camera camera = {make_float3(0.0f, 0.65f, 2.8f),
+                                            make_float3(0.0f, -0.05f, -4.0f), 48.0f}) {
     const AreaLight light{make_float3(-0.8f, 4.5f, -3.5f), make_float3(1.5f, 0, 0),
                           make_float3(0, 0, 1.0f), make_float3(10.0f, 8.0f, 5.5f)};
     std::vector<Sphere> spheres;
@@ -1209,7 +1212,7 @@ std::vector<float3> render(int width, int height, int samples, std::uint32_t see
                                                   width, height, samples, seed, device_spheres,
                                                   static_cast<int>(spheres.size()), device_triangles,
                                                   device_nodes, static_cast<int>(nodes.size()), light, environment,
-                                                  textures);
+                                                  textures, camera);
                 check(cudaGetLastError(), "render tile launch");
                 check(cudaMemcpy(tile.data(), device_tile, tile_width * tile_height * sizeof(float3),
                                  cudaMemcpyDeviceToHost), "copy rendered tile");
@@ -1392,8 +1395,11 @@ int main(int argc, char** argv) {
         int samples = 64;
         int width = 640;
         int height = 360;
+        Camera camera{make_float3(0.0f, 0.65f, 2.8f),
+                      make_float3(0.0f, -0.05f, -4.0f), 48.0f};
         const bool gltf_mode = argc > 1 && std::string(argv[1]) == "--gltf";
         const bool showcase_mode = argc > 1 && std::string(argv[1]) == "--showcase";
+        const bool showcase_angle_mode = argc > 1 && std::string(argv[1]) == "--showcase-angle";
         const bool scene_mode = argc > 1 && std::string(argv[1]) == "--scene";
         const bool hdr_mode = argc > 1 && std::string(argv[1]) == "--hdr";
         if (scene_mode) {
@@ -1411,11 +1417,17 @@ int main(int argc, char** argv) {
                 frame_imported_triangles(mesh.triangles, 1.3f, x, z);
                 append_imported(imported, std::move(mesh));
             }
-        } else if (gltf_mode || showcase_mode) {
+        } else if (gltf_mode || showcase_mode || showcase_angle_mode) {
             if (argc < 3) throw std::invalid_argument(
-                "usage: cuda_pathtracer --gltf|--showcase model.gltf [output.bmp] [spp] [environment.hdr]");
+                "usage: cuda_pathtracer --gltf|--showcase|--showcase-angle model.gltf [output.bmp] [spp] [environment.hdr]");
             imported = load_gltf_triangles(argv[2]);
-            if (showcase_mode) frame_imported_triangles(imported.triangles, 3.8f, 0.0f, -4.5f, 1);
+            if (showcase_mode || showcase_angle_mode) {
+                frame_imported_triangles(imported.triangles, 3.8f, 0.0f, -4.5f, 1);
+            }
+            if (showcase_angle_mode) {
+                camera = {make_float3(2.5f, 0.35f, 1.8f),
+                          make_float3(0.0f, -0.15f, -4.35f), 43.0f};
+            }
             else frame_imported_triangles(imported.triangles);
             output = argc > 3 ? argv[3] : "cuda_gltf_pathtracer.bmp";
             samples = argc > 4 ? std::stoi(argv[4]) : 64;
@@ -1434,7 +1446,8 @@ int main(int argc, char** argv) {
         }
         write_image(output, width, height,
                     render(width, height, samples, 0xC0FFEEu, imported,
-                           !gltf_mode && !showcase_mode && !scene_mode, environment.get()));
+                           !gltf_mode && !showcase_mode && !showcase_angle_mode && !scene_mode,
+                           environment.get(), camera));
         std::cout << "CUDA path traced " << width << 'x' << height << " at " << samples
                   << " spp with " << imported.triangles.size() << " imported triangles"
                   << (environment ? " and HDR environment" : "") << " to " << output << '\n';

@@ -25,7 +25,7 @@ light that transports energy into the scene.
 | 0 — PBR baseline | `b11436a` | Automatic full-scene bounds and opaque core PBR | [`quality_gltf_toycar_128spp.png`](quality_gltf_toycar_128spp.png) |
 | 1 — Transmission | `1ea84e7` | Add KHR transmission/IOR while preserving camera and light | [`quality_gltf_toycar_transmission_128spp.png`](quality_gltf_toycar_transmission_128spp.png) |
 | 2 — Subject framing | `d1815ee` | Frame material 0/2 car geometry while material 1 fabric no longer controls bounds | [`evolution_toycar_stage2_subject_framing_128spp.png`](evolution_toycar_stage2_subject_framing_128spp.png) |
-| 3 — Three-quarter camera | planned | Low 3/4 view to expose body curvature and silhouette | — |
+| 3 — Three-quarter camera | current change | Low 3/4 view to expose body curvature and silhouette | [`evolution_toycar_stage3_three_quarter_camera_128spp.png`](evolution_toycar_stage3_three_quarter_camera_128spp.png) |
 | 4 — Studio lighting | planned | Key/fill/rim setup with useful reflection shapes | — |
 | 5 — Clearcoat and sheen | planned | Add the car-paint coat and fabric grazing reflection | — |
 

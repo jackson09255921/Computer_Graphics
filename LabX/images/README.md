@@ -41,6 +41,7 @@ visually inspected at native resolution after automated image validation.
 | ToyCar baseline | [`quality_gltf_toycar_128spp.png`](quality_gltf_toycar_128spp.png) | Pre-transmission reference retained for visual comparison |
 | ToyCar transmission | [`quality_gltf_toycar_transmission_128spp.png`](quality_gltf_toycar_transmission_128spp.png) | 99,081 triangles at 128 spp; singular transforms and KHR dielectric transmission handled |
 | ToyCar subject framing | [`evolution_toycar_stage2_subject_framing_128spp.png`](evolution_toycar_stage2_subject_framing_128spp.png) | Material-aware bounds make the car the subject without changing camera, lighting, SPP, or seed |
+| ToyCar 3/4 camera | [`evolution_toycar_stage3_three_quarter_camera_128spp.png`](evolution_toycar_stage3_three_quarter_camera_128spp.png) | Low three-quarter camera exposes body curvature and silhouette while framing, lighting, materials, SPP, and seed remain fixed |
 | WaterBottle | [`quality_gltf_waterbottle_128spp.png`](quality_gltf_waterbottle_128spp.png) | 4,510 textured PBR triangles at 128 spp |
 | CUDA multi-asset | [`quality_cuda_multi_asset_128spp.png`](quality_cuda_multi_asset_128spp.png) | Bunny and teapot, 11,288 triangles at 1280x720 and 128 spp |
 
