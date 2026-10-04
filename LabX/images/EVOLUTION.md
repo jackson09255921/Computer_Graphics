@@ -99,7 +99,7 @@ the clearcoat lineage popularized by the 2012 Disney principled BRDF.
 
 | Stage | Commit | Controlled change | Result |
 | --- | --- | --- | --- |
-| 12 — Sheen textures | pending | Enable sRGB color (RGB) and linear roughness (alpha) textures | [`baseline`](evolution_sheen_stage12_baseline_128spp.png) · [`textures`](evolution_sheen_stage12_textures_128spp.png) |
+| 12 — Sheen textures | `76403ce` | Enable sRGB color (RGB) and linear roughness (alpha) textures | [`baseline`](evolution_sheen_stage12_baseline_128spp.png) · [`textures`](evolution_sheen_stage12_textures_128spp.png) |
 
 The reproducible validator derives from Khronos SheenTestGrid and injects two
 procedural PNGs without changing its 21,646 triangles or 4×4 factor grid. Both
