@@ -50,7 +50,7 @@ int main() {
     {"bufferView":1,"componentType":5123,"count":3,"type":"SCALAR"},
     {"bufferView":2,"componentType":5126,"count":3,"type":"VEC3"}
   ],
-  "materials":[{"doubleSided":true,"emissiveFactor":[0.1,0.2,0.3],"extensions":{"KHR_materials_transmission":{"transmissionFactor":0.7},"KHR_materials_ior":{"ior":1.4},"KHR_materials_clearcoat":{"clearcoatFactor":0.8,"clearcoatRoughnessFactor":0.12},"KHR_materials_sheen":{"sheenColorFactor":[0.9,0.2,0.1],"sheenRoughnessFactor":0.45}},"pbrMetallicRoughness":{"baseColorFactor":[0.2,0.4,0.8,1],"metallicFactor":0.6,"roughnessFactor":0.25}}],
+  "materials":[{"doubleSided":true,"alphaMode":"MASK","alphaCutoff":0.35,"emissiveFactor":[0.1,0.2,0.3],"extensions":{"KHR_materials_transmission":{"transmissionFactor":0.7},"KHR_materials_ior":{"ior":1.4},"KHR_materials_clearcoat":{"clearcoatFactor":0.8,"clearcoatRoughnessFactor":0.12},"KHR_materials_sheen":{"sheenColorFactor":[0.9,0.2,0.1],"sheenRoughnessFactor":0.45}},"pbrMetallicRoughness":{"baseColorFactor":[0.2,0.4,0.8,0.75],"metallicFactor":0.6,"roughnessFactor":0.25}}],
   "meshes":[{"primitives":[{"attributes":{"POSITION":0,"NORMAL":2},"indices":1,"material":0}]}],
   "nodes":[{"mesh":0,"translation":[2,3,4],"scale":[2,2,2]}],
   "scenes":[{"nodes":[0]}],"scene":0
@@ -82,6 +82,9 @@ int main() {
         require(triangle.occlusion_texture == nullptr && near(triangle.occlusion_strength, 1.0),
                 "missing occlusion texture must retain the neutral defaults");
         require(triangle.double_sided, "double-sided material state must be imported");
+        require(triangle.alpha_mode == 1 && near(triangle.alpha_cutoff, 0.35) &&
+                    near(triangle.base_color_alpha, 0.75),
+                "alpha mode, cutoff, and base-color alpha must be imported");
         require(triangle.material_index == 0, "primitive material index must be retained for scene framing");
         require(triangle.has_normals && near(triangle.first_normal.z, 1.0) &&
                     near(triangle.second_normal.y, 1.0) && near(triangle.third_normal.x, 1.0),
@@ -157,12 +160,15 @@ int main() {
         require(glb_asset.triangles().size() == 1, "GLB v2 JSON and BIN chunks must load");
 
         const cg::assets::GltfTexture texture{2, 2,
-            {{1, 0, 0}, {0, 1, 0}, {0, 0, 1}, {1, 1, 1}}};
+            {{1, 0, 0}, {0, 1, 0}, {0, 0, 1}, {1, 1, 1}}, {0.25, 0.5, 0.75, 1.0}};
         const cg::Color first_texel = texture.sample({0.25, 0.25});
         const cg::Color repeated_texel = texture.sample({1.25, 0.25});
         require(near(first_texel.x, 1.0) && near(first_texel.y, 0.0) &&
                     near(repeated_texel.x, first_texel.x),
                 "base-color texture sampling must be bilinear and repeat UV coordinates");
+        require(near(texture.sample_alpha({0.25, 0.25}), 0.25) &&
+                    near(texture.sample_alpha({1.25, 0.25}), 0.25),
+                "alpha texture sampling must be bilinear and repeat UV coordinates");
 
         std::filesystem::remove(gltf_path);
         std::filesystem::remove(bin_path);

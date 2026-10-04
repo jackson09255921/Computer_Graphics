@@ -136,6 +136,11 @@ disabling or enabling sheen, which makes the material change independently
 verifiable. Occlusion textures modulate environment and later-bounce energy
 using the glTF strength factor, while `doubleSided` controls triangle back-face
 culling instead of treating every imported surface as two-sided.
+RGBA base-color textures retain their alpha channel. `MASK` materials reject
+transparent texels during BVH traversal using the authored cutoff; `BLEND`
+materials use stochastic alpha coverage so camera, indirect, and shadow rays
+can continue through partially transparent surfaces without sorted raster-style
+compositing.
 
 The optional `restir_di` CUDA target contains the 2020 ReSTIR DI reservoir
 foundation: weighted candidate streaming, temporal reuse, spatial reuse, and

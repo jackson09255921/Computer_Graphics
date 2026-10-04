@@ -345,6 +345,26 @@ Color GltfTexture::sample(Vec2 uv) const {
                 lerp(texel(x0, y0 + 1), texel(x0 + 1, y0 + 1), tx), ty);
 }
 
+double GltfTexture::sample_alpha(Vec2 uv) const {
+    if (alpha.empty() || width == 0 || height == 0) return 1.0;
+    uv.x -= std::floor(uv.x);
+    uv.y -= std::floor(uv.y);
+    const double x = uv.x * static_cast<double>(width) - 0.5;
+    const double y = uv.y * static_cast<double>(height) - 0.5;
+    const auto texel = [&](long long column, long long row) {
+        const auto wrap = [](long long value, std::size_t size) {
+            const long long length = static_cast<long long>(size);
+            return static_cast<std::size_t>((value % length + length) % length);
+        };
+        return alpha[wrap(row, height) * width + wrap(column, width)];
+    };
+    const long long x0 = static_cast<long long>(std::floor(x));
+    const long long y0 = static_cast<long long>(std::floor(y));
+    const double tx = x - std::floor(x), ty = y - std::floor(y);
+    return (1.0 - ty) * ((1.0 - tx) * texel(x0, y0) + tx * texel(x0 + 1, y0)) +
+           ty * ((1.0 - tx) * texel(x0, y0 + 1) + tx * texel(x0 + 1, y0 + 1));
+}
+
 GltfAsset GltfAsset::load(const std::filesystem::path& path) {
     const Document document = read_document(path);
     const Json root = JsonParser(document.json).parse();
@@ -397,10 +417,13 @@ GltfAsset GltfAsset::load(const std::filesystem::path& path) {
             texture->width = static_cast<std::size_t>(width);
             texture->height = static_cast<std::size_t>(height);
             texture->pixels.reserve(texture->width * texture->height);
-            for (std::size_t pixel = 0; pixel < texture->width * texture->height; ++pixel)
+            texture->alpha.reserve(texture->width * texture->height);
+            for (std::size_t pixel = 0; pixel < texture->width * texture->height; ++pixel) {
                 texture->pixels.push_back({decoded[pixel * 4] / 255.0,
                                            decoded[pixel * 4 + 1] / 255.0,
                                            decoded[pixel * 4 + 2] / 255.0});
+                texture->alpha.push_back(decoded[pixel * 4 + 3] / 255.0);
+            }
             stbi_image_free(decoded);
             textures.push_back(std::move(texture));
         }
@@ -455,6 +478,9 @@ GltfAsset GltfAsset::load(const std::filesystem::path& path) {
             int primitive_material_index = -1;
             double occlusion_strength = 1.0;
             bool double_sided = false;
+            int alpha_mode = 0;
+            double alpha_cutoff = 0.5;
+            double base_color_alpha = 1.0;
             if (const Json* material_index = primitive.find("material")) {
                 const std::size_t index = integer(*material_index);
                 primitive_material_index = static_cast<int>(index);
@@ -462,6 +488,8 @@ GltfAsset GltfAsset::load(const std::filesystem::path& path) {
                 const Json& material_source = root.find("materials")->array().at(index);
                 const Json* pbr = material_source.find("pbrMetallicRoughness");
                 if (pbr) {
+                    if (const Json* factor = pbr->find("baseColorFactor"))
+                        base_color_alpha = factor->array()[3].number();
                     if (const Json* texture = pbr->find("baseColorTexture"))
                         base_color_texture = textures.at(member_integer(*texture, "index"));
                     if (const Json* texture = pbr->find("metallicRoughnessTexture"))
@@ -480,6 +508,12 @@ GltfAsset GltfAsset::load(const std::filesystem::path& path) {
                 }
                 if (const Json* sided = material_source.find("doubleSided"))
                     double_sided = std::get<bool>(sided->value);
+                if (const Json* mode = material_source.find("alphaMode")) {
+                    if (mode->string() == "MASK") alpha_mode = 1;
+                    else if (mode->string() == "BLEND") alpha_mode = 2;
+                }
+                if (const Json* cutoff = material_source.find("alphaCutoff"))
+                    alpha_cutoff = cutoff->number();
                 if (const Json* factor = material_source.find("emissiveFactor"))
                     emissive_factor = {factor->array()[0].number(), factor->array()[1].number(),
                                        factor->array()[2].number()};
@@ -516,7 +550,8 @@ GltfAsset GltfAsset::load(const std::filesystem::path& path) {
                         emissive_texture, clearcoat_texture, occlusion_texture, emissive_factor,
                         sheen_color_factor, sheen_roughness,
                         clearcoat_factor, clearcoat_roughness, normal_scale, material,
-                        primitive_material_index, occlusion_strength, double_sided});
+                        primitive_material_index, occlusion_strength, double_sided,
+                        alpha_mode, alpha_cutoff, base_color_alpha});
                 } else {
                     const auto normal_or_face = [&](std::uint32_t vertex) {
                         const Vec3 transformed = transform_normal(world, vertex_normals.at(vertex));
@@ -532,7 +567,8 @@ GltfAsset GltfAsset::load(const std::filesystem::path& path) {
                         emissive_texture, clearcoat_texture, occlusion_texture, emissive_factor,
                         sheen_color_factor, sheen_roughness,
                         clearcoat_factor, clearcoat_roughness, normal_scale, material,
-                        primitive_material_index, occlusion_strength, double_sided});
+                        primitive_material_index, occlusion_strength, double_sided,
+                        alpha_mode, alpha_cutoff, base_color_alpha});
                 }
             }
         }

@@ -1,5 +1,13 @@
 ﻿[
     {
+        "name":  "AlphaBlendModeTest",
+        "file":  "AlphaBlendModeTest/AlphaBlendModeTest.glb",
+        "source":  "https://github.com/KhronosGroup/glTF-Sample-Assets/tree/main/Models/AlphaBlendModeTest",
+        "license":  "AlphaBlendModeTest/README.md",
+        "bytes":  2978812,
+        "sha256":  "37c3577d143071b42dd46e9d942b157837eb25c6340112171d7faecaa987b14e"
+    },
+    {
         "name":  "Avocado",
         "file":  "Avocado/Avocado.glb",
         "source":  "https://github.com/KhronosGroup/glTF-Sample-Assets/tree/main/Models/Avocado",

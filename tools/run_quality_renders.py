@@ -75,6 +75,14 @@ def main() -> int:
         publish(source, f"evolution_helmet_stage8_{label}_{args.gpu_spp}spp.png",
                 (640, 360), f"damaged-helmet-{label}")
 
+    alpha_test = samples / "AlphaBlendModeTest" / "AlphaBlendModeTest.glb"
+    for mode, label in (("--alpha-baseline", "opaque"), ("--alpha", "alpha")):
+        source = artifacts / f"alpha_modes_{label}_{args.gpu_spp}spp.ppm"
+        run([str(executable(gpu, "cuda_pathtracer", args.config)), mode,
+             str(alpha_test), str(source), str(args.gpu_spp)])
+        publish(source, f"evolution_alpha_stage9_{label}_{args.gpu_spp}spp.png",
+                (640, 360), f"alpha-modes-{label}")
+
     models = ROOT / "LabX" / "data" / "legacy_converted" / "meshes"
     multi = artifacts / f"cuda_multi_asset_{args.gpu_spp}spp.ppm"
     run([str(executable(gpu, "cuda_pathtracer", args.config)), "--scene", str(multi), str(args.gpu_spp),

@@ -5,7 +5,6 @@ official Khronos glTF Sample Assets repository. Each model directory keeps its
 upstream README with the author, credits, and license. `manifest.json` records
 the canonical source URL, byte size, and SHA-256 digest of every downloaded GLB.
 
-These assets exercise UVs, image textures, normal maps, multiple materials, and
-PBR metallic/roughness data. The current LabX loader does not support every one
-of those features yet; they form the compatibility corpus for implementing and
-testing that support incrementally.
+These assets exercise UVs, RGBA image textures, alpha modes, normal and
+occlusion maps, multiple materials, and PBR metallic/roughness data. The corpus
+is expanded as each compatibility stage gains a deterministic visual test.

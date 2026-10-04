@@ -57,6 +57,18 @@ seed `0xC0FFEE`. Occlusion changes 45,111 pixels with a 0.359 channel MAE and a
 maximum channel delta of 58; native-resolution review shows the intended subtle
 darkening in seams, panel gaps, and recessed parts rather than a global color shift.
 
+## AlphaBlendModeTest: transparency evolution
+
+| Stage | Commit | Controlled change | Result |
+| --- | --- | --- | --- |
+| 9 — Alpha modes | pending | Preserve RGBA and enable MASK cutoff plus stochastic BLEND coverage during BVH traversal | [`opaque baseline`](evolution_alpha_stage9_opaque_128spp.png) · [`alpha`](evolution_alpha_stage9_alpha_128spp.png) |
+
+The official Khronos test asset exposes five authored opacity/cutoff cases in a
+single view. Both 640x360 renders use the same camera, studio lights, 128 spp,
+and seed `0xC0FFEE`. Alpha processing changes 94,139 pixels with a 4.825 channel
+MAE and maximum channel delta of 181; the reviewed result reveals the rear frame
+and background through MASK/BLEND texels while OPAQUE remains solid.
+
 ## Rules for future stages
 
 1. Use a new descriptive filename; never replace a reviewed image.
