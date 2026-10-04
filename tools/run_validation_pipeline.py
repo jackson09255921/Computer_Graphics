@@ -116,6 +116,14 @@ def publish_png(source: pathlib.Path, destination: pathlib.Path) -> str:
     return str(destination.relative_to(ROOT))
 
 
+def mean_absolute_difference(first: pathlib.Path, second: pathlib.Path) -> float:
+    first_width, first_height, first_pixels = rgb_pixels(first)
+    second_width, second_height, second_pixels = rgb_pixels(second)
+    if (first_width, first_height) != (second_width, second_height):
+        raise ValueError("visual comparison dimensions do not match")
+    return sum(abs(a - b) for a, b in zip(first_pixels, second_pixels)) / len(first_pixels)
+
+
 def write_reports(output: pathlib.Path, records: list[dict[str, object]], elapsed: float) -> None:
     report = {"status": "passed", "elapsed_seconds": round(elapsed, 3), "validations": records}
     (output / "validation-report.json").write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
@@ -225,6 +233,24 @@ def main() -> int:
             result["published"] = publish_png(target, gallery / "pipeline_cuda_multi_asset_smoke.png")
             return result
         stage("render-cuda-multi-asset", cuda_render)
+
+        mesh_baseline = output / "mesh_light_baseline.ppm"
+        mesh_feature = output / "mesh_light_feature.ppm"
+        def cuda_mesh_light():
+            for mode, target in (("--mesh-light-baseline", mesh_baseline),
+                                 ("--mesh-light", mesh_feature)):
+                run([str(executable(gpu, "cuda_pathtracer", args.config)), mode,
+                     str(target), str(args.spp)])
+                validate_image(target, (640, 360))
+            difference = mean_absolute_difference(mesh_baseline, mesh_feature)
+            if difference < 2.0:
+                raise ValueError(f"mesh-light visual delta is too small: {difference:.3f}")
+            return {
+                "mean_absolute_difference": round(difference, 3),
+                "baseline": publish_png(mesh_baseline, gallery / "pipeline_mesh_light_baseline.png"),
+                "feature": publish_png(mesh_feature, gallery / "pipeline_mesh_light_nee_mis.png"),
+            }
+        stage("render-cuda-mesh-light", cuda_mesh_light)
 
     write_reports(output, records, time.monotonic() - started)
     print(f"pipeline passed: {len(records)} validations; reports in {output}")

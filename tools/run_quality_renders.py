@@ -139,6 +139,13 @@ def main() -> int:
         publish(source, f"evolution_anisotropy_stage15_{label}_{args.gpu_spp}spp.png",
                 (640, 360), f"anisotropy-{label}")
 
+    for mode, label in (("--mesh-light-baseline", "baseline"), ("--mesh-light", "nee_mis")):
+        source = artifacts / f"mesh_light_{label}_{args.gpu_spp}spp.ppm"
+        run([str(executable(gpu, "cuda_pathtracer", args.config)), mode,
+             str(source), str(args.gpu_spp)])
+        publish(source, f"evolution_mesh_light_stage16_{label}_{args.gpu_spp}spp.png",
+                (640, 360), f"mesh-light-{label}")
+
     models = ROOT / "LabX" / "data" / "legacy_converted" / "meshes"
     multi = artifacts / f"cuda_multi_asset_{args.gpu_spp}spp.ppm"
     run([str(executable(gpu, "cuda_pathtracer", args.config)), "--scene", str(multi), str(args.gpu_spp),

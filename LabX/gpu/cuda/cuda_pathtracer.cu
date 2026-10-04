@@ -78,6 +78,7 @@ struct Triangle {
     UvMapping transmission_mapping{};
     UvMapping specular_mapping{}; UvMapping specular_color_mapping{};
     UvMapping anisotropy_mapping{};
+    int mesh_light_index{-1};
 };
 struct TextureDescriptor { int offset; int width; int height; int wrap_s; int wrap_t; };
 struct ImportedAssets {
@@ -87,6 +88,8 @@ struct ImportedAssets {
 };
 struct AreaLight { float3 center; float3 half_u; float3 half_v; float3 emission; };
 struct LightSet { AreaLight lights[3]; int count; };
+struct MeshLight { int triangle_index; float area; float weight; float cdf; };
+struct MeshLightSet { const MeshLight* lights; int count; float total_weight; };
 struct Camera { float3 origin; float3 target; float vertical_fov; };
 struct GpuEnvironment {
     const float3* pixels;
@@ -121,6 +124,7 @@ struct Hit {
     float2 transmission_uv;
     float2 specular_uv; float2 specular_color_uv;
     float2 anisotropy_uv;
+    int triangle_index{-1}; int mesh_light_index{-1};
 };
 
 struct Rng {
@@ -276,6 +280,8 @@ __device__ void intersect_triangles(const Ray& ray, const Triangle* triangles, c
                 closest.anisotropy_texture_index = triangle.anisotropy_texture_index;
                 closest.occlusion_texture_index = triangle.occlusion_texture_index;
                 closest.occlusion_strength = triangle.occlusion_strength;
+                closest.triangle_index = index;
+                closest.mesh_light_index = triangle.mesh_light_index;
                 closest.found = true;
             }
         } else {
@@ -662,6 +668,27 @@ __host__ __device__ float light_area(const AreaLight& light) {
                             cross3(light.half_u, light.half_v)));
 }
 
+__device__ int sample_mesh_light(const MeshLightSet& lights, float sample) {
+    if (!lights.lights || lights.count <= 0 || lights.total_weight <= 0.0f) return -1;
+    int low = 0, high = lights.count - 1;
+    while (low < high) {
+        const int middle = low + (high - low) / 2;
+        if (sample <= lights.lights[middle].cdf) high = middle;
+        else low = middle + 1;
+    }
+    return low;
+}
+
+__device__ float mesh_light_pdf(const MeshLight& light, const Triangle& triangle,
+                                float3 direction, float distance, float total_weight) {
+    const float3 normal = normalize3(cross3(sub(triangle.second, triangle.first),
+                                            sub(triangle.third, triangle.first)));
+    const float cosine = triangle.double_sided ? fabsf(dot3(normal, mul(direction, -1.0f)))
+                                                : fmaxf(0.0f, dot3(normal, mul(direction, -1.0f)));
+    if (cosine <= 0.0f || light.area <= 0.0f || total_weight <= 0.0f) return 0.0f;
+    return (light.weight / total_weight) * distance * distance / (cosine * light.area);
+}
+
 __device__ bool intersect_light(const AreaLight& light, const Ray& ray, float& distance) {
     const float3 normal = normalize3(cross3(light.half_u, light.half_v));
     const float denominator = dot3(normal, ray.direction);
@@ -760,7 +787,8 @@ __device__ float3 sample_environment(const GpuEnvironment& environment, float3 d
 
 __device__ float3 radiance(Ray ray, const Sphere* spheres, int sphere_count,
                            const Triangle* triangles, const BvhNode* nodes, int node_count,
-                           const LightSet& lights, const GpuEnvironment& environment,
+                           const LightSet& lights, const MeshLightSet& mesh_lights,
+                           const GpuEnvironment& environment,
                            const GpuTextures& textures, Rng& rng) {
     float3 result = make_float3(0, 0, 0);
     float3 throughput = make_float3(1, 1, 1);
@@ -800,7 +828,14 @@ __device__ float3 radiance(Ray ray, const Sphere* spheres, int sphere_count,
         hit.albedo = mul(hit.albedo, sample_texture(textures, hit.texture_index, hit.base_color_uv));
         if (hit.emissive_texture_index >= 0)
             hit.emissive = mul(hit.emissive, sample_texture(textures, hit.emissive_texture_index, hit.emissive_uv));
-        result = add(result, mul(throughput, hit.emissive));
+        float emissive_weight = 1.0f;
+        if (previous_uses_mis && hit.mesh_light_index >= 0) {
+            const MeshLight mesh_light = mesh_lights.lights[hit.mesh_light_index];
+            const float light_pdf = mesh_light_pdf(mesh_light, triangles[mesh_light.triangle_index],
+                                                   ray.direction, hit.distance, mesh_lights.total_weight);
+            emissive_weight = power_heuristic(previous_bsdf_pdf, light_pdf);
+        }
+        result = add(result, mul(mul(throughput, hit.emissive), emissive_weight));
         if (hit.clearcoat_texture_index >= 0)
             hit.clearcoat *= sample_texture(textures, hit.clearcoat_texture_index, hit.clearcoat_uv).x;
         if (hit.clearcoat_roughness_texture_index >= 0) {
@@ -920,6 +955,58 @@ __device__ float3 radiance(Ray ray, const Sphere* spheres, int sphere_count,
                                              surface_cosine * weight / light_pdf));
                 }
             }
+            const int mesh_light_index = sample_mesh_light(mesh_lights, rng.next());
+            if (mesh_light_index >= 0) {
+                const MeshLight mesh_light = mesh_lights.lights[mesh_light_index];
+                const Triangle emitter = triangles[mesh_light.triangle_index];
+                const float root = sqrtf(rng.next());
+                const float barycentric0 = 1.0f - root;
+                const float barycentric1 = root * (1.0f - rng.next());
+                const float barycentric2 = root - barycentric1;
+                const float3 light_point = add(mul(emitter.first, barycentric0),
+                    add(mul(emitter.second, barycentric1), mul(emitter.third, barycentric2)));
+                const float3 offset = sub(light_point, hit.position);
+                const float distance_squared = dot3(offset, offset);
+                const float distance = sqrtf(distance_squared);
+                if (distance > 1.0e-4f) {
+                    const float3 direction_to_light = mul(offset, 1.0f / distance);
+                    const float surface_cosine = fmaxf(0.0f, dot3(hit.normal, direction_to_light));
+                    const float light_pdf = mesh_light_pdf(mesh_light, emitter, direction_to_light,
+                                                           distance, mesh_lights.total_weight);
+                    if (surface_cosine > 0.0f && light_pdf > 0.0f) {
+                        Hit blocker{};
+                        const Ray shadow{add(hit.position, mul(hit.normal, 1.0e-4f)), direction_to_light};
+                        const bool blocked = intersect_scene(shadow, spheres, sphere_count, triangles, nodes,
+                                                             node_count, textures, blocker) &&
+                                             blocker.distance < distance - 2.0e-4f;
+                        if (!blocked) {
+                            const float2 uv0 = make_float2(
+                                emitter.first_uv.x * barycentric0 + emitter.second_uv.x * barycentric1 + emitter.third_uv.x * barycentric2,
+                                emitter.first_uv.y * barycentric0 + emitter.second_uv.y * barycentric1 + emitter.third_uv.y * barycentric2);
+                            const float2 uv1 = make_float2(
+                                emitter.first_uv1.x * barycentric0 + emitter.second_uv1.x * barycentric1 + emitter.third_uv1.x * barycentric2,
+                                emitter.first_uv1.y * barycentric0 + emitter.second_uv1.y * barycentric1 + emitter.third_uv1.y * barycentric2);
+                            float3 emission = emitter.emissive;
+                            if (emitter.emissive_texture_index >= 0)
+                                emission = mul(emission, sample_texture(textures, emitter.emissive_texture_index,
+                                    mapped_uv(uv0, uv1, emitter.emissive_mapping)));
+                            const float3 brdf = evaluate_metallic_roughness(
+                                hit.normal, hit.clearcoat_normal, view_direction, direction_to_light,
+                                hit.albedo, hit.metallic, hit.roughness, hit.clearcoat,
+                                hit.clearcoat_roughness, hit.sheen_color, hit.sheen_roughness,
+                                hit.specular_factor, hit.specular_color, anisotropy_tangent,
+                                anisotropy_bitangent, hit.anisotropy_strength);
+                            const float bsdf_pdf = metallic_roughness_pdf(
+                                hit.normal, hit.clearcoat_normal, view_direction, direction_to_light,
+                                hit.metallic, hit.roughness, hit.clearcoat, hit.clearcoat_roughness,
+                                anisotropy_tangent, anisotropy_bitangent, hit.anisotropy_strength);
+                            const float weight = power_heuristic(light_pdf, bsdf_pdf);
+                            result = add(result, mul(mul(mul(throughput, brdf), emission),
+                                                     surface_cosine * weight / light_pdf));
+                        }
+                    }
+                }
+            }
             float3 environment_direction{};
             float3 environment_value{};
             float environment_sample_pdf = 0.0f;
@@ -1037,7 +1124,7 @@ __device__ float3 radiance(Ray ray, const Sphere* spheres, int sphere_count,
 __global__ void render_tile(float3* tile, int tile_x, int tile_y, int tile_width, int tile_height,
                             int image_width, int image_height, int samples, std::uint32_t seed,
                             const Sphere* spheres, int sphere_count, const Triangle* triangles,
-                            const BvhNode* nodes, int node_count, LightSet lights,
+                            const BvhNode* nodes, int node_count, LightSet lights, MeshLightSet mesh_lights,
                             GpuEnvironment environment, GpuTextures textures, Camera camera) {
     const int local_x = static_cast<int>(blockIdx.x * blockDim.x + threadIdx.x);
     const int local_y = static_cast<int>(blockIdx.y * blockDim.y + threadIdx.y);
@@ -1060,7 +1147,8 @@ __global__ void render_tile(float3* tile, int tile_x, int tile_y, int tile_width
         const float3 direction = normalize3(add(forward, add(mul(right, (u - 0.5f) * viewport * aspect),
                                                                mul(up, (0.5f - v) * viewport))));
         color = add(color, radiance({origin, direction}, spheres, sphere_count,
-                                    triangles, nodes, node_count, lights, environment, textures, rng));
+                                    triangles, nodes, node_count, lights, mesh_lights,
+                                    environment, textures, rng));
     }
     tile[local_y * tile_width + local_x] = mul(color, 1.0f / static_cast<float>(samples));
 }
@@ -1105,6 +1193,16 @@ __global__ void probe_mis(int* passed) {
     *passed = fabsf(power_heuristic(0.25f, 0.25f) - 0.5f) < 1.0e-6f && intersects &&
               fabsf(distance - 2.0f) < 1.0e-6f &&
               fabsf(area_light_pdf(light, ray, distance) - 1.0f) < 1.0e-6f;
+}
+
+__global__ void probe_mesh_lights(int* passed) {
+    const MeshLight lights[2]{{0, 2.0f, 1.0f, 0.25f}, {1, 2.0f, 3.0f, 1.0f}};
+    Triangle triangle{make_float3(-1, 2, -1), make_float3(1, 2, -1), make_float3(-1, 2, 1),
+                      make_float3(1, 1, 1), 0.0f, 0.5f, 0.0f, 1.5f};
+    const MeshLightSet set{lights, 2, 4.0f};
+    const float pdf = mesh_light_pdf(lights[0], triangle, make_float3(0, 1, 0), 2.0f, 4.0f);
+    *passed = sample_mesh_light(set, 0.20f) == 0 && sample_mesh_light(set, 0.30f) == 1 &&
+              fabsf(pdf - 0.5f) < 1.0e-6f;
 }
 
 __global__ void probe_environment(GpuEnvironment environment, int* passed) {
@@ -1250,6 +1348,24 @@ void validate_mis_on_gpu() {
         check(cudaFree(device_passed), "cudaFree MIS probe result");
         device_passed = nullptr;
         if (!passed) throw std::runtime_error("GPU area-light PDF or MIS power heuristic probe failed");
+    } catch (...) {
+        if (device_passed) cudaFree(device_passed);
+        throw;
+    }
+}
+
+void validate_mesh_lights_on_gpu() {
+    int* device_passed = nullptr;
+    try {
+        check(cudaMalloc(&device_passed, sizeof(int)), "cudaMalloc mesh-light probe result");
+        probe_mesh_lights<<<1, 1>>>(device_passed);
+        check(cudaGetLastError(), "mesh-light probe launch");
+        int passed = 0;
+        check(cudaMemcpy(&passed, device_passed, sizeof(int), cudaMemcpyDeviceToHost),
+              "copy mesh-light probe result");
+        check(cudaFree(device_passed), "cudaFree mesh-light probe result");
+        device_passed = nullptr;
+        if (!passed) throw std::runtime_error("GPU mesh-light CDF selection or solid-angle PDF probe failed");
     } catch (...) {
         if (device_passed) cudaFree(device_passed);
         throw;
@@ -1553,12 +1669,52 @@ EnvironmentData build_environment_data(const cg::environment::EnvironmentMap* en
     return result;
 }
 
+std::vector<MeshLight> build_mesh_lights(std::vector<Triangle>& triangles,
+                                         const ImportedAssets& imported,
+                                         float& total_weight) {
+    std::vector<MeshLight> result;
+    total_weight = 0.0f;
+    for (std::size_t triangle_index = 0; triangle_index < triangles.size(); ++triangle_index) {
+        Triangle& triangle = triangles[triangle_index];
+        float3 average_texture = make_float3(1.0f, 1.0f, 1.0f);
+        if (triangle.emissive_texture_index >= 0) {
+            const TextureDescriptor& descriptor = imported.textures.at(
+                static_cast<std::size_t>(triangle.emissive_texture_index));
+            average_texture = make_float3(0, 0, 0);
+            const int pixel_count = descriptor.width * descriptor.height;
+            for (int index = 0; index < pixel_count; ++index) {
+                const float4 pixel = imported.texture_pixels[descriptor.offset + index];
+                average_texture = add(average_texture, make_float3(pixel.x, pixel.y, pixel.z));
+            }
+            if (pixel_count > 0) average_texture = mul(average_texture, 1.0f / static_cast<float>(pixel_count));
+        }
+        const float3 average_emission = mul(triangle.emissive, average_texture);
+        const float luminance = 0.2126f * average_emission.x + 0.7152f * average_emission.y +
+                                0.0722f * average_emission.z;
+        const float area = 0.5f * sqrtf(dot3(cross3(sub(triangle.second, triangle.first),
+                                                   sub(triangle.third, triangle.first)),
+                                            cross3(sub(triangle.second, triangle.first),
+                                                   sub(triangle.third, triangle.first))));
+        const float weight = area * fmaxf(0.0f, luminance) * (triangle.double_sided ? 2.0f : 1.0f);
+        if (area <= 1.0e-10f || weight <= 1.0e-10f) continue;
+        triangle.mesh_light_index = static_cast<int>(result.size());
+        total_weight += weight;
+        result.push_back({static_cast<int>(triangle_index), area, weight, total_weight});
+    }
+    if (total_weight > 0.0f) {
+        for (MeshLight& light : result) light.cdf /= total_weight;
+        result.back().cdf = 1.0f;
+    }
+    return result;
+}
+
 std::vector<float3> render(int width, int height, int samples, std::uint32_t seed,
                            const ImportedAssets& imported = {}, bool show_demo_spheres = true,
                            const cg::environment::EnvironmentMap* environment_map = nullptr,
                            Camera camera = {make_float3(0.0f, 0.65f, 2.8f),
                                             make_float3(0.0f, -0.05f, -4.0f), 48.0f},
-                           bool studio_lighting = false) {
+                           bool studio_lighting = false, bool enable_mesh_lights = true,
+                           bool mesh_light_demo = false) {
     LightSet lights{{
         {make_float3(-0.8f, 4.5f, -3.5f), make_float3(1.5f, 0, 0),
          make_float3(0, 0, 1.0f), make_float3(10.0f, 8.0f, 5.5f)},
@@ -1592,8 +1748,24 @@ std::vector<float3> render(int width, int height, int samples, std::uint32_t see
         {make_float3(-7, -1, -9), make_float3(7, 6, -9), make_float3(-7, 6, -9),
          make_float3(0.3f, 0.38f, 0.5f), 0.0f, 0.7f, 0.0f, 1.5f},
     };
+    if (mesh_light_demo) {
+        Triangle first{make_float3(-1.25f, 3.3f, -3.0f), make_float3(1.25f, 3.3f, -5.2f),
+                       make_float3(1.25f, 3.3f, -3.0f), make_float3(0.05f, 0.05f, 0.05f),
+                       0.0f, 0.5f, 0.0f, 1.5f};
+        first.emissive = make_float3(16.0f, 10.0f, 5.0f);
+        Triangle second{make_float3(-1.25f, 3.3f, -3.0f), make_float3(-1.25f, 3.3f, -5.2f),
+                        make_float3(1.25f, 3.3f, -5.2f), make_float3(0.05f, 0.05f, 0.05f),
+                        0.0f, 0.5f, 0.0f, 1.5f};
+        second.emissive = first.emissive;
+        triangles.push_back(first);
+        triangles.push_back(second);
+    }
     triangles.insert(triangles.end(), imported.triangles.begin(), imported.triangles.end());
     const std::vector<BvhNode> nodes = build_bvh(triangles);
+    float mesh_light_total_weight = 0.0f;
+    const std::vector<MeshLight> mesh_lights = enable_mesh_lights
+        ? build_mesh_lights(triangles, imported, mesh_light_total_weight)
+        : std::vector<MeshLight>{};
     const EnvironmentData environment_data = build_environment_data(environment_map);
     Sphere* device_spheres = nullptr;
     Triangle* device_triangles = nullptr;
@@ -1603,11 +1775,15 @@ std::vector<float3> render(int width, int height, int samples, std::uint32_t see
     float* device_environment_cdf = nullptr;
     float4* device_texture_pixels = nullptr;
     TextureDescriptor* device_texture_descriptors = nullptr;
+    MeshLight* device_mesh_lights = nullptr;
     float3* device_tile = nullptr;
     try {
         if (!spheres.empty()) check(cudaMalloc(&device_spheres, spheres.size() * sizeof(Sphere)), "cudaMalloc spheres");
         check(cudaMalloc(&device_triangles, triangles.size() * sizeof(Triangle)), "cudaMalloc triangles");
         check(cudaMalloc(&device_nodes, nodes.size() * sizeof(BvhNode)), "cudaMalloc BVH nodes");
+        if (!mesh_lights.empty())
+            check(cudaMalloc(&device_mesh_lights, mesh_lights.size() * sizeof(MeshLight)),
+                  "cudaMalloc mesh lights");
         if (!environment_data.pixels.empty()) {
             check(cudaMalloc(&device_environment_pixels, environment_data.pixels.size() * sizeof(float3)),
                   "cudaMalloc HDR environment");
@@ -1636,6 +1812,9 @@ std::vector<float3> render(int width, int height, int samples, std::uint32_t see
               "copy triangles");
         check(cudaMemcpy(device_nodes, nodes.data(), nodes.size() * sizeof(BvhNode), cudaMemcpyHostToDevice),
               "copy BVH nodes");
+        if (!mesh_lights.empty())
+            check(cudaMemcpy(device_mesh_lights, mesh_lights.data(), mesh_lights.size() * sizeof(MeshLight),
+                             cudaMemcpyHostToDevice), "copy mesh lights");
         if (!environment_data.pixels.empty()) {
             check(cudaMemcpy(device_environment_pixels, environment_data.pixels.data(),
                              environment_data.pixels.size() * sizeof(float3), cudaMemcpyHostToDevice),
@@ -1653,6 +1832,8 @@ std::vector<float3> render(int width, int height, int samples, std::uint32_t see
                                          environment_map ? static_cast<int>(environment_map->height()) : 0};
         const GpuTextures textures{device_texture_pixels, device_texture_descriptors,
                                    static_cast<int>(imported.textures.size())};
+        const MeshLightSet mesh_light_set{device_mesh_lights, static_cast<int>(mesh_lights.size()),
+                                          mesh_light_total_weight};
         std::vector<float3> image(static_cast<std::size_t>(width) * height);
         std::vector<float3> tile(kTileWidth * kTileHeight);
         for (int tile_y = 0; tile_y < height; tile_y += kTileHeight) {
@@ -1664,7 +1845,8 @@ std::vector<float3> render(int width, int height, int samples, std::uint32_t see
                 render_tile<<<blocks, threads>>>(device_tile, tile_x, tile_y, tile_width, tile_height,
                                                   width, height, samples, seed, device_spheres,
                                                   static_cast<int>(spheres.size()), device_triangles,
-                                                  device_nodes, static_cast<int>(nodes.size()), lights, environment,
+                                                  device_nodes, static_cast<int>(nodes.size()), lights,
+                                                  mesh_light_set, environment,
                                                   textures, camera);
                 check(cudaGetLastError(), "render tile launch");
                 check(cudaMemcpy(tile.data(), device_tile, tile_width * tile_height * sizeof(float3),
@@ -1687,6 +1869,8 @@ std::vector<float3> render(int width, int height, int samples, std::uint32_t see
         device_texture_descriptors = nullptr;
         if (device_texture_pixels) check(cudaFree(device_texture_pixels), "cudaFree texture pixels");
         device_texture_pixels = nullptr;
+        if (device_mesh_lights) check(cudaFree(device_mesh_lights), "cudaFree mesh lights");
+        device_mesh_lights = nullptr;
         check(cudaFree(device_nodes), "cudaFree BVH nodes");
         device_nodes = nullptr;
         check(cudaFree(device_triangles), "cudaFree triangles");
@@ -1701,6 +1885,7 @@ std::vector<float3> render(int width, int height, int samples, std::uint32_t see
         if (device_environment_pixels) cudaFree(device_environment_pixels);
         if (device_texture_descriptors) cudaFree(device_texture_descriptors);
         if (device_texture_pixels) cudaFree(device_texture_pixels);
+        if (device_mesh_lights) cudaFree(device_mesh_lights);
         if (device_nodes) cudaFree(device_nodes);
         if (device_triangles) cudaFree(device_triangles);
         if (device_spheres) cudaFree(device_spheres);
@@ -1772,6 +1957,7 @@ void self_test() {
     validate_bvh_on_gpu();
     validate_dielectric_on_gpu();
     validate_mis_on_gpu();
+    validate_mesh_lights_on_gpu();
     validate_environment_on_gpu();
     validate_ggx_on_gpu();
     const std::filesystem::path gltf_path = "cuda_gltf_test.gltf";
@@ -1874,6 +2060,8 @@ int main(int argc, char** argv) {
         const bool specular_mode = argc > 1 && std::string(argv[1]) == "--specular";
         const bool anisotropy_baseline_mode = argc > 1 && std::string(argv[1]) == "--anisotropy-baseline";
         const bool anisotropy_mode = argc > 1 && std::string(argv[1]) == "--anisotropy";
+        const bool mesh_light_baseline_mode = argc > 1 && std::string(argv[1]) == "--mesh-light-baseline";
+        const bool mesh_light_mode = argc > 1 && std::string(argv[1]) == "--mesh-light";
         const bool scene_mode = argc > 1 && std::string(argv[1]) == "--scene";
         const bool hdr_mode = argc > 1 && std::string(argv[1]) == "--hdr";
         if (scene_mode) {
@@ -2009,6 +2197,10 @@ int main(int argc, char** argv) {
             samples = argc > 4 ? std::stoi(argv[4]) : 64;
             if (argc > 5) environment = std::make_unique<cg::environment::EnvironmentMap>(
                 cg::environment::EnvironmentMap::load_radiance(argv[5]));
+        } else if (mesh_light_baseline_mode || mesh_light_mode) {
+            output = argc > 2 ? argv[2] : "cuda_mesh_light.bmp";
+            samples = argc > 3 ? std::stoi(argv[3]) : 64;
+            camera = {make_float3(0.0f, 0.65f, 2.8f), make_float3(0.0f, 0.0f, -4.2f), 48.0f};
         } else if (hdr_mode) {
             if (argc < 3) throw std::invalid_argument(
                 "usage: cuda_pathtracer --hdr environment.hdr [output.bmp] [spp]");
@@ -2042,7 +2234,8 @@ int main(int argc, char** argv) {
                                sheen_texture_baseline_mode || sheen_texture_mode ||
                                transmission_texture_baseline_mode || transmission_texture_mode ||
                                specular_baseline_mode || specular_mode ||
-                               anisotropy_baseline_mode || anisotropy_mode));
+                               anisotropy_baseline_mode || anisotropy_mode,
+                           !mesh_light_baseline_mode, mesh_light_baseline_mode || mesh_light_mode));
         std::cout << "CUDA path traced " << width << 'x' << height << " at " << samples
                   << " spp with " << imported.triangles.size() << " imported triangles"
                   << (environment ? " and HDR environment" : "") << " to " << output << '\n';
