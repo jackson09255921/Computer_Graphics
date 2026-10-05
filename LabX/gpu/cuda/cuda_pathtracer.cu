@@ -2133,9 +2133,9 @@ int main(int argc, char** argv) {
                           make_float3(0.0f, 0.0f, -4.4f), 44.0f};
             }
             else if (transmission_texture_baseline_mode || transmission_texture_mode) {
-                frame_imported_triangles(imported.triangles, 4.3f, 0.0f, -4.5f);
-                camera = {make_float3(0.55f, 0.5f, 1.6f),
-                          make_float3(0.0f, 0.0f, -4.4f), 44.0f};
+                frame_imported_triangles(imported.triangles, 6.0f, 0.0f, -4.5f);
+                camera = {make_float3(0.12f, 0.45f, 1.65f),
+                          make_float3(0.0f, 0.15f, -4.45f), 38.0f};
             }
             else if (specular_baseline_mode || specular_mode) {
                 frame_imported_triangles(imported.triangles, 4.4f, 0.0f, -4.5f);
