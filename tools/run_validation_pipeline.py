@@ -170,7 +170,7 @@ def main() -> int:
             run([str(executable(build, program, args.config)), *command_args])
             source = pathlib.Path(command_args[0])
             result = validate_image(source, dimensions)
-            result["published"] = publish_png(source, gallery / gallery_name)
+            result["published"] = publish_png(source, gallery / "ci" / gallery_name)
             return result
         stage(f"render-{name}", render)
 
@@ -186,7 +186,7 @@ def main() -> int:
         if first["sha256"] == last["sha256"]:
             raise ValueError("animation: first and last frames are identical")
         sheet["published"] = publish_png(animation_dir / "contact_sheet.bmp",
-                                          gallery / "pipeline_animation_contact_sheet.png")
+                                          gallery / "ci" / "pipeline_animation_contact_sheet.png")
         return {"frames": len(frames), "contact_sheet": sheet}
     stage("render-animation", animation)
 
@@ -196,7 +196,7 @@ def main() -> int:
             target = output / f"legacy_{model}.bmp"
             run([str(executable(build, "legacy_asc_demo", args.config)), str(legacy / f"{model}.asc"), str(target)])
             result = validate_image(target, (512, 512))
-            result["published"] = publish_png(target, gallery / f"pipeline_legacy_{model}.png")
+            result["published"] = publish_png(target, gallery / "ci" / f"pipeline_legacy_{model}.png")
             return result
         stage(f"legacy-{model}", render_legacy)
 
@@ -230,7 +230,7 @@ def main() -> int:
             run([str(executable(gpu, "cuda_pathtracer", args.config)), "--scene", str(target), str(args.spp),
                  str(models / "bunny_from_obj.gltf"), str(models / "teapot_from_obj.gltf")])
             result = validate_image(target, (1280, 720))
-            result["published"] = publish_png(target, gallery / "pipeline_cuda_multi_asset_smoke.png")
+            result["published"] = publish_png(target, gallery / "ci" / "pipeline_cuda_multi_asset_smoke.png")
             return result
         stage("render-cuda-multi-asset", cuda_render)
 
@@ -247,8 +247,8 @@ def main() -> int:
                 raise ValueError(f"mesh-light visual delta is too small: {difference:.3f}")
             return {
                 "mean_absolute_difference": round(difference, 3),
-                "baseline": publish_png(mesh_baseline, gallery / "pipeline_mesh_light_baseline.png"),
-                "feature": publish_png(mesh_feature, gallery / "pipeline_mesh_light_nee_mis.png"),
+                "baseline": publish_png(mesh_baseline, gallery / "ci" / "pipeline_mesh_light_baseline.png"),
+                "feature": publish_png(mesh_feature, gallery / "ci" / "pipeline_mesh_light_nee_mis.png"),
             }
         stage("render-cuda-mesh-light", cuda_mesh_light)
 

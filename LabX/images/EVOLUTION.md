@@ -9,10 +9,10 @@ explicitly says otherwise.
 
 | Stage | Commit | Controlled change | Result |
 | --- | --- | --- | --- |
-| 16 — Emissive surface only | `885ead0` | Keep the same emissive ceiling geometry but disable explicit mesh-light sampling | [`baseline`](evolution_mesh_light_stage16_baseline_128spp.png) |
-| 17 — Mesh-light NEE | `885ead0` | Uniform point sampling on emissive triangles converts the area PDF to solid angle | [`NEE + MIS`](evolution_mesh_light_stage16_nee_mis_128spp.png) |
-| 18 — BSDF/light MIS | `885ead0` | Power-heuristic weighting joins direct-light samples with BSDF hits | [`NEE + MIS`](evolution_mesh_light_stage16_nee_mis_128spp.png) |
-| 19 — Power distribution | `885ead0` | Select triangles from an area-times-average-luminance CDF | [`NEE + MIS`](evolution_mesh_light_stage16_nee_mis_128spp.png) |
+| 16 — Emissive surface only | `885ead0` | Keep the same emissive ceiling geometry but disable explicit mesh-light sampling | [`baseline`](evolution/evolution_mesh_light_stage16_baseline_128spp.png) |
+| 17 — Mesh-light NEE | `885ead0` | Uniform point sampling on emissive triangles converts the area PDF to solid angle | [`NEE + MIS`](evolution/evolution_mesh_light_stage16_nee_mis_128spp.png) |
+| 18 — BSDF/light MIS | `885ead0` | Power-heuristic weighting joins direct-light samples with BSDF hits | [`NEE + MIS`](evolution/evolution_mesh_light_stage16_nee_mis_128spp.png) |
+| 19 — Power distribution | `885ead0` | Select triangles from an area-times-average-luminance CDF | [`NEE + MIS`](evolution/evolution_mesh_light_stage16_nee_mis_128spp.png) |
 
 Both 640x360 images use 128 spp and seed `0xC0FFEE`. Their mean absolute
 channel difference is 10.909. The feature image shows the emissive ceiling
@@ -23,8 +23,8 @@ the baseline can only discover that transport through much noisier BSDF paths.
 
 | Stage | Commit | Controlled change | Result |
 | --- | --- | --- | --- |
-| 0 — PBR baseline | `b11436a` | Base color, normal, and metallic-roughness maps | [`quality_gltf_lantern_128spp.png`](quality_gltf_lantern_128spp.png) |
-| 1 — Emissive surface | `6944a92` | Add emissive factor/texture and surface radiance only | [`quality_gltf_lantern_emissive_128spp.png`](quality_gltf_lantern_emissive_128spp.png) |
+| 0 — PBR baseline | `b11436a` | Base color, normal, and metallic-roughness maps | [`quality_gltf_lantern_128spp.png`](quality/quality_gltf_lantern_128spp.png) |
+| 1 — Emissive surface | `6944a92` | Add emissive factor/texture and surface radiance only | [`quality_gltf_lantern_emissive_128spp.png`](quality/quality_gltf_lantern_emissive_128spp.png) |
 | 2 — Emissive lighting | planned | Sample emissive triangles with NEE/MIS so the lamp illuminates its surroundings | — |
 | 3 — Showcase lighting | planned | Darker exposure, warm key light, and cool rim light | — |
 
@@ -36,14 +36,14 @@ light that transports energy into the scene.
 
 | Stage | Commit | Controlled change | Result |
 | --- | --- | --- | --- |
-| 0 — PBR baseline | `b11436a` | Automatic full-scene bounds and opaque core PBR | [`quality_gltf_toycar_128spp.png`](quality_gltf_toycar_128spp.png) |
-| 1 — Transmission | `1ea84e7` | Add KHR transmission/IOR while preserving camera and light | [`quality_gltf_toycar_transmission_128spp.png`](quality_gltf_toycar_transmission_128spp.png) |
-| 2 — Subject framing | `d1815ee` | Frame material 0/2 car geometry while material 1 fabric no longer controls bounds | [`evolution_toycar_stage2_subject_framing_128spp.png`](evolution_toycar_stage2_subject_framing_128spp.png) |
-| 3 — Three-quarter camera | `66536a6` | Low 3/4 view to expose body curvature and silhouette | [`evolution_toycar_stage3_three_quarter_camera_128spp.png`](evolution_toycar_stage3_three_quarter_camera_128spp.png) |
-| 4 — Studio lighting | `538a865` | Warm key, cool fill, and off-camera rim lights with multi-light MIS | [`evolution_toycar_stage4_studio_lighting_128spp.png`](evolution_toycar_stage4_studio_lighting_128spp.png) |
-| 5 — Clearcoat | `a75e312` | Add a second dielectric GGX coat with matched lobe sampling/PDF | [`evolution_toycar_stage5_clearcoat_128spp.png`](evolution_toycar_stage5_clearcoat_128spp.png) |
-| 6 — Fabric sheen | `8670276` | Enable KHR_materials_sheen with Charlie microfiber distribution; paired baseline changes only this lobe | [`baseline`](evolution_toycar_stage6_fabric_baseline_128spp.png) · [`sheen`](evolution_toycar_stage6_fabric_sheen_128spp.png) |
-| 7 — Close framing | `a8bf651` | Increase full-scene scale and narrow the camera FOV while retaining the complete car and cloth silhouette | [`baseline`](evolution_toycar_stage7_close_baseline_128spp.png) · [`sheen`](evolution_toycar_stage7_close_sheen_128spp.png) |
+| 0 — PBR baseline | `b11436a` | Automatic full-scene bounds and opaque core PBR | [`quality_gltf_toycar_128spp.png`](quality/quality_gltf_toycar_128spp.png) |
+| 1 — Transmission | `1ea84e7` | Add KHR transmission/IOR while preserving camera and light | [`quality_gltf_toycar_transmission_128spp.png`](quality/quality_gltf_toycar_transmission_128spp.png) |
+| 2 — Subject framing | `d1815ee` | Frame material 0/2 car geometry while material 1 fabric no longer controls bounds | [`evolution_toycar_stage2_subject_framing_128spp.png`](evolution/evolution_toycar_stage2_subject_framing_128spp.png) |
+| 3 — Three-quarter camera | `66536a6` | Low 3/4 view to expose body curvature and silhouette | [`evolution_toycar_stage3_three_quarter_camera_128spp.png`](evolution/evolution_toycar_stage3_three_quarter_camera_128spp.png) |
+| 4 — Studio lighting | `538a865` | Warm key, cool fill, and off-camera rim lights with multi-light MIS | [`evolution_toycar_stage4_studio_lighting_128spp.png`](evolution/evolution_toycar_stage4_studio_lighting_128spp.png) |
+| 5 — Clearcoat | `a75e312` | Add a second dielectric GGX coat with matched lobe sampling/PDF | [`evolution_toycar_stage5_clearcoat_128spp.png`](evolution/evolution_toycar_stage5_clearcoat_128spp.png) |
+| 6 — Fabric sheen | `8670276` | Enable KHR_materials_sheen with Charlie microfiber distribution; paired baseline changes only this lobe | [`baseline`](evolution/evolution_toycar_stage6_fabric_baseline_128spp.png) · [`sheen`](evolution/evolution_toycar_stage6_fabric_sheen_128spp.png) |
+| 7 — Close framing | `a8bf651` | Increase full-scene scale and narrow the camera FOV while retaining the complete car and cloth silhouette | [`baseline`](evolution/evolution_toycar_stage7_close_baseline_128spp.png) · [`sheen`](evolution/evolution_toycar_stage7_close_sheen_128spp.png) |
 
 The original framing is deliberately retained: it documents why scene-wide
 bounding boxes are reliable for CI yet weak for presentation. Stages 2–5 then
@@ -64,7 +64,7 @@ clipping. At 128 spp, the paired renders differ across 98,431 pixels with a
 
 | Stage | Commit | Controlled change | Result |
 | --- | --- | --- | --- |
-| 8 — Occlusion map | `4b28a7f` | Import the glTF occlusion texture/strength and apply it to environment plus later-bounce energy | [`baseline`](evolution_helmet_stage8_baseline_128spp.png) · [`occlusion`](evolution_helmet_stage8_occlusion_128spp.png) |
+| 8 — Occlusion map | `4b28a7f` | Import the glTF occlusion texture/strength and apply it to environment plus later-bounce energy | [`baseline`](evolution/evolution_helmet_stage8_baseline_128spp.png) · [`occlusion`](evolution/evolution_helmet_stage8_occlusion_128spp.png) |
 
 Both 640x360 images use the same close camera, three-light studio, 128 spp, and
 seed `0xC0FFEE`. Occlusion changes 45,111 pixels with a 0.359 channel MAE and a
@@ -75,7 +75,7 @@ darkening in seams, panel gaps, and recessed parts rather than a global color sh
 
 | Stage | Commit | Controlled change | Result |
 | --- | --- | --- | --- |
-| 9 — Alpha modes | `979a9d1` | Preserve RGBA and enable MASK cutoff plus stochastic BLEND coverage during BVH traversal | [`opaque baseline`](evolution_alpha_stage9_opaque_128spp.png) · [`alpha`](evolution_alpha_stage9_alpha_128spp.png) |
+| 9 — Alpha modes | `979a9d1` | Preserve RGBA and enable MASK cutoff plus stochastic BLEND coverage during BVH traversal | [`opaque baseline`](evolution/evolution_alpha_stage9_opaque_128spp.png) · [`alpha`](evolution/evolution_alpha_stage9_alpha_128spp.png) |
 
 The official Khronos test asset exposes five authored opacity/cutoff cases in a
 single view. Both 640x360 renders use the same camera, studio lights, 128 spp,
@@ -87,7 +87,7 @@ and background through MASK/BLEND texels while OPAQUE remains solid.
 
 | Stage | Commit | Controlled change | Result |
 | --- | --- | --- | --- |
-| 10 — Texture transforms | `3273175` | Enable per-texture texCoord, offset, rotation, scale and sampler wrapping | [`baseline`](evolution_texture_stage10_baseline_128spp.png) · [`transformed`](evolution_texture_stage10_transformed_128spp.png) |
+| 10 — Texture transforms | `3273175` | Enable per-texture texCoord, offset, rotation, scale and sampler wrapping | [`baseline`](evolution/evolution_texture_stage10_baseline_128spp.png) · [`transformed`](evolution/evolution_texture_stage10_transformed_128spp.png) |
 
 The official Khronos test uses six panels to expose offset, rotation, scale and
 combined mapping errors. Both 640x360 renders use the same camera, studio lights,
@@ -99,7 +99,7 @@ three U/V/UV success panels and all green arrow targets.
 
 | Stage | Commit | Controlled change | Result |
 | --- | --- | --- | --- |
-| 11 — Clearcoat textures | `c59b535` | Enable factor (R), roughness (G), and independent coat-normal textures | [`baseline`](evolution_clearcoat_stage11_baseline_128spp.png) · [`textures`](evolution_clearcoat_stage11_textures_128spp.png) |
+| 11 — Clearcoat textures | `c59b535` | Enable factor (R), roughness (G), and independent coat-normal textures | [`baseline`](evolution/evolution_clearcoat_stage11_baseline_128spp.png) · [`textures`](evolution/evolution_clearcoat_stage11_textures_128spp.png) |
 
 The official Khronos ClearCoatTest contains 37,116 triangles and five labelled
 rows for partial coating, roughness variation, base normals, shared normals and
@@ -113,7 +113,7 @@ the clearcoat lineage popularized by the 2012 Disney principled BRDF.
 
 | Stage | Commit | Controlled change | Result |
 | --- | --- | --- | --- |
-| 12 — Sheen textures | `76403ce` | Enable sRGB color (RGB) and linear roughness (alpha) textures | [`baseline`](evolution_sheen_stage12_baseline_128spp.png) · [`textures`](evolution_sheen_stage12_textures_128spp.png) |
+| 12 — Sheen textures | `76403ce` | Enable sRGB color (RGB) and linear roughness (alpha) textures | [`baseline`](evolution/evolution_sheen_stage12_baseline_128spp.png) · [`textures`](evolution/evolution_sheen_stage12_textures_128spp.png) |
 
 The reproducible validator derives from Khronos SheenTestGrid and injects two
 procedural PNGs without changing its 21,646 triangles or 4×4 factor grid. Both
@@ -127,7 +127,7 @@ distribution published by Conty and Kulla in 2017.
 
 | Stage | Commit | Controlled change | Result |
 | --- | --- | --- | --- |
-| 13 — Transmission texture | `0f4fbbd` | Multiply dielectric transmission by the texture red channel; reframe the grid for readable labels and spheres | [`baseline`](evolution_transmission_stage13_baseline_128spp.png) · [`textures`](evolution_transmission_stage13_textures_128spp.png) |
+| 13 — Transmission texture | `0f4fbbd` | Multiply dielectric transmission by the texture red channel; reframe the grid for readable labels and spheres | [`baseline`](evolution/evolution_transmission_stage13_baseline_128spp.png) · [`textures`](evolution/evolution_transmission_stage13_textures_128spp.png) |
 
 The official CC0 Khronos TransmissionTest contains 128,775 triangles and mixes
 uniform, rough, metallic and textured transmission. Both 640x360 renders use
@@ -142,7 +142,7 @@ dates to 2020.
 
 | Stage | Commit | Controlled change | Result |
 | --- | --- | --- | --- |
-| 14 — Specular extension | `66aa5ab` | Enable factor/color and alpha/RGB texture controls for dielectric F0/F90 | [`baseline`](evolution_specular_stage14_baseline_128spp.png) · [`extension`](evolution_specular_stage14_extension_128spp.png) |
+| 14 — Specular extension | `66aa5ab` | Enable factor/color and alpha/RGB texture controls for dielectric F0/F90 | [`baseline`](evolution/evolution_specular_stage14_baseline_128spp.png) · [`extension`](evolution/evolution_specular_stage14_extension_128spp.png) |
 
 The official Khronos SpecularTest contains 44,828 triangles and seven labelled
 rows. Both 640x360 renders use the same camera, studio lights, 128 spp and seed
@@ -156,7 +156,7 @@ alpha-only texture, and the final above-one color ramp reaching mirror-like F0.
 
 | Stage | Commit | Controlled change | Result |
 | --- | --- | --- | --- |
-| 15 — Anisotropic GGX | `6a3aed7` | Enable strength, rotation and RGB direction/strength texture with matched sampling/PDF | [`baseline`](evolution_anisotropy_stage15_baseline_128spp.png) · [`extension`](evolution_anisotropy_stage15_extension_128spp.png) |
+| 15 — Anisotropic GGX | `6a3aed7` | Enable strength, rotation and RGB direction/strength texture with matched sampling/PDF | [`baseline`](evolution/evolution_anisotropy_stage15_baseline_128spp.png) · [`extension`](evolution/evolution_anisotropy_stage15_extension_128spp.png) |
 
 The official CC0 Khronos AnisotropyDiscTest contains 2,788 triangles and tests
 six base roughness values against a four-quadrant direction/strength map. Both

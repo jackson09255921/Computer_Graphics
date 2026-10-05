@@ -95,7 +95,7 @@ pipeline {
 
     post {
         always {
-            archiveArtifacts artifacts: 'build-jenkins/validation-artifacts/**/*,build-jenkins/*visual*.ppm,build-jenkins/*diff*.ppm,LabX/images/*.png', allowEmptyArchive: true
+            archiveArtifacts artifacts: 'build-jenkins/validation-artifacts/**/*,build-jenkins/*visual*.ppm,build-jenkins/*diff*.ppm,LabX/images/**/*.png', allowEmptyArchive: true
             junit testResults: 'build-jenkins/validation-artifacts/validation-report.xml', allowEmptyResults: true
         }
     }

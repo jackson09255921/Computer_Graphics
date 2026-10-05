@@ -10,7 +10,7 @@ The project implements rendering algorithms directly rather than delegating them
 to a graphics API. OpenGL/GLUT remains a presentation layer for the legacy labs;
 the reusable core and offline renderers are API-independent and headless.
 
-![ToyCar fabric sheen comparison](LabX/images/evolution_toycar_stage7_close_sheen_128spp.png)
+![ToyCar fabric sheen comparison](LabX/images/evolution/evolution_toycar_stage7_close_sheen_128spp.png)
 
 ## Current capabilities
 
@@ -79,20 +79,20 @@ possible.
 
 | Stage | Technique | Reviewed output |
 | --- | --- | --- |
-| ToyCar 3 | Three-quarter camera | [image](LabX/images/evolution_toycar_stage3_three_quarter_camera_128spp.png) |
-| ToyCar 4 | Three-light studio and multi-light MIS | [image](LabX/images/evolution_toycar_stage4_studio_lighting_128spp.png) |
-| ToyCar 5 | Clearcoat | [image](LabX/images/evolution_toycar_stage5_clearcoat_128spp.png) |
-| ToyCar 6 | Fabric sheen | [baseline](LabX/images/evolution_toycar_stage6_fabric_baseline_128spp.png) / [sheen](LabX/images/evolution_toycar_stage6_fabric_sheen_128spp.png) |
-| ToyCar 7 | Close material framing | [baseline](LabX/images/evolution_toycar_stage7_close_baseline_128spp.png) / [sheen](LabX/images/evolution_toycar_stage7_close_sheen_128spp.png) |
-| Helmet 8 | Occlusion map | [baseline](LabX/images/evolution_helmet_stage8_baseline_128spp.png) / [occlusion](LabX/images/evolution_helmet_stage8_occlusion_128spp.png) |
-| Alpha 9 | MASK and BLEND | [opaque](LabX/images/evolution_alpha_stage9_opaque_128spp.png) / [alpha](LabX/images/evolution_alpha_stage9_alpha_128spp.png) |
-| Texture 10 | KHR texture transforms | [baseline](LabX/images/evolution_texture_stage10_baseline_128spp.png) / [transformed](LabX/images/evolution_texture_stage10_transformed_128spp.png) |
-| Clearcoat 11 | Factor, roughness and coat-normal textures | [baseline](LabX/images/evolution_clearcoat_stage11_baseline_128spp.png) / [textures](LabX/images/evolution_clearcoat_stage11_textures_128spp.png) |
-| Sheen 12 | Color and alpha-channel roughness textures | [baseline](LabX/images/evolution_sheen_stage12_baseline_128spp.png) / [textures](LabX/images/evolution_sheen_stage12_textures_128spp.png) |
-| Transmission 13 | Per-pixel dielectric transmission | [baseline](LabX/images/evolution_transmission_stage13_baseline_128spp.png) / [textures](LabX/images/evolution_transmission_stage13_textures_128spp.png) |
-| Specular 14 | Dielectric F0/F90 factor and color controls | [baseline](LabX/images/evolution_specular_stage14_baseline_128spp.png) / [extension](LabX/images/evolution_specular_stage14_extension_128spp.png) |
-| Anisotropy 15 | Directional GGX strength, rotation and texture | [baseline](LabX/images/evolution_anisotropy_stage15_baseline_128spp.png) / [extension](LabX/images/evolution_anisotropy_stage15_extension_128spp.png) |
-| Mesh light 16 | Emissive triangles, NEE and BSDF/light MIS | [baseline](LabX/images/evolution_mesh_light_stage16_baseline_128spp.png) / [NEE + MIS](LabX/images/evolution_mesh_light_stage16_nee_mis_128spp.png) |
+| ToyCar 3 | Three-quarter camera | [image](LabX/images/evolution/evolution_toycar_stage3_three_quarter_camera_128spp.png) |
+| ToyCar 4 | Three-light studio and multi-light MIS | [image](LabX/images/evolution/evolution_toycar_stage4_studio_lighting_128spp.png) |
+| ToyCar 5 | Clearcoat | [image](LabX/images/evolution/evolution_toycar_stage5_clearcoat_128spp.png) |
+| ToyCar 6 | Fabric sheen | [baseline](LabX/images/evolution/evolution_toycar_stage6_fabric_baseline_128spp.png) / [sheen](LabX/images/evolution/evolution_toycar_stage6_fabric_sheen_128spp.png) |
+| ToyCar 7 | Close material framing | [baseline](LabX/images/evolution/evolution_toycar_stage7_close_baseline_128spp.png) / [sheen](LabX/images/evolution/evolution_toycar_stage7_close_sheen_128spp.png) |
+| Helmet 8 | Occlusion map | [baseline](LabX/images/evolution/evolution_helmet_stage8_baseline_128spp.png) / [occlusion](LabX/images/evolution/evolution_helmet_stage8_occlusion_128spp.png) |
+| Alpha 9 | MASK and BLEND | [opaque](LabX/images/evolution/evolution_alpha_stage9_opaque_128spp.png) / [alpha](LabX/images/evolution/evolution_alpha_stage9_alpha_128spp.png) |
+| Texture 10 | KHR texture transforms | [baseline](LabX/images/evolution/evolution_texture_stage10_baseline_128spp.png) / [transformed](LabX/images/evolution/evolution_texture_stage10_transformed_128spp.png) |
+| Clearcoat 11 | Factor, roughness and coat-normal textures | [baseline](LabX/images/evolution/evolution_clearcoat_stage11_baseline_128spp.png) / [textures](LabX/images/evolution/evolution_clearcoat_stage11_textures_128spp.png) |
+| Sheen 12 | Color and alpha-channel roughness textures | [baseline](LabX/images/evolution/evolution_sheen_stage12_baseline_128spp.png) / [textures](LabX/images/evolution/evolution_sheen_stage12_textures_128spp.png) |
+| Transmission 13 | Per-pixel dielectric transmission | [baseline](LabX/images/evolution/evolution_transmission_stage13_baseline_128spp.png) / [textures](LabX/images/evolution/evolution_transmission_stage13_textures_128spp.png) |
+| Specular 14 | Dielectric F0/F90 factor and color controls | [baseline](LabX/images/evolution/evolution_specular_stage14_baseline_128spp.png) / [extension](LabX/images/evolution/evolution_specular_stage14_extension_128spp.png) |
+| Anisotropy 15 | Directional GGX strength, rotation and texture | [baseline](LabX/images/evolution/evolution_anisotropy_stage15_baseline_128spp.png) / [extension](LabX/images/evolution/evolution_anisotropy_stage15_extension_128spp.png) |
+| Mesh light 16 | Emissive triangles, NEE and BSDF/light MIS | [baseline](LabX/images/evolution/evolution_mesh_light_stage16_baseline_128spp.png) / [NEE + MIS](LabX/images/evolution/evolution_mesh_light_stage16_nee_mis_128spp.png) |
 
 See the complete [rendering evolution log](LabX/images/EVOLUTION.md) and
 [reviewed image gallery](LabX/images/README.md).

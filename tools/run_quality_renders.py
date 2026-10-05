@@ -31,8 +31,9 @@ def main() -> int:
     def publish(source: pathlib.Path, destination: str, dimensions: tuple[int, int], name: str) -> None:
         begin = time.monotonic()
         result = validate_image(source, dimensions)
+        category = "evolution" if destination.startswith("evolution_") else "quality"
         result.update(name=name, seconds=round(time.monotonic() - begin, 3),
-                      published=publish_png(source, gallery / destination))
+                      published=publish_png(source, gallery / category / destination))
         results.append(result)
 
     cpu_output = artifacts / f"cpu_pathtracer_{args.cpu_spp}spp.bmp"
