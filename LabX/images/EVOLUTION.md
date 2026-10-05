@@ -105,7 +105,7 @@ The official Khronos ClearCoatTest contains 37,116 triangles and five labelled
 rows for partial coating, roughness variation, base normals, shared normals and
 independent coat normals. Both 640x360 renders use the same camera, studio
 lights, 128 spp and seed `0xC0FFEE`. Enabling the three texture slots changes
-19,676 pixels with a 0.249 channel MAE and maximum channel delta of 135. Both
+17,133 pixels with a 0.217 channel MAE and maximum channel delta of 134. Both
 PNGs were read back and inspected at native resolution. The layered model follows
 the clearcoat lineage popularized by the 2012 Disney principled BRDF.
 
@@ -118,8 +118,8 @@ the clearcoat lineage popularized by the 2012 Disney principled BRDF.
 The reproducible validator derives from Khronos SheenTestGrid and injects two
 procedural PNGs without changing its 21,646 triangles or 4×4 factor grid. Both
 640x360 renders use the same camera, studio lights, 128 spp and seed
-`0xC0FFEE`. Enabling the texture slots changes 50,913 pixels with a 0.702
-channel MAE and maximum channel delta of 90. Both PNGs were read back and
+`0xC0FFEE`. Enabling the texture slots changes 53,905 pixels with a 0.770
+channel MAE and maximum channel delta of 80. Both PNGs were read back and
 inspected at native resolution. The material lobe uses the Charlie microfiber
 distribution published by Conty and Kulla in 2017.
 
@@ -161,8 +161,8 @@ alpha-only texture, and the final above-one color ramp reaching mirror-like F0.
 The official CC0 Khronos AnisotropyDiscTest contains 2,788 triangles and tests
 six base roughness values against a four-quadrant direction/strength map. Both
 640x360 renders use the same camera, studio lights, 128 spp and seed
-`0xC0FFEE`. Anisotropy changes 56,399 pixels with a 0.757 channel MAE and
-maximum channel delta of 160. Native review confirms rotated elongated
+`0xC0FFEE`. Anisotropy changes 92,263 pixels with a 1.706 channel MAE and
+maximum channel delta of 157. Native review confirms rotated elongated
 highlights at low roughness and the expected disappearance of anisotropy as
 roughness approaches one. The implementation uses the Khronos alpha formula
 `mix(roughness², 1, strength²)` consistently in BRDF, Smith masking, sampling
@@ -170,7 +170,8 @@ and PDF. `KHR_materials_anisotropy` was ratified in 2023.
 
 ## Rules for future stages
 
-1. Use a new descriptive filename; never replace a reviewed image.
+1. Use a new descriptive filename for a new technique. A corrected camera may
+   replace the same stage only when the validation record explains why.
 2. Change one major variable per commit.
 3. Record resolution, SPP, seed, model, and active material features.
 4. Run automated image validation and inspect the PNG at native resolution.

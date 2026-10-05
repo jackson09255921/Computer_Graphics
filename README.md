@@ -95,7 +95,9 @@ possible.
 | Mesh light 16 | Emissive triangles, NEE and BSDF/light MIS | [baseline](LabX/images/evolution/evolution_mesh_light_stage16_baseline_128spp.png) / [NEE + MIS](LabX/images/evolution/evolution_mesh_light_stage16_nee_mis_128spp.png) |
 
 See the complete [rendering evolution log](LabX/images/EVOLUTION.md) and
-[reviewed image gallery](LabX/images/README.md).
+[reviewed image gallery](LabX/images/README.md). The latest
+[full visual audit](LabX/images/VALIDATION.md) records regenerated outputs,
+measured baseline/feature differences, fixes, and remaining limitations.
 
 ## Repository layout
 

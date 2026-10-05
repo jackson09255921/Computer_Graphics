@@ -19,11 +19,14 @@ shortlist, it is supporting evidence rather than a portfolio highlight.
 | 1 | [Mesh-light NEE + MIS](evolution/evolution_mesh_light_stage16_nee_mis_128spp.png) | Most direct proof that emissive geometry now lights other objects with stable soft shadows |
 | 2 | [Transmission textures](evolution/evolution_transmission_stage13_textures_128spp.png) | Readable labelled grid showing glass, rough transmission, metallic transmission and texture masks |
 | 3 | [ToyCar close sheen](evolution/evolution_toycar_stage7_close_sheen_128spp.png) | Strongest complete-object material presentation with recognizable geometry and cloth folds |
-| 4 | [Clearcoat textures](evolution/evolution_clearcoat_stage11_textures_128spp.png) | Controlled clearcoat factor, roughness and coat-normal validation |
-| 5 | [Specular extension](evolution/evolution_specular_stage14_extension_128spp.png) | Labelled F0/F90 factor and color test |
-| 6 | [Anisotropic GGX](evolution/evolution_anisotropy_stage15_extension_128spp.png) | Directional highlight rotation and stretching |
-| 7 | [CUDA multi-asset quality scene](quality/quality_cuda_multi_asset_128spp.png) | High-resolution multi-object integration render |
-| 8 | [CPU path tracer reference](quality/quality_cpu_pathtracer_512spp.png) | Stable CPU reference for indirect light, reflection, glass and soft shadows |
+| 4 | [Texture transforms](evolution/evolution_texture_stage10_transformed_128spp.png) | Very clear U/V/UV success panels and mapping targets |
+| 5 | [Alpha MASK/BLEND](evolution/evolution_alpha_stage9_alpha_128spp.png) | Labelled coverage and cutoff panels with visible background exposure |
+| 6 | [Specular extension](evolution/evolution_specular_stage14_extension_128spp.png) | Labelled F0/F90 factor and color test |
+| 7 | [Anisotropic GGX](evolution/evolution_anisotropy_stage15_extension_128spp.png) | Directional highlight rotation and stretching across roughness values |
+| 8 | [CUDA multi-asset quality scene](quality/quality_cuda_multi_asset_128spp.png) | High-resolution multi-object integration render |
+
+See [the latest full visual audit](VALIDATION.md) for measured differences,
+corrected images, and remaining limitations.
 
 ## Folder policy
 
