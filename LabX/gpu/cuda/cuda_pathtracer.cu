@@ -1673,21 +1673,23 @@ std::vector<MeshLight> build_mesh_lights(std::vector<Triangle>& triangles,
                                          const ImportedAssets& imported,
                                          float& total_weight) {
     std::vector<MeshLight> result;
+    std::vector<float3> average_textures(imported.textures.size(), make_float3(1.0f, 1.0f, 1.0f));
+    for (std::size_t texture_index = 0; texture_index < imported.textures.size(); ++texture_index) {
+        const TextureDescriptor& descriptor = imported.textures[texture_index];
+        float3 average = make_float3(0, 0, 0);
+        const int pixel_count = descriptor.width * descriptor.height;
+        for (int index = 0; index < pixel_count; ++index) {
+            const float4 pixel = imported.texture_pixels[descriptor.offset + index];
+            average = add(average, make_float3(pixel.x, pixel.y, pixel.z));
+        }
+        if (pixel_count > 0) average_textures[texture_index] = mul(average, 1.0f / static_cast<float>(pixel_count));
+    }
     total_weight = 0.0f;
     for (std::size_t triangle_index = 0; triangle_index < triangles.size(); ++triangle_index) {
         Triangle& triangle = triangles[triangle_index];
         float3 average_texture = make_float3(1.0f, 1.0f, 1.0f);
-        if (triangle.emissive_texture_index >= 0) {
-            const TextureDescriptor& descriptor = imported.textures.at(
-                static_cast<std::size_t>(triangle.emissive_texture_index));
-            average_texture = make_float3(0, 0, 0);
-            const int pixel_count = descriptor.width * descriptor.height;
-            for (int index = 0; index < pixel_count; ++index) {
-                const float4 pixel = imported.texture_pixels[descriptor.offset + index];
-                average_texture = add(average_texture, make_float3(pixel.x, pixel.y, pixel.z));
-            }
-            if (pixel_count > 0) average_texture = mul(average_texture, 1.0f / static_cast<float>(pixel_count));
-        }
+        if (triangle.emissive_texture_index >= 0)
+            average_texture = average_textures.at(static_cast<std::size_t>(triangle.emissive_texture_index));
         const float3 average_emission = mul(triangle.emissive, average_texture);
         const float luminance = 0.2126f * average_emission.x + 0.7152f * average_emission.y +
                                 0.0722f * average_emission.z;
@@ -2074,9 +2076,9 @@ int main(int argc, char** argv) {
             const int model_count = argc - 4;
             for (int model = 0; model < model_count; ++model) {
                 ImportedAssets mesh = load_gltf_triangles(argv[model + 4]);
-                const float x = (static_cast<float>(model) - 0.5f * static_cast<float>(model_count - 1)) * 1.35f;
+                const float x = (static_cast<float>(model) - 0.5f * static_cast<float>(model_count - 1)) * 2.25f;
                 const float z = -4.3f - 0.35f * static_cast<float>(model % 2);
-                frame_imported_triangles(mesh.triangles, 1.3f, x, z);
+                frame_imported_triangles(mesh.triangles, 2.2f, x, z);
                 append_imported(imported, std::move(mesh));
             }
         } else if (gltf_mode || showcase_mode || showcase_angle_mode || showcase_studio_mode ||
@@ -2091,11 +2093,11 @@ int main(int argc, char** argv) {
                 "usage: cuda_pathtracer --gltf|--showcase|--showcase-angle|--showcase-studio|--fabric-baseline|--fabric-sheen|--fabric-close-baseline|--fabric-close-sheen|--occlusion-baseline|--occlusion|--alpha-baseline|--alpha|--texture-transform-baseline|--texture-transform model.gltf [output.bmp] [spp] [environment.hdr]");
             imported = load_gltf_triangles(argv[2]);
             if (showcase_mode || showcase_angle_mode || showcase_studio_mode) {
-                frame_imported_triangles(imported.triangles, 3.8f, 0.0f, -4.5f, 1);
+                frame_imported_triangles(imported.triangles, 5.0f, 0.0f, -4.5f, 1);
             }
             if (showcase_angle_mode || showcase_studio_mode) {
                 camera = {make_float3(2.5f, 0.35f, 1.8f),
-                          make_float3(0.0f, -0.15f, -4.35f), 43.0f};
+                          make_float3(0.0f, -0.05f, -4.35f), 39.0f};
             }
             else if (fabric_baseline_mode || fabric_sheen_mode) {
                 frame_imported_triangles(imported.triangles, 3.6f, 0.0f, -4.5f);
@@ -2123,14 +2125,14 @@ int main(int argc, char** argv) {
                           make_float3(0.0f, 0.25f, -4.4f), 42.0f};
             }
             else if (clearcoat_texture_baseline_mode || clearcoat_texture_mode) {
-                frame_imported_triangles(imported.triangles, 4.5f, 0.0f, -4.5f);
+                frame_imported_triangles(imported.triangles, 3.7f, 0.0f, -4.5f);
                 camera = {make_float3(0.6f, 0.45f, 1.6f),
-                          make_float3(0.0f, 0.0f, -4.4f), 43.0f};
+                          make_float3(0.0f, 0.25f, -4.4f), 39.0f};
             }
             else if (sheen_texture_baseline_mode || sheen_texture_mode) {
                 frame_imported_triangles(imported.triangles, 4.8f, 0.0f, -4.5f);
                 camera = {make_float3(0.45f, 0.45f, 1.6f),
-                          make_float3(0.0f, 0.0f, -4.4f), 44.0f};
+                          make_float3(0.0f, 0.1f, -4.4f), 42.0f};
             }
             else if (transmission_texture_baseline_mode || transmission_texture_mode) {
                 frame_imported_triangles(imported.triangles, 6.0f, 0.0f, -4.5f);
@@ -2143,11 +2145,15 @@ int main(int argc, char** argv) {
                           make_float3(0.0f, 0.0f, -4.4f), 44.0f};
             }
             else if (anisotropy_baseline_mode || anisotropy_mode) {
-                frame_imported_triangles(imported.triangles, 4.4f, 0.0f, -4.5f);
-                camera = {make_float3(0.55f, 0.55f, 1.6f),
-                          make_float3(0.0f, 0.0f, -4.4f), 43.0f};
+                frame_imported_triangles(imported.triangles, 5.8f, 0.0f, -4.5f);
+                camera = {make_float3(0.2f, 0.5f, 1.6f),
+                          make_float3(0.0f, 0.15f, -4.4f), 38.0f};
             }
-            else frame_imported_triangles(imported.triangles);
+            else {
+                frame_imported_triangles(imported.triangles, 4.0f);
+                camera = {make_float3(0.0f, 0.75f, 2.8f),
+                          make_float3(0.0f, 0.3f, -4.0f), 43.0f};
+            }
             if (showcase_studio_mode || fabric_baseline_mode || fabric_close_baseline_mode)
                 for (Triangle& triangle : imported.triangles)
                     triangle.sheen_color = make_float3(0, 0, 0);
